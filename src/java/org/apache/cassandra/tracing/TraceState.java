@@ -19,36 +19,30 @@ package org.apache.cassandra.tracing;
 
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.base.Stopwatch;
+import org.apache.cassandra.concurrent.Stage;
+import org.apache.cassandra.concurrent.StageManager;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.JVMStabilityInspector;
+import org.apache.cassandra.utils.progress.ProgressEvent;
+import org.apache.cassandra.utils.progress.ProgressEventNotifier;
+import org.apache.cassandra.utils.progress.ProgressListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.MessageFormatter;
 
-import org.apache.cassandra.concurrent.Stage;
-import org.apache.cassandra.concurrent.StageManager;
-import org.apache.cassandra.db.ConsistencyLevel;
-import org.apache.cassandra.db.Mutation;
-import org.apache.cassandra.exceptions.OverloadedException;
-import org.apache.cassandra.service.StorageProxy;
-import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.JVMStabilityInspector;
-import org.apache.cassandra.utils.WrappedRunnable;
-import org.apache.cassandra.utils.progress.ProgressEvent;
-import org.apache.cassandra.utils.progress.ProgressEventNotifier;
-import org.apache.cassandra.utils.progress.ProgressListener;
+import com.google.common.base.Stopwatch;
 
 /**
  * ThreadLocal state for a tracing session. The presence of an instance of this class as a ThreadLocal denotes that an
  * operation is being traced.
  */
-public class TraceState implements ProgressEventNotifier
+public abstract class TraceState implements ProgressEventNotifier
 {
     private static final Logger logger = LoggerFactory.getLogger(TraceState.class);
     private static final int WAIT_FOR_PENDING_EVENTS_TIMEOUT_SECS =
@@ -78,7 +72,7 @@ public class TraceState implements ProgressEventNotifier
     // See CASSANDRA-7626 for more details.
     private final AtomicInteger references = new AtomicInteger(1);
 
-    public TraceState(InetAddress coordinator, UUID sessionId, Tracing.TraceType traceType)
+    protected TraceState(InetAddress coordinator, UUID sessionId, Tracing.TraceType traceType)
     {
         assert coordinator != null;
         assert sessionId != null;
@@ -90,7 +84,7 @@ public class TraceState implements ProgressEventNotifier
         this.ttl = traceType.getTTL();
         watch = Stopwatch.createStarted();
         this.status = Status.IDLE;
-}
+    }
 
     /**
      * Activate notification with provided {@code tag} name.
@@ -160,7 +154,7 @@ public class TraceState implements ProgressEventNotifier
         return status;
     }
 
-    private synchronized void notifyActivity()
+    protected synchronized void notifyActivity()
     {
         status = Status.ACTIVE;
         notifyAll();
@@ -186,12 +180,7 @@ public class TraceState implements ProgressEventNotifier
         if (notify)
             notifyActivity();
 
-        final String threadName = Thread.currentThread().getName();
-        final int elapsed = elapsed();
-
-        executeMutation(TraceKeyspace.makeEventMutation(sessionIdBytes, message, elapsed, threadName, ttl));
-        if (logger.isTraceEnabled())
-            logger.trace("Adding <{}> to trace events", message);
+        traceImpl(message);
 
         for (ProgressListener listener : listeners)
         {
@@ -199,45 +188,7 @@ public class TraceState implements ProgressEventNotifier
         }
     }
 
-    static void executeMutation(final Mutation mutation)
-    {
-        StageManager.getStage(Stage.TRACING).execute(new WrappedRunnable()
-        {
-            protected void runMayThrow() throws Exception
-            {
-                mutateWithCatch(mutation);
-            }
-        });
-    }
-
-    /**
-     * Called from {@link org.apache.cassandra.net.OutboundTcpConnection} for non-local traces (traces
-     * that are not initiated by local node == coordinator).
-     */
-    public static void mutateWithTracing(final ByteBuffer sessionId, final String message, final int elapsed, final int ttl)
-    {
-        final String threadName = Thread.currentThread().getName();
-
-        StageManager.getStage(Stage.TRACING).execute(new WrappedRunnable()
-        {
-            public void runMayThrow()
-            {
-                mutateWithCatch(TraceKeyspace.makeEventMutation(sessionId, message, elapsed, threadName, ttl));
-            }
-        });
-    }
-
-    static void mutateWithCatch(Mutation mutation)
-    {
-        try
-        {
-            StorageProxy.mutate(Collections.singletonList(mutation), ConsistencyLevel.ANY);
-        }
-        catch (OverloadedException e)
-        {
-            Tracing.logger.warn("Too many nodes are overloaded to save trace events");
-        }
-    }
+    protected abstract void traceImpl(String message);
 
     /**
      * Post a no-op event to the TRACING stage, so that we can be sure that any previous mutations
