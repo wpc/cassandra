@@ -4,5 +4,11 @@
   "base" : "git:HEAD^, hg:.^",
   "git:arc.feature.start.default" : "origin/trunk",
   "arc.land.onto.default" : "trunk",
-  "git.default-relative-commit" : "HEAD^"
+  "git.default-relative-commit" : "HEAD^",
+  "phutil_libraries" : {
+    "igcassandra-arcanist" : "arcanist/"
+   },
+  "events.listeners" : [
+    "FacebookDiffCreatedListener"
+  ]
 }
