@@ -1207,6 +1207,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     }
 
+    public void apply_rocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition replayPosition)
+    {
+
+    }
+
     /**
      * @param sstables
      * @return sstables whose key range overlaps with that of the given sstables, not including itself.
