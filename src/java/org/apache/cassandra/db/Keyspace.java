@@ -570,7 +570,16 @@ public class Keyspace
                 UpdateTransaction indexTransaction = updateIndexes
                                                      ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
                                                      : UpdateTransaction.NO_OP;
-                cfs.apply(upd, indexTransaction, opGroup, replayPosition);
+
+                if (this.getName().equals("rocksdb"))
+                {
+                    cfs.apply_rocksdb(upd, indexTransaction, opGroup, replayPosition);
+                }
+                else
+                {
+                    cfs.apply(upd, indexTransaction, opGroup, replayPosition);
+                }
+
                 if (requiresViewUpdate)
                     baseComplete.set(System.currentTimeMillis());
             }

@@ -822,7 +822,7 @@ public final class CFMetaData
         return columnMetadata.get(name.bytes);
     }
 
-    // In general it is preferable to work with ColumnIdentifier to make it
+    // In general it is preferable to work with ColumnIdentifiear to make it
     // clear that we are talking about a CQL column, not a cell name, but there
     // is a few cases where all we have is a ByteBuffer (when dealing with IndexExpression
     // for instance) so...

@@ -48,6 +48,9 @@ import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.apache.cassandra.db.compaction.*;
 import org.apache.cassandra.db.filter.ClusteringIndexFilter;
 import org.apache.cassandra.db.filter.DataLimits;
+import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.ColumnData;
+import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.view.TableViews;
 import org.apache.cassandra.db.lifecycle.*;
 import org.apache.cassandra.db.partitions.CachedPartition;
@@ -74,11 +77,15 @@ import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.TopKSampler.SamplerResult;
+import org.apache.cassandra.utils.btree.BTreeSearchIterator;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -220,6 +227,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private final ScheduledFuture<?> latencyCalculator;
 
     private volatile boolean compactionSpaceCheck = true;
+    private RocksDB db = null;
+    private Options options = null;
+
 
     public static void shutdownPostFlushExecutor() throws InterruptedException
     {
@@ -253,6 +263,19 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         // because the old one still aliases the previous comparator.
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
+
+        if (keyspace.getName().equals("rocksdb"))
+        {
+            options = new Options().setCreateIfMissing(true);
+            try
+            {
+                db = RocksDB.open(options, "/data/rocksdb/" + keyspace.getName() + "/" + name);
+            }
+            catch (RocksDBException e)
+            {
+                e.printStackTrace();
+            }
+        }
     }
 
     void scheduleFlush()
@@ -465,6 +488,22 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             latencyCalculator = ScheduledExecutors.optionalTasks.schedule(Runnables.doNothing(), 0, TimeUnit.NANOSECONDS);
             mbeanName = null;
             oldMBeanName= null;
+        }
+
+        if (keyspace.getName().equals("rocksdb"))
+        {
+            options = new Options().setCreateIfMissing(true);
+            try
+            {
+                logger.info("DDDDikang: open rocksdb");
+                db = RocksDB.open(options, "/data/rocksdb/" + keyspace.getName() + "/" + name);
+                logger.info("DDDDikang: opened rocksdb");
+            }
+            catch (RocksDBException e)
+            {
+                logger.error(e.toString(), e);
+                e.printStackTrace();
+            }
         }
     }
 
@@ -1207,9 +1246,33 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     }
 
-    public void apply_rocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition replayPosition)
+    public void apply_rocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition commitLogPosition)
     {
+        ByteBuffer key = update.partitionKey().getKey();
+        for (Row row: update)
+        {
+            for (ColumnDefinition colDef : row.columns())
+            {
+                if (colDef.isComplex())
+                    continue;
 
+                ByteBuffer col_name = colDef.name.bytes;
+                Cell cell = row.getCell(colDef);
+                ByteBuffer value = cell.value();
+
+                ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(key).put(col_name);
+
+                try
+                {
+                    logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
+                    db.put(rocksdb_key.array(), value.array());
+                }
+                catch (RocksDBException e)
+                {
+                    logger.error(e.toString(), e);
+                }
+            }
+        }
     }
 
     /**
