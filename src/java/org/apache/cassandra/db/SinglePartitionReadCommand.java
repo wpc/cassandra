@@ -496,6 +496,11 @@ public class SinglePartitionReadCommand extends ReadCommand
         return queryMemtableAndDiskInternal(cfs, copyOnHeap);
     }
 
+    public UnfilteredRowIterator queryRocksDB(ColumnFamilyStore cfs)
+    {
+        return null;
+    }
+
     @Override
     protected int oldestUnrepairedTombstone()
     {

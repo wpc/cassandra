@@ -113,7 +113,6 @@ public final class CFMetaData
     // that as convenience to access that column more easily (but we could replace calls by partitionColumns().iterator().next()
     // for those tables in practice).
     private volatile ColumnDefinition compactValueColumn;
-
     /*
      * All of these methods will go away once CFMetaData becomes completely immutable.
      */
@@ -938,6 +937,10 @@ public final class CFMetaData
                 if (isDense())
                     this.compactValueColumn = def;
                 break;
+        }
+        if (this.ksName.equals("rocksdb"))
+        {
+            logger.info("DDDDDDikang: put: " + new String(def.name.bytes.array()));
         }
         this.columnMetadata.put(def.name.bytes, def);
         return this;

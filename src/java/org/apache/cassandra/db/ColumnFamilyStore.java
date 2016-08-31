@@ -1256,7 +1256,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 if (colDef.isComplex())
                     continue;
 
-                ByteBuffer col_name = colDef.name.bytes;
+                ByteBuffer col_name = colDef.name.bytes.duplicate();
                 Cell cell = row.getCell(colDef);
                 ByteBuffer value = cell.value();
 
@@ -1264,7 +1264,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
                 try
                 {
-                    logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
+                    //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
                     db.put(rocksdb_key.array(), value.array());
                 }
                 catch (RocksDBException e)
