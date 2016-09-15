@@ -78,6 +78,14 @@ public class RandomPartitioner implements IPartitioner
         return new BigIntegerToken(token);
     }
 
+    public BigIntegerToken getRandomToken(Random random)
+    {
+        BigInteger token = FBUtilities.hashToBigInteger(GuidGenerator.guidAsBytes(random));
+        if ( token.signum() == -1 )
+            token = token.multiply(BigInteger.valueOf(-1L));
+        return new BigIntegerToken(token);
+    }
+
     private final Token.TokenFactory tokenFactory = new Token.TokenFactory() {
         public ByteBuffer toByteArray(Token token)
         {
@@ -153,6 +161,19 @@ public class RandomPartitioner implements IPartitioner
         public long getHeapSize()
         {
             return HEAP_SIZE;
+        }
+
+        public Token increaseSlightly()
+        {
+            return new BigIntegerToken(token.add(BigInteger.ONE));
+        }
+
+        public double size(Token next)
+        {
+            BigIntegerToken n = (BigIntegerToken) next;
+            BigInteger v = n.token.subtract(token);  // Overflow acceptable and desired.
+            double d = Math.scalb(v.doubleValue(), -127); // Scale so that the full range is 1.
+            return d > 0.0 ? d : (d + 1.0); // Adjust for signed long, also making sure t.size(t) == 1.
         }
     }
 
