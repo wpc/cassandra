@@ -52,9 +52,12 @@ import org.apache.cassandra.thrift.ThriftResultsMerger;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.SearchIterator;
+import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.BTreeSet;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.memory.HeapAllocator;
+
+import org.rocksdb.RocksDBException;
 
 
 /**
@@ -498,7 +501,50 @@ public class SinglePartitionReadCommand extends ReadCommand
 
     public UnfilteredRowIterator queryRocksDB(ColumnFamilyStore cfs)
     {
-        return null;
+        ByteBuffer key = partitionKey().getKey();
+
+        Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
+
+        List<Clustering> values = new ArrayList<>();
+        while (iter_col.hasNext())
+        {
+            ByteBuffer col_name = iter_col.next().name.bytes.duplicate();
+            ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(key).put(col_name);
+            try
+            {
+                byte[] value = cfs.db.get(rocksdb_key.array());
+                values.add(Clustering.make(ByteBuffer.wrap(value)));
+            }
+            catch (RocksDBException e)
+            {
+                e.printStackTrace();
+            }
+        }
+
+        Iterator<Clustering> iter = values.iterator();
+
+        CFMetaData rockscf = cfs.metadata;
+
+
+        return new AbstractUnfilteredRowIterator(cfs.metadata,
+                                                 partitionKey(),
+                                                 DeletionTime.LIVE,
+                                                 columnFilter().fetchedColumns(),
+                                                 null,
+                                                 false,
+                                                 EncodingStats.NO_STATS)
+        {
+            protected Unfiltered computeNext()
+            {
+                if (!iter.hasNext())
+                    return endOfData();
+
+                return BTreeRow.create(iter.next(),
+                                       LivenessInfo.EMPTY,
+                                       Row.Deletion.regular(DeletionTime.LIVE),
+                                       BTree.empty());
+            }
+        };
     }
 
     @Override

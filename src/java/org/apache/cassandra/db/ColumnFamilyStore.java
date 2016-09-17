@@ -227,7 +227,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private final ScheduledFuture<?> latencyCalculator;
 
     private volatile boolean compactionSpaceCheck = true;
-    private RocksDB db = null;
+    public RocksDB db = null;
     private Options options = null;
 
 
