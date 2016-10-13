@@ -69,10 +69,9 @@ public class GuidGenerator {
         return convertToStandardFormat( sb.toString() );
     }
 
-    public static ByteBuffer guidAsBytes(Random random)
+    public static ByteBuffer guidAsBytes(Random random, long time)
     {
         StringBuilder sbValueBeforeMD5 = new StringBuilder();
-        long time = System.currentTimeMillis();
         long rand = 0;
         rand = random.nextLong();
         sbValueBeforeMD5.append(s_id)
@@ -87,7 +86,7 @@ public class GuidGenerator {
 
     public static ByteBuffer guidAsBytes()
     {
-        return guidAsBytes(myRand);
+        return guidAsBytes(myRand, System.currentTimeMillis());
     }
 
     /*
