@@ -57,6 +57,7 @@ import org.apache.cassandra.utils.btree.BTreeSet;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.memory.HeapAllocator;
 
+import org.apache.cassandra.utils.btree.UpdateFunction;
 import org.rocksdb.RocksDBException;
 
 
@@ -495,6 +496,9 @@ public class SinglePartitionReadCommand extends ReadCommand
     {
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
+        if (cfs.keyspace.getName().equals("rocksdb"))
+            return queryRocksDB(cfs);
+
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();
         return queryMemtableAndDiskInternal(cfs, copyOnHeap);
     }
@@ -505,15 +509,21 @@ public class SinglePartitionReadCommand extends ReadCommand
 
         Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
 
-        List<Clustering> values = new ArrayList<>();
+        //List<Clustering> values = new ArrayList<>();
+        List<ColumnData> dataBuffer = new ArrayList<>();
         while (iter_col.hasNext())
         {
-            ByteBuffer col_name = iter_col.next().name.bytes.duplicate();
-            ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(key).put(col_name);
+            ColumnDefinition col_def = iter_col.next();
+            ByteBuffer row_key = partitionKey().getKey().duplicate();
+            ByteBuffer col_name = col_def.name.bytes.duplicate();
+            ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(row_key).put(col_name);
             try
             {
                 byte[] value = cfs.db.get(rocksdb_key.array());
-                values.add(Clustering.make(ByteBuffer.wrap(value)));
+                //values.add(cfs.metadata.comparator.make(ByteBuffer.wrap(value)));
+                logger.info(new String(value));
+                Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME, ByteBuffer.wrap(value), null);
+                dataBuffer.add(cell);
             }
             catch (RocksDBException e)
             {
@@ -521,12 +531,10 @@ public class SinglePartitionReadCommand extends ReadCommand
             }
         }
 
-        Iterator<Clustering> iter = values.iterator();
+        Iterator<List<ColumnData>> rowIter = Collections.singletonList(dataBuffer).iterator();
+        Clustering clustering = cfs.metadata.comparator.make();
 
-        CFMetaData rockscf = cfs.metadata;
-
-
-        return new AbstractUnfilteredRowIterator(cfs.metadata,
+        AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
                                                  partitionKey(),
                                                  DeletionTime.LIVE,
                                                  columnFilter().fetchedColumns(),
@@ -536,15 +544,19 @@ public class SinglePartitionReadCommand extends ReadCommand
         {
             protected Unfiltered computeNext()
             {
-                if (!iter.hasNext())
+                if (!rowIter.hasNext())
                     return endOfData();
 
-                return BTreeRow.create(iter.next(),
+                return BTreeRow.create(clustering,
                                        LivenessInfo.EMPTY,
                                        Row.Deletion.regular(DeletionTime.LIVE),
-                                       BTree.empty());
+                                       BTree.build(rowIter.next(), UpdateFunction.<ColumnData>noOp()));
             }
         };
+
+        //logger.info(iterator.next().toString(cfs.metadata));
+
+        return iterator;
     }
 
     @Override
