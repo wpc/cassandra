@@ -938,10 +938,6 @@ public final class CFMetaData
                     this.compactValueColumn = def;
                 break;
         }
-        if (this.ksName.equals("rocksdb"))
-        {
-            logger.info("DDDDDDikang: put: " + new String(def.name.bytes.array()));
-        }
         this.columnMetadata.put(def.name.bytes, def);
         return this;
     }
