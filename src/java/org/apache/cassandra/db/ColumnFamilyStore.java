@@ -1249,28 +1249,41 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     public void apply_rocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition commitLogPosition)
     {
         ByteBuffer key = update.partitionKey().getKey();
+
         for (Row row: update)
         {
-            for (ColumnDefinition colDef : row.columns())
+            applyRowToRocksDB(key, row);
+        }
+
+        Row staticRow = update.staticRow();
+        if (!staticRow.isEmpty())
+        {
+            applyRowToRocksDB(key, staticRow);
+        }
+
+    }
+
+    private void applyRowToRocksDB(ByteBuffer key, Row row)
+    {
+        for (ColumnDefinition colDef : row.columns())
+        {
+            if (colDef.isComplex())
+                continue;
+
+            ByteBuffer col_name = colDef.name.bytes.duplicate();
+            Cell cell = row.getCell(colDef);
+            ByteBuffer value = cell.value();
+
+            ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(key).put(col_name);
+
+            try
             {
-                if (colDef.isComplex())
-                    continue;
-
-                ByteBuffer col_name = colDef.name.bytes.duplicate();
-                Cell cell = row.getCell(colDef);
-                ByteBuffer value = cell.value();
-
-                ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(key).put(col_name);
-
-                try
-                {
-                    //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                    db.put(rocksdb_key.array(), value.array());
-                }
-                catch (RocksDBException e)
-                {
-                    logger.error(e.toString(), e);
-                }
+                //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
+                db.put(rocksdb_key.array(), value.array());
+            }
+            catch (RocksDBException e)
+            {
+                logger.error(e.toString(), e);
             }
         }
     }
