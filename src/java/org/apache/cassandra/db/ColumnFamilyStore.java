@@ -269,6 +269,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             options = new Options().setCreateIfMissing(true);
             try
             {
+                options.setAllowConcurrentMemtableWrite(true);
+                options.setEnableWriteThreadAdaptiveYield(true);
+                options.setBytesPerSync(1024*1024);
+
                 db = RocksDB.open(options, "/data/rocksdb/" + keyspace.getName() + "/" + name);
             }
             catch (RocksDBException e)
