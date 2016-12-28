@@ -573,7 +573,7 @@ public class Keyspace
 
                 if (this.getName().equals("rocksdb"))
                 {
-                    cfs.apply_rocksdb(upd, indexTransaction, opGroup, replayPosition);
+                    cfs.applyRocksdb(upd, indexTransaction, opGroup, replayPosition);
                 }
                 else
                 {

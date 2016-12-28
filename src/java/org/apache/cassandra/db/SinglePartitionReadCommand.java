@@ -506,7 +506,6 @@ public class SinglePartitionReadCommand extends ReadCommand
     public UnfilteredRowIterator queryRocksDB(ColumnFamilyStore cfs)
     {
         ByteBuffer key = partitionKey().getKey();
-
         Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
 
         //List<Clustering> values = new ArrayList<>();
@@ -517,10 +516,13 @@ public class SinglePartitionReadCommand extends ReadCommand
             ByteBuffer row_key = partitionKey().getKey().duplicate();
             ByteBuffer col_name = col_def.name.bytes.duplicate();
             ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(row_key).put(col_name);
+            logger.debug("DDDDDikang: query key: " + new String(rocksdb_key.array()) + " cf: " + cfs.name);
             try
             {
                 byte[] value = cfs.db.get(rocksdb_key.array());
                 //values.add(cfs.metadata.comparator.make(ByteBuffer.wrap(value)));
+                if (value == null)
+                    continue;
                 logger.info(new String(value));
                 Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME, ByteBuffer.wrap(value), null);
                 dataBuffer.add(cell);
@@ -532,7 +534,7 @@ public class SinglePartitionReadCommand extends ReadCommand
         }
 
         Iterator<List<ColumnData>> rowIter = Collections.singletonList(dataBuffer).iterator();
-        Clustering clustering = cfs.metadata.comparator.make();
+        Clustering clustering = cfs.metadata.getKeyValidatorAsClusteringComparator().make();
 
         AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
                                                  partitionKey(),
