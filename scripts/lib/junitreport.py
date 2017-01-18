@@ -16,8 +16,6 @@ def _testname(testcase_element):
 
 def failures(test_summary):
     doc = ElementTree(file=test_summary)
-    return [TestFailure(_testname(t), t.find('./failure').text) for t in doc.findall('.//testcase[failure]')]
-
-def errors(test_summary):
-    doc = ElementTree(file=test_summary)
-    return [TestFailure(_testname(t), t.find('./error').text) for t in doc.findall('.//testcase[error]')]
+    failures = [TestFailure(_testname(t), t.find('./failure').text) for t in doc.findall('.//testcase[failure]')]
+    errors = [TestFailure(_testname(t), t.find('./error').text) for t in doc.findall('.//testcase[error]')]
+    return failures + errors
