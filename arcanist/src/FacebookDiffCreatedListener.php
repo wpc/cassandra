@@ -48,9 +48,10 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
 
     $test_step = array(
       'name' => 'Test Cassandra',
-      'shell' => 'scripts/test --all --runners=2',
+      'shell' => 'scripts/test --all --runners=2 --timeout=900000',
       'required' => false,
       'artifacts' => array($test_summary),
+      'parser' => 'scripts/test_report',
     );
 
     $cmd_args = array(
@@ -59,6 +60,12 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
       'steps' => array(
         $build_step,
         $test_step,
+      ),
+      'report' => array(
+        array(
+          'type' => 'phcomment',
+          'report_trigger' => array('fail', 'warning'),
+        ),
       ),
     );
 

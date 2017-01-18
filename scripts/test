@@ -61,16 +61,10 @@ test_summary = os.path.join(util.PROJECT_ROOT, 'build/test/TESTS-TestSuites.xml'
 if os.path.isfile(test_summary):
     os.remove(test_summary)
 
+logging.info("Running all tests with %s runner and timeout %s ms..." % (options.runners, options.timeout))
+
 try:
     ant.run_all_test(options.runners, options.timeout)
 except subprocess.CalledProcessError:
-    if os.path.isfile(test_summary):
-        failures = junitreport.failures(test_summary) + junitreport.errors(test_summary)
-        if len(failures) > 0:
-            print('\n>>>>>>>>>>> %i TESTS FAILED <<<<<<<<<<<\n' % len(failures))
-            for failure in failures:
-                print(failure.testname)
-                print(failure.error)
-            print('\n')
-    sys.stdout.flush()
+    logging.error("ant test failed, run scripts/test_report to get list of failures")
     sys.exit(1)
