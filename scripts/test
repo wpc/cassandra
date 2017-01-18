@@ -21,6 +21,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), './lib'))
 
 import ant
 import util
+import multiprocessing
+import junitreport
 
 parser = optparse.OptionParser(usage='usage: %prog [options] test_name',
                                description='Run Cassandra tests')
@@ -28,6 +30,9 @@ parser.add_option('-b', '--build', action='store_true', default=False, help='Run
 parser.add_option('-l', '--list', action='store_true', default=False, help='List available test')
 parser.add_option('-a', '--all', action='store_true', default=False, help='Run all test')
 parser.add_option('-j', '--json', action='store_true', default=False, help='Print output as Json')
+parser.add_option('--runners', action='store', default=multiprocessing.cpu_count()/2+1, help='Concurrent runners when running all tests')
+parser.add_option('--timeout', action='store', default='300000', help='Timeout for single test when running all tests')
+
 
 options, args = parser.parse_args(sys.argv[1:])
 
@@ -57,9 +62,15 @@ if os.path.isfile(test_summary):
     os.remove(test_summary)
 
 try:
-    ant.run_all_test()
+    ant.run_all_test(options.runners, options.timeout)
 except subprocess.CalledProcessError:
-    # If the test summary is generated, suppress the error so that legocastle could
-    # upload the test report.
-    if not os.path.isfile(test_summary):
-        raise
+    if os.path.isfile(test_summary):
+        failures = junitreport.failures(test_summary) + junitreport.errors(test_summary)
+        if len(failures) > 0:
+            print('\n>>>>>>>>>>> %i TESTS FAILED <<<<<<<<<<<\n' % len(failures))
+            for failure in failures:
+                print(failure.testname)
+                print(failure.error)
+            print('\n')
+    sys.stdout.flush()
+    sys.exit(1)

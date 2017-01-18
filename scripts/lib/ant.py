@@ -5,7 +5,6 @@
 # the root directory of this source tree.
 
 import logging
-import multiprocessing
 import os
 import os.path
 import subprocess
@@ -57,5 +56,5 @@ def run_test(test_name):
     run_ant_target('test-single', ['-Dtest.name=%s'%test_name])
 
 
-def run_all_test():
-    run_ant_target('test', ['-Dtest.runners=%s' % multiprocessing.cpu_count()])
+def run_all_test(runners, timeout):
+    run_ant_target('test', ['-Dtest.runners=%s' % runners, "-Dtest.timeout=%s" % timeout])

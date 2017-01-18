@@ -34,12 +34,23 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
       ),
     );
 
+    $test_summary = array(
+      'name' => 'Test Summary',
+      'paths' => array(
+        'build/test',
+      ),
+      'report' => array(
+        array(
+          'type' => 'phcomment',
+        ),
+      ),
+    );
+
     $test_step = array(
       'name' => 'Test Cassandra',
-      'shell' => './scripts/test --all',
-      'logs' => array(
-          'build/test/TESTS-TestSuites.xml' => 'Test Reports',
-      ),
+      'shell' => 'scripts/test --all --runners=2',
+      'required' => false,
+      'artifacts' => array($test_summary),
     );
 
     $cmd_args = array(
