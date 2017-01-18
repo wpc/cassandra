@@ -37,7 +37,7 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
     $test_summary = array(
       'name' => 'Test Summary',
       'paths' => array(
-        'build/test/TESTS-TestSuites.xml',
+        'build/test',
       ),
       'report' => array(
         array(
@@ -48,7 +48,8 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
 
     $test_step = array(
       'name' => 'Test Cassandra',
-      'shell' => './scripts/test --all',
+      'shell' => 'scripts/test --all --runners=2',
+      'required' => false,
       'artifacts' => array($test_summary),
     );
 
