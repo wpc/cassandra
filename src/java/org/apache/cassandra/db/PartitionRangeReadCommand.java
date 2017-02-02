@@ -18,6 +18,7 @@
 package org.apache.cassandra.db;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +49,7 @@ import org.apache.cassandra.service.pager.*;
 import org.apache.cassandra.thrift.ThriftResultsMerger;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.tracing.FacebookTracingImpl;
 
 /**
  * A read command that selects a (part of a) range of partitions.
@@ -339,6 +341,13 @@ public class PartitionRangeReadCommand extends ReadCommand
         return dataRange().isPaging()
              ? new MessageOut<>(MessagingService.Verb.PAGED_RANGE, this, pagedRangeSerializer)
              : new MessageOut<>(MessagingService.Verb.RANGE_SLICE, this, rangeSliceSerializer);
+    }
+
+    public MessageOut<ReadCommand> createMessage(int version, InetAddress target)
+    {
+        return dataRange().isPaging()
+                ? new MessageOut<>(MessagingService.Verb.PAGED_RANGE, this, pagedRangeSerializer, target, FacebookTracingImpl.QUERY_TYPE_READ, metadata().ksName, metadata().cfName)
+                : new MessageOut<>(MessagingService.Verb.RANGE_SLICE, this, rangeSliceSerializer, target, FacebookTracingImpl.QUERY_TYPE_READ, metadata().ksName, metadata().cfName);
     }
 
     protected void appendCQLWhereClause(StringBuilder sb)

@@ -1205,7 +1205,7 @@ public class StorageProxy implements StorageProxyMBean
                 {
                     // belongs on a different server
                     if (message == null)
-                        message = mutation.createMessage();
+                        message = mutation.createMessage(destination);
                     String dc = DatabaseDescriptor.getEndpointSnitch().getDatacenter(destination);
                     // direct writes to local DC or old Cassandra versions
                     // (1.1 knows how to forward old-style String message IDs; updated to int in 2.0)
@@ -2101,7 +2101,7 @@ public class StorageProxy implements StorageProxyMBean
             {
                 for (InetAddress endpoint : toQuery.filteredEndpoints)
                 {
-                    MessageOut<ReadCommand> message = rangeCommand.createMessage(MessagingService.instance().getVersion(endpoint));
+                    MessageOut<ReadCommand> message = rangeCommand.createMessage(MessagingService.instance().getVersion(endpoint), endpoint);
                     Tracing.trace("Enqueuing request to {}", endpoint);
                     MessagingService.instance().sendRRWithFailure(message, endpoint, handler);
                 }

@@ -20,7 +20,9 @@ package org.apache.cassandra.net;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -59,6 +61,21 @@ public class MessageOut<T>
              isTracing()
                  ? Tracing.instance.getTraceHeaders()
                  : Collections.<String, byte[]>emptyMap());
+    }
+
+    public MessageOut(MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, InetAddress target, String queryType, String ksName, String cfName)
+    {
+        this(verb, payload, serializer, target, queryType, ksName, Arrays.asList(cfName));
+    }
+
+    public MessageOut(MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, InetAddress target, String queryType, String ksName, List<String> cfNames)
+    {
+        this(verb,
+                payload,
+                serializer,
+                isTracing()
+                        ? Tracing.instance.getTraceHeaders(target, queryType, ksName, cfNames)
+                        : Collections.<String, byte[]>emptyMap());
     }
 
     private MessageOut(MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, Map<String, byte[]> parameters)

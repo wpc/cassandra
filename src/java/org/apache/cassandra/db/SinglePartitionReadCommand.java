@@ -18,6 +18,7 @@
 package org.apache.cassandra.db;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -50,6 +51,7 @@ import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.StorageProxy;
 import org.apache.cassandra.service.pager.*;
 import org.apache.cassandra.thrift.ThriftResultsMerger;
+import org.apache.cassandra.tracing.FacebookTracingImpl;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.SearchIterator;
@@ -1065,6 +1067,11 @@ public class SinglePartitionReadCommand extends ReadCommand
     public MessageOut<ReadCommand> createMessage(int version)
     {
         return new MessageOut<>(MessagingService.Verb.READ, this, readSerializer);
+    }
+
+    public MessageOut<ReadCommand> createMessage(int version, InetAddress target)
+    {
+        return new MessageOut<>(MessagingService.Verb.READ, this, readSerializer, target, FacebookTracingImpl.QUERY_TYPE_READ, metadata().ksName, metadata().cfName);
     }
 
     protected void appendCQLWhereClause(StringBuilder sb)

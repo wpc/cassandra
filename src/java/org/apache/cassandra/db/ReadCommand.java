@@ -18,6 +18,7 @@
 package org.apache.cassandra.db;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Predicate;
@@ -528,6 +529,7 @@ public abstract class ReadCommand implements ReadQuery
      * Creates a message for this command.
      */
     public abstract MessageOut<ReadCommand> createMessage(int version);
+    public abstract MessageOut<ReadCommand> createMessage(int version, InetAddress target);
 
     protected abstract void appendCQLWhereClause(StringBuilder sb);
 

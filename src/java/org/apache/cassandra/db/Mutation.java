@@ -18,6 +18,7 @@
 package org.apache.cassandra.db;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.cassandra.tracing.Tracing;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -37,6 +39,7 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.tracing.FacebookTracingImpl;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -227,6 +230,22 @@ public class Mutation implements IMutation
     public void applyUnsafe()
     {
         apply(false);
+    }
+
+    public MessageOut<Mutation> createMessage(InetAddress target)
+    {
+        if (Tracing.isTracing()) {
+            List<String> cfnames = new ArrayList<String>(modifications.size());
+            for (UUID cfid : modifications.keySet()) {
+                CFMetaData cfm = Schema.instance.getCFMetaData(cfid);
+                if (cfm != null) {
+                    cfnames.add(cfm.cfName);
+                }
+            }
+            return new MessageOut<>(MessagingService.Verb.MUTATION, this, serializer, target, FacebookTracingImpl.QUERY_TYPE_WRITE, keyspaceName, cfnames);
+        } else {
+            return createMessage();
+        }
     }
 
     public MessageOut<Mutation> createMessage()

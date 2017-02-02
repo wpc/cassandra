@@ -22,6 +22,7 @@ package org.apache.cassandra.tracing;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -159,9 +160,9 @@ public abstract class Tracing implements ExecutorLocal<TraceState>
 
         TraceState ts = newTraceState(localAddress, sessionId, traceType);
         set(ts);
-        sessions.put(sessionId, ts);
+        sessions.put(ts.sessionId, ts);
 
-        return sessionId;
+        return ts.sessionId;
     }
 
     public void doneWithNonLocalSession(TraceState state)
@@ -258,6 +259,11 @@ public abstract class Tracing implements ExecutorLocal<TraceState>
         return ImmutableMap.of(
                 TRACE_HEADER, UUIDGen.decompose(Tracing.instance.getSessionId()),
                 TRACE_TYPE, new byte[] { Tracing.TraceType.serialize(Tracing.instance.getTraceType()) });
+    }
+
+    public Map<String, byte[]> getTraceHeaders(InetAddress target, String queryType, String ksName, List<String> cfNames)
+    {
+        return getTraceHeaders();
     }
 
     protected abstract TraceState newTraceState(InetAddress coordinator, UUID sessionId, Tracing.TraceType traceType);
