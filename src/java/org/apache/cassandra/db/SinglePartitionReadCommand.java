@@ -534,7 +534,6 @@ public class SinglePartitionReadCommand extends ReadCommand
         }
 
         Iterator<List<ColumnData>> rowIter = Collections.singletonList(dataBuffer).iterator();
-        Clustering clustering = cfs.metadata.getKeyValidatorAsClusteringComparator().make();
 
         AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
                                                  partitionKey(),
@@ -549,7 +548,7 @@ public class SinglePartitionReadCommand extends ReadCommand
                 if (!rowIter.hasNext())
                     return endOfData();
 
-                return BTreeRow.create(clustering,
+                return BTreeRow.create(Clustering.EMPTY,
                                        LivenessInfo.EMPTY,
                                        Row.Deletion.regular(DeletionTime.LIVE),
                                        BTree.build(rowIter.next(), UpdateFunction.<ColumnData>noOp()));
