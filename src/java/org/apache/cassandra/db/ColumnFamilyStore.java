@@ -48,8 +48,8 @@ import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.apache.cassandra.db.compaction.*;
 import org.apache.cassandra.db.filter.ClusteringIndexFilter;
 import org.apache.cassandra.db.filter.DataLimits;
+import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.rows.Cell;
-import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.view.TableViews;
 import org.apache.cassandra.db.lifecycle.*;
@@ -77,7 +77,6 @@ import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.TopKSampler.SamplerResult;
-import org.apache.cassandra.utils.btree.BTreeSearchIterator;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
@@ -1253,39 +1252,68 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     public void applyRocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition commitLogPosition)
     {
         ByteBuffer key = update.partitionKey().getKey();
+        AbstractType<?> keyValidator = update.metadata().getKeyValidator();
+
+        List<ColumnDefinition> clusteringColumns = update.metadata().clusteringColumns();
 
         for (Row row: update)
         {
-            applyRowToRocksDB(key, row);
+            applyRowToRocksDB(key, row, keyValidator, clusteringColumns);
         }
 
         Row staticRow = update.staticRow();
         if (!staticRow.isEmpty())
         {
-            applyRowToRocksDB(key, staticRow);
+            applyRowToRocksDB(key, staticRow, keyValidator, clusteringColumns);
         }
 
     }
 
-    private void applyRowToRocksDB(ByteBuffer key, Row row)
+    private void applyRowToRocksDB(ByteBuffer key, Row row, AbstractType<?> keyValidator, List<ColumnDefinition> clusteringColumns)
     {
+
+        ByteBuffer rowKey = key.duplicate();
+        String strRowKey = keyValidator.getString(rowKey);
+
+
+        Clustering clustering = row.clustering();
+
+        for (int i = 0; i < clustering.size(); i++)
+        {
+            ColumnDefinition colDef = clusteringColumns.get(i);
+            ByteBuffer col_name = colDef.name.bytes.duplicate();
+
+            ByteBuffer value = clustering.get(i);
+
+            String rocksdbKey = strRowKey + new String(col_name.array());
+
+            try
+            {
+                //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
+                db.put(rocksdbKey.getBytes(), value.array());
+            }
+            catch (RocksDBException e)
+            {
+                logger.error(e.toString(), e);
+            }
+        }
+
+        // value colummns
         for (ColumnDefinition colDef : row.columns())
         {
             if (colDef.isComplex())
                 continue;
 
-            ByteBuffer rowKey = key.duplicate();
-
             ByteBuffer col_name = colDef.name.bytes.duplicate();
             Cell cell = row.getCell(colDef);
             ByteBuffer value = cell.value();
 
-            ByteBuffer rocksdb_key = ByteBuffer.allocate(rowKey.capacity() + col_name.capacity()).put(rowKey).put(col_name);
+            String rocksdbKey = strRowKey + new String(col_name.array());
 
             try
             {
                 //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksdb_key.array(), value.array());
+                db.put(rocksdbKey.getBytes(), value.array());
             }
             catch (RocksDBException e)
             {
