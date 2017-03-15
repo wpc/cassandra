@@ -229,6 +229,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     public RocksDB db = null;
     private Options options = null;
 
+    private static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
+    private static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
+
 
     public static void shutdownPostFlushExecutor() throws InterruptedException
     {
@@ -263,7 +266,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
 
-        if (keyspace.getName().equals("rocksdb"))
+        String rocksDBKeyspace = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
+        String rocksDBDir = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
+
+        if (keyspace.getName().equals(rocksDBKeyspace))
         {
             options = new Options().setCreateIfMissing(true);
             try
@@ -272,7 +278,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setEnableWriteThreadAdaptiveYield(true);
                 options.setBytesPerSync(1024*1024);
 
-                db = RocksDB.open(options, "/data/rocksdb/" + keyspace.getName() + "/" + name);
+                db = RocksDB.open(options, rocksDBDir + keyspace.getName() + "/" + name);
             }
             catch (RocksDBException e)
             {
