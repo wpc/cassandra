@@ -497,10 +497,87 @@ public class SinglePartitionReadCommand extends ReadCommand
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
         if (cfs.keyspace.getName().equals("rocksdb"))
-            return queryRocksDB(cfs);
+            return queryRocksDBLegacy(cfs);
 
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();
         return queryMemtableAndDiskInternal(cfs, copyOnHeap);
+    }
+
+    public UnfilteredRowIterator queryRocksDBLegacy(ColumnFamilyStore cfs)
+    {
+        ByteBuffer key = partitionKey().getKey();
+
+        String strRowKey = metadata().getKeyValidator().getString(key);
+        String rocksDBKey = strRowKey;
+
+        // clustering
+        Iterator<Clustering> clusteringIterator = ((ClusteringIndexNamesFilter) clusteringIndexFilter).requestedRows().iterator();
+        Clustering clustering = clusteringIterator.next();
+
+        List<ColumnDefinition> clusteringColumns = metadata().clusteringColumns();
+
+        for (int index = 0; index < clusteringColumns.size(); index ++) {
+            ColumnDefinition colDef = clusteringColumns.get(index);
+            String colValue = colDef.type.getString(clustering.values[0]);
+            rocksDBKey += colValue;
+        }
+
+        // fetch the value of RocksDB
+        List<ColumnData> dataBuffer = new ArrayList<>();
+
+
+        Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
+
+        while (iter_col.hasNext())
+        {
+            ColumnDefinition col_def = iter_col.next();
+            try
+            {
+                byte[] value = cfs.db.get(rocksDBKey.getBytes());
+                if (value != null)
+                {
+                    logger.debug(new String(value));
+                    Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME, ByteBuffer.wrap(value), null);
+                    dataBuffer.add(cell);
+                }
+            }
+            catch (RocksDBException e)
+            {
+                e.printStackTrace();
+            }
+        }
+
+        Iterator<List<ColumnData>> rowIter;
+        if (dataBuffer.isEmpty())
+        {
+            rowIter = Collections.emptyIterator();
+        }
+        else
+        {
+            rowIter = Collections.singletonList(dataBuffer).iterator();
+        }
+
+        AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
+                                                                                   partitionKey(),
+                                                                                   DeletionTime.LIVE,
+                                                                                   columnFilter().fetchedColumns(),
+                                                                                   null,
+                                                                                   false,
+                                                                                   EncodingStats.NO_STATS)
+        {
+            protected Unfiltered computeNext()
+            {
+                if (!rowIter.hasNext())
+                    return endOfData();
+
+                return BTreeRow.create(clustering,
+                                       LivenessInfo.EMPTY,
+                                       Row.Deletion.regular(DeletionTime.LIVE),
+                                       BTree.build(rowIter.next(), UpdateFunction.<ColumnData>noOp()));
+            }
+        };
+
+        return iterator;
     }
 
     public UnfilteredRowIterator queryRocksDB(ColumnFamilyStore cfs)

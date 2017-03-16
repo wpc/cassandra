@@ -1280,7 +1280,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         ByteBuffer rowKey = key.duplicate();
         String strRowKey = keyValidator.getString(rowKey);
-
+        String rocksDBKey = strRowKey;
 
         Clustering clustering = row.clustering();
 
@@ -1290,18 +1290,19 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             ByteBuffer col_name = colDef.name.bytes.duplicate();
 
             ByteBuffer value = clustering.get(i);
+            String colValue = colDef.type.getString(value);
 
-            String rocksdbKey = strRowKey + new String(col_name.array());
+            rocksDBKey = rocksDBKey + colValue;
 
-            try
+            /*try
             {
                 //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksdbKey.getBytes(), value.array());
+                //db.put(rocksdbKey.getBytes(), value.array());
             }
             catch (RocksDBException e)
             {
                 logger.error(e.toString(), e);
-            }
+            }*/
         }
 
         // value colummns
@@ -1312,14 +1313,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
             ByteBuffer col_name = colDef.name.bytes.duplicate();
             Cell cell = row.getCell(colDef);
-            ByteBuffer value = cell.value();
+            String value = colDef.type.getString(cell.value());
 
-            String rocksdbKey = strRowKey + new String(col_name.array());
+            //String rocksdbKey = strRowKey + new String(col_name.array());
 
             try
             {
                 //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksdbKey.getBytes(), value.array());
+                db.put(rocksDBKey.getBytes(), value.getBytes());
             }
             catch (RocksDBException e)
             {
