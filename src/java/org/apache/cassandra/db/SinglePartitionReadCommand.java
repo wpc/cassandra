@@ -536,8 +536,9 @@ public class SinglePartitionReadCommand extends ReadCommand
                 byte[] value = cfs.db.get(rocksDBKey.getBytes());
                 if (value != null)
                 {
-                    logger.debug(new String(value));
-                    Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME, ByteBuffer.wrap(value), null);
+                    //logger.debug(new String(value));
+                    Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME,
+                                               col_def.type.fromString(new String(value)), null);
                     dataBuffer.add(cell);
                 }
             }
