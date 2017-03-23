@@ -82,6 +82,7 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.rocksdb.CompressionType;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -274,9 +275,15 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             options = new Options().setCreateIfMissing(true);
             try
             {
+                final long writeBufferSize = 512 * 1024 * 1024L;
+
                 options.setAllowConcurrentMemtableWrite(true);
                 options.setEnableWriteThreadAdaptiveYield(true);
                 options.setBytesPerSync(1024*1024);
+                options.setBaseBackgroundCompactions(20);
+                options.setCompressionType(CompressionType.LZ4_COMPRESSION);
+                options.setWriteBufferSize(writeBufferSize);
+                options.setMaxBytesForLevelBase(4 * writeBufferSize);
 
                 db = RocksDB.open(options, rocksDBDir + keyspace.getName() + "/" + name);
             }
