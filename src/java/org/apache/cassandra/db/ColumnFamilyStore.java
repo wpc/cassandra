@@ -280,8 +280,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setAllowConcurrentMemtableWrite(true);
                 options.setEnableWriteThreadAdaptiveYield(true);
                 options.setBytesPerSync(1024*1024);
-                options.setBaseBackgroundCompactions(20);
                 options.setMaxBackgroundCompactions(20);
+                options.setBaseBackgroundCompactions(20);
                 options.setCompressionType(CompressionType.LZ4_COMPRESSION);
                 options.setWriteBufferSize(writeBufferSize);
                 options.setMaxBytesForLevelBase(4 * writeBufferSize);
