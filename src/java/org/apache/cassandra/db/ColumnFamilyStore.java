@@ -240,6 +240,37 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         postFlushExecutor.awaitTermination(60, TimeUnit.SECONDS);
     }
 
+    private void openRocksDB()
+    {
+        String rocksDBKeyspace = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
+        String rocksDBDir = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
+
+        if (keyspace.getName().equals(rocksDBKeyspace))
+        {
+            options = new Options().setCreateIfMissing(true);
+            try
+            {
+                final long writeBufferSize = 512 * 1024 * 1024L;
+
+                options.setAllowConcurrentMemtableWrite(true);
+                options.setEnableWriteThreadAdaptiveYield(true);
+                options.setBytesPerSync(1024*1024);
+                options.setMaxBackgroundCompactions(20);
+                options.setBaseBackgroundCompactions(20);
+                options.setCompressionType(CompressionType.LZ4_COMPRESSION);
+                options.setWriteBufferSize(writeBufferSize);
+                options.setMaxBytesForLevelBase(4 * writeBufferSize);
+
+                logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
+                db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);
+            }
+            catch (RocksDBException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+
     public void reload()
     {
         // metadata object has been mutated directly. make all the members jibe with new settings.
@@ -267,32 +298,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
 
-        String rocksDBKeyspace = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
-        String rocksDBDir = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
-
-        if (keyspace.getName().equals(rocksDBKeyspace))
-        {
-            options = new Options().setCreateIfMissing(true);
-            try
-            {
-                final long writeBufferSize = 512 * 1024 * 1024L;
-
-                options.setAllowConcurrentMemtableWrite(true);
-                options.setEnableWriteThreadAdaptiveYield(true);
-                options.setBytesPerSync(1024*1024);
-                options.setMaxBackgroundCompactions(20);
-                options.setBaseBackgroundCompactions(20);
-                options.setCompressionType(CompressionType.LZ4_COMPRESSION);
-                options.setWriteBufferSize(writeBufferSize);
-                options.setMaxBytesForLevelBase(4 * writeBufferSize);
-
-                db = RocksDB.open(options, rocksDBDir + keyspace.getName() + "/" + name);
-            }
-            catch (RocksDBException e)
-            {
-                e.printStackTrace();
-            }
-        }
+        openRocksDB();
     }
 
     void scheduleFlush()
@@ -507,21 +513,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             oldMBeanName= null;
         }
 
-        if (keyspace.getName().equals("rocksdb"))
-        {
-            options = new Options().setCreateIfMissing(true);
-            try
-            {
-                logger.info("DDDDikang: open rocksdb");
-                db = RocksDB.open(options, "/data/rocksdb/" + keyspace.getName() + "/" + name);
-                logger.info("DDDDikang: opened rocksdb");
-            }
-            catch (RocksDBException e)
-            {
-                logger.error(e.toString(), e);
-                e.printStackTrace();
-            }
-        }
+        openRocksDB();
     }
 
     public Directories getDirectories()
