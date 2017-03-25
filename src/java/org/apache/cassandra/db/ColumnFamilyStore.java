@@ -257,6 +257,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setBytesPerSync(1024*1024);
                 options.setMaxBackgroundCompactions(20);
                 options.setBaseBackgroundCompactions(20);
+                options.setMaxSubcompactions(8);
                 options.setCompressionType(CompressionType.LZ4_COMPRESSION);
                 options.setWriteBufferSize(writeBufferSize);
                 options.setMaxBytesForLevelBase(4 * writeBufferSize);
