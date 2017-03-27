@@ -250,7 +250,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             options = new Options().setCreateIfMissing(true);
             try
             {
-                final long writeBufferSize = 512 * 1024 * 1024L;
+                final long writeBufferSize = 8 * 512 * 1024 * 1024L;
+                final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
 
                 options.setAllowConcurrentMemtableWrite(true);
                 options.setEnableWriteThreadAdaptiveYield(true);
@@ -261,6 +262,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setCompressionType(CompressionType.LZ4_COMPRESSION);
                 options.setWriteBufferSize(writeBufferSize);
                 options.setMaxBytesForLevelBase(4 * writeBufferSize);
+                options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
+                options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
 
                 logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
                 db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);
