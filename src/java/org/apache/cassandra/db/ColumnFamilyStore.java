@@ -82,6 +82,7 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -264,6 +265,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setMaxBytesForLevelBase(4 * writeBufferSize);
                 options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
                 options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
+                options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
 
                 logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
                 db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);

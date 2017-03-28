@@ -528,6 +528,7 @@ public class SinglePartitionReadCommand extends ReadCommand
 
         Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
 
+        Tracing.trace("Fetching data from rocksdb, on {}", rocksDBKey);
         while (iter_col.hasNext())
         {
             ColumnDefinition col_def = iter_col.next();
@@ -547,6 +548,7 @@ public class SinglePartitionReadCommand extends ReadCommand
                 e.printStackTrace();
             }
         }
+        Tracing.trace("Fetched data from rocksdb, on {}", rocksDBKey);
 
         Iterator<List<ColumnData>> rowIter;
         if (dataBuffer.isEmpty())
