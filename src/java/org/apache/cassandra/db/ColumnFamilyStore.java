@@ -84,9 +84,12 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
+import org.rocksdb.HistogramData;
+import org.rocksdb.HistogramType;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.Statistics;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -230,6 +233,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private volatile boolean compactionSpaceCheck = true;
     public RocksDB db = null;
     private Options options = null;
+    public Statistics rocksdbStats = null;
 
     private static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
     private static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
@@ -266,6 +270,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
                 options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
                 options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+
+                rocksdbStats = options.statisticsPtr();
+                HistogramData histogramData = rocksdbStats.getHistogramData(HistogramType.DB_GET);
+
 
                 logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
                 db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);

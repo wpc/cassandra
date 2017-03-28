@@ -535,6 +535,7 @@ public class SinglePartitionReadCommand extends ReadCommand
             try
             {
                 byte[] value = cfs.db.get(rocksDBKey.getBytes());
+                Tracing.trace("Fetched data from rocksdb");
                 if (value != null)
                 {
                     //logger.debug(new String(value));
@@ -548,7 +549,6 @@ public class SinglePartitionReadCommand extends ReadCommand
                 e.printStackTrace();
             }
         }
-        Tracing.trace("Fetched data from rocksdb, on {}", rocksDBKey);
 
         Iterator<List<ColumnData>> rowIter;
         if (dataBuffer.isEmpty())
