@@ -1322,16 +1322,19 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             if (colDef.isComplex())
                 continue;
 
-            ByteBuffer col_name = colDef.name.bytes.duplicate();
+            //ByteBuffer col_name = colDef.name.bytes.duplicate();
             Cell cell = row.getCell(colDef);
-            String value = colDef.type.getString(cell.value());
+
+            byte[] bytesValue = new byte[cell.value().remaining()];
+            cell.value().get(bytesValue, 0, bytesValue.length);
+            //String value = colDef.type.getString(cell.value());
 
             //String rocksdbKey = strRowKey + new String(col_name.array());
 
             try
             {
                 //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksDBKey.getBytes(), value.getBytes());
+                db.put(rocksDBKey.getBytes(), bytesValue);
             }
             catch (RocksDBException e)
             {

@@ -24,6 +24,7 @@ import java.util.*;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
+import com.datastax.shaded.netty.buffer.ByteBuf;
 import org.apache.cassandra.cache.IRowCacheEntry;
 import org.apache.cassandra.cache.RowCacheKey;
 import org.apache.cassandra.cache.RowCacheSentinel;
@@ -540,7 +541,7 @@ public class SinglePartitionReadCommand extends ReadCommand
                 {
                     //logger.debug(new String(value));
                     Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME,
-                                               col_def.type.fromString(new String(value)), null);
+                                               ByteBuffer.wrap(value), null);
                     dataBuffer.add(cell);
                 }
             }
