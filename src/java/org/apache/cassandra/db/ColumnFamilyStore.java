@@ -82,14 +82,8 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.rocksdb.CompactionPriority;
-import org.rocksdb.CompressionType;
-import org.rocksdb.HistogramData;
-import org.rocksdb.HistogramType;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.Statistics;
+import org.rocksdb.*;
+import org.rocksdb.BloomFilter;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -261,6 +255,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setAllowConcurrentMemtableWrite(true);
                 options.setEnableWriteThreadAdaptiveYield(true);
                 options.setBytesPerSync(1024*1024);
+                options.setWalBytesPerSync(1024*1024);
                 options.setMaxBackgroundCompactions(20);
                 options.setBaseBackgroundCompactions(20);
                 options.setMaxSubcompactions(8);
@@ -271,10 +266,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
                 options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
 
+                final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
+                final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
+                tableOptions.setFilter(bloomFilter);
+                options.setTableFormatConfig(tableOptions);
+
                 rocksdbStats = options.statisticsPtr();
-                HistogramData histogramData = rocksdbStats.getHistogramData(HistogramType.DB_GET);
-
-
                 logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
                 db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);
             }
