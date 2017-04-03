@@ -1298,22 +1298,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         for (int i = 0; i < clustering.size(); i++)
         {
             ColumnDefinition colDef = clusteringColumns.get(i);
-            ByteBuffer col_name = colDef.name.bytes.duplicate();
 
             ByteBuffer value = clustering.get(i);
             String colValue = colDef.type.getString(value);
 
             rocksDBKey = rocksDBKey + colValue;
-
-            /*try
-            {
-                //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                //db.put(rocksdbKey.getBytes(), value.array());
-            }
-            catch (RocksDBException e)
-            {
-                logger.error(e.toString(), e);
-            }*/
         }
 
         // value colummns
@@ -1321,15 +1310,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         {
             if (colDef.isComplex())
                 continue;
-
-            //ByteBuffer col_name = colDef.name.bytes.duplicate();
             Cell cell = row.getCell(colDef);
 
             byte[] bytesValue = new byte[cell.value().remaining()];
             cell.value().get(bytesValue, 0, bytesValue.length);
-            //String value = colDef.type.getString(cell.value());
-
-            //String rocksdbKey = strRowKey + new String(col_name.array());
 
             try
             {
