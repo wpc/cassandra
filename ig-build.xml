@@ -1,7 +1,7 @@
 <project name="apache-cassandra" basedir="." default="jar">
   <import file="build.xml"/>
 
-  <target name="build-src-unit" depends="build" description="Compile sources and unit tests">
+  <target name="build-src-unit" depends="build, build-test" description="Compile sources and unit tests">
     <javac
      debug="true"
      debuglevel="${debuglevel}"
