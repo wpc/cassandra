@@ -17,7 +17,7 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
     $build_artifact = array(
       'name' => 'rpm',
       'paths' => array(
-        'build/cassandra.rpm',
+        'build/rpm',
       ),
       'report' => array(
         array(
@@ -34,23 +34,10 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
       ),
     );
 
-    $test_summary = array(
-      'name' => 'Test Summary',
-      'paths' => array(
-        'build/test',
-      ),
-      'report' => array(
-        array(
-          'type' => 'phcomment',
-        ),
-      ),
-    );
-
     $test_step = array(
       'name' => 'Test Cassandra',
       'shell' => 'scripts/test --all --runners=2 --timeout=900000',
       'required' => false,
-      'artifacts' => array($test_summary),
       'parser' => 'scripts/test_report',
     );
 
@@ -75,7 +62,7 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
       'vcs' => 'ig-cassandra-git',
       'diff' => $diffID,
       'type' => 'lego',
-      'alias' => 'ig-cassandra-test',
+      'alias' => 'ig-cassandra-build',
       );
 
     $sandcastle = new ArcanistSandcastleClient($event->getValue('workflow'));
