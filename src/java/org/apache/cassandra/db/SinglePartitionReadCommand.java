@@ -44,6 +44,7 @@ import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.ClientState;
@@ -60,6 +61,8 @@ import org.apache.cassandra.utils.memory.HeapAllocator;
 
 import org.apache.cassandra.utils.btree.UpdateFunction;
 import org.rocksdb.RocksDBException;
+
+import static org.apache.cassandra.db.ColumnFamilyStore.DEFAULT_ROCKSDB_KEYSPACE;
 
 
 /**
@@ -497,7 +500,7 @@ public class SinglePartitionReadCommand extends ReadCommand
     {
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
-        if (cfs.keyspace.getName().equals("rocksdb"))
+        if (cfs.keyspace.getName().equals(System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE)))
             return queryRocksDBLegacy(cfs);
 
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();
@@ -508,20 +511,10 @@ public class SinglePartitionReadCommand extends ReadCommand
     {
         ByteBuffer key = partitionKey().getKey();
 
-        String strRowKey = metadata().getKeyValidator().getString(key);
-        String rocksDBKey = strRowKey;
-
         // clustering
-        Iterator<Clustering> clusteringIterator = ((ClusteringIndexNamesFilter) clusteringIndexFilter).requestedRows().iterator();
-        Clustering clustering = clusteringIterator.next();
-
-        List<ColumnDefinition> clusteringColumns = metadata().clusteringColumns();
-
-        for (int index = 0; index < clusteringColumns.size(); index ++) {
-            ColumnDefinition colDef = clusteringColumns.get(index);
-            String colValue = colDef.type.getString(clustering.values[0]);
-            rocksDBKey += colValue;
-        }
+        NavigableSet<Clustering> clusterings = ((ClusteringIndexNamesFilter) clusteringIndexFilter).requestedRows();
+        Clustering clustering = clusterings.first();
+        byte[] rocksDBKey = RowKeyEncoder.encode(key.duplicate(), clustering, metadata());
 
         // fetch the value of RocksDB
         List<ColumnData> dataBuffer = new ArrayList<>();
@@ -535,7 +528,7 @@ public class SinglePartitionReadCommand extends ReadCommand
             ColumnDefinition col_def = iter_col.next();
             try
             {
-                byte[] value = cfs.db.get(rocksDBKey.getBytes());
+                byte[] value = cfs.db.get(rocksDBKey);
                 Tracing.trace("Fetched data from rocksdb");
                 if (value != null)
                 {

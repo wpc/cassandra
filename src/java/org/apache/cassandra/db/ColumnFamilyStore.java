@@ -72,6 +72,7 @@ import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
@@ -229,8 +230,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private Options options = null;
     public Statistics rocksdbStats = null;
 
-    private static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
-    private static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
+    public static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
+    public static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
 
 
     public static void shutdownPostFlushExecutor() throws InterruptedException
@@ -272,8 +273,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setTableFormatConfig(tableOptions);
 
                 rocksdbStats = options.statisticsPtr();
-                logger.info(rocksDBDir + "/" + keyspace.getName() + "/" + name);
-                db = RocksDB.open(options, rocksDBDir + "/" + keyspace.getName() + "/" + name);
+                String rocksDBTableDir = rocksDBDir + "/" + keyspace.getName() + "/" + name;
+                FileUtils.createDirectory(rocksDBDir);
+                FileUtils.createDirectory(rocksDBTableDir);
+                db = RocksDB.open(options, rocksDBTableDir);
             }
             catch (RocksDBException e)
             {
@@ -1289,21 +1292,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private void applyRowToRocksDB(ByteBuffer key, Row row, AbstractType<?> keyValidator, List<ColumnDefinition> clusteringColumns)
     {
 
-        ByteBuffer rowKey = key.duplicate();
-        String strRowKey = keyValidator.getString(rowKey);
-        String rocksDBKey = strRowKey;
-
         Clustering clustering = row.clustering();
 
-        for (int i = 0; i < clustering.size(); i++)
-        {
-            ColumnDefinition colDef = clusteringColumns.get(i);
-
-            ByteBuffer value = clustering.get(i);
-            String colValue = colDef.type.getString(value);
-
-            rocksDBKey = rocksDBKey + colValue;
-        }
+        byte[] rocksDBKey = RowKeyEncoder.encode(key.duplicate(), clustering, metadata);
 
         // value colummns
         for (ColumnDefinition colDef : row.columns())
@@ -1318,7 +1309,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             try
             {
                 //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksDBKey.getBytes(), bytesValue);
+                db.put(rocksDBKey, bytesValue);
             }
             catch (RocksDBException e)
             {
