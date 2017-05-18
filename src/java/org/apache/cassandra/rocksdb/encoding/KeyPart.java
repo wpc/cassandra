@@ -57,24 +57,24 @@ public class KeyPart
 
     static
     {
-        rowKeyFactories.put(AsciiType.instance, VariableLengthByteArrayRowKey::new);
-        rowKeyFactories.put(BytesType.instance, VariableLengthByteArrayRowKey::new);
-        rowKeyFactories.put(BooleanType.instance, BooleanRowKey::new);
-        rowKeyFactories.put(ByteType.instance, ByteRowKey::new);
-        rowKeyFactories.put(DecimalType.instance, BigDecimalRowKey::new);
-        rowKeyFactories.put(DoubleType.instance, DoubleRowKey::new);
-        rowKeyFactories.put(FloatType.instance, FloatRowKey::new);
-        rowKeyFactories.put(InetAddressType.instance, VariableLengthByteArrayRowKey::new);
-        rowKeyFactories.put(Int32Type.instance, IntegerRowKey::new);
-        rowKeyFactories.put(IntegerType.instance, BigIntegerRowKey::new);
-        rowKeyFactories.put(LongType.instance, LongRowKey::new);
-        rowKeyFactories.put(ShortType.instance, ShortRowKey::new);
-        rowKeyFactories.put(SimpleDateType.instance, IntegerRowKey::new);
-        rowKeyFactories.put(TimeType.instance, LongRowKey::new);
-        rowKeyFactories.put(TimestampType.instance, LongRowKey::new);
-        rowKeyFactories.put(TimeUUIDType.instance, UUIDRowKey::new);
-        rowKeyFactories.put(UTF8Type.instance, UTF8RowKey::new);
-        rowKeyFactories.put(UUIDType.instance, UUIDRowKey::new);
+        rowKeyFactories.put(AsciiType.instance, () -> new VariableLengthByteArrayRowKey());
+        rowKeyFactories.put(BytesType.instance, () -> new VariableLengthByteArrayRowKey());
+        rowKeyFactories.put(BooleanType.instance, () -> new BooleanRowKey());
+        rowKeyFactories.put(ByteType.instance, () -> new ByteRowKey());
+        rowKeyFactories.put(DecimalType.instance, () -> new BigDecimalRowKey());
+        rowKeyFactories.put(DoubleType.instance, () -> new DoubleRowKey());
+        rowKeyFactories.put(FloatType.instance, () -> new FloatRowKey());
+        rowKeyFactories.put(InetAddressType.instance, () -> new VariableLengthByteArrayRowKey());
+        rowKeyFactories.put(Int32Type.instance, () -> new IntegerRowKey());
+        rowKeyFactories.put(IntegerType.instance, () -> new BigIntegerRowKey());
+        rowKeyFactories.put(LongType.instance, () -> new LongRowKey());
+        rowKeyFactories.put(ShortType.instance, () -> new ShortRowKey());
+        rowKeyFactories.put(SimpleDateType.instance, () -> new IntegerRowKey());
+        rowKeyFactories.put(TimeType.instance, () -> new LongRowKey());
+        rowKeyFactories.put(TimestampType.instance, () -> new LongRowKey());
+        rowKeyFactories.put(TimeUUIDType.instance, () -> new UUIDRowKey());
+        rowKeyFactories.put(UTF8Type.instance, () -> new UTF8RowKey());
+        rowKeyFactories.put(UUIDType.instance, () -> new UUIDRowKey());
     }
 
     private static final Map<AbstractType, RowKeyInputAdapter> rowKeyAdapters = new HashMap<>();
