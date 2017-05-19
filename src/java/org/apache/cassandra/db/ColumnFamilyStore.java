@@ -36,6 +36,7 @@ import com.google.common.base.*;
 import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
+import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,6 @@ import org.apache.cassandra.db.compaction.*;
 import org.apache.cassandra.db.filter.ClusteringIndexFilter;
 import org.apache.cassandra.db.filter.DataLimits;
 import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.view.TableViews;
 import org.apache.cassandra.db.lifecycle.*;
@@ -266,6 +266,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
                 options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
                 options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+                options.setMergeOperatorName("cassandra");
 
                 final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
                 final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
@@ -1295,26 +1296,16 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         Clustering clustering = row.clustering();
 
         byte[] rocksDBKey = RowKeyEncoder.encode(key.duplicate(), clustering, metadata);
+        byte[] rocksDBValue = RowValueEncoder.encode(metadata, row);
 
         // value colummns
-        for (ColumnDefinition colDef : row.columns())
+        try
         {
-            if (colDef.isComplex())
-                continue;
-            Cell cell = row.getCell(colDef);
-
-            byte[] bytesValue = new byte[cell.value().remaining()];
-            cell.value().get(bytesValue, 0, bytesValue.length);
-
-            try
-            {
-                //logger.debug("DDDDDikang: key: " + new String(rocksdb_key.array()) + ", value: " + new String(value.array()));
-                db.put(rocksDBKey, bytesValue);
-            }
-            catch (RocksDBException e)
-            {
-                logger.error(e.toString(), e);
-            }
+            db.merge(rocksDBKey, rocksDBValue);
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
         }
     }
 

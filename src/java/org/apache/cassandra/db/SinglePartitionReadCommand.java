@@ -24,7 +24,6 @@ import java.util.*;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
-import com.datastax.shaded.netty.buffer.ByteBuf;
 import org.apache.cassandra.cache.IRowCacheEntry;
 import org.apache.cassandra.cache.RowCacheKey;
 import org.apache.cassandra.cache.RowCacheSentinel;
@@ -36,6 +35,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.lifecycle.*;
 import org.apache.cassandra.db.filter.*;
 import org.apache.cassandra.db.partitions.*;
+import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
@@ -518,30 +518,14 @@ public class SinglePartitionReadCommand extends ReadCommand
 
         // fetch the value of RocksDB
         List<ColumnData> dataBuffer = new ArrayList<>();
-
-
-        Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
-
-        Tracing.trace("Fetching data from rocksdb, on {}", rocksDBKey);
-        while (iter_col.hasNext())
-        {
-            ColumnDefinition col_def = iter_col.next();
-            try
-            {
-                byte[] value = cfs.db.get(rocksDBKey);
-                Tracing.trace("Fetched data from rocksdb");
-                if (value != null)
-                {
-                    //logger.debug(new String(value));
-                    Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME,
-                                               ByteBuffer.wrap(value), null);
-                    dataBuffer.add(cell);
-                }
+        try {
+            byte[] value = cfs.db.get(rocksDBKey);
+            Tracing.trace("Fetched data from rocksdb");
+            if (value != null && value.length != 0) {
+              RowValueEncoder.decode(metadata(), columnFilter(), ByteBuffer.wrap(value), dataBuffer);
             }
-            catch (RocksDBException e)
-            {
-                e.printStackTrace();
-            }
+        } catch (RocksDBException e) {
+            e.printStackTrace();
         }
 
         Iterator<List<ColumnData>> rowIter;
