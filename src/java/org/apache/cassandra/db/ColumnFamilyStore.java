@@ -36,6 +36,8 @@ import com.google.common.base.*;
 import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
+
+import org.apache.cassandra.metrics.RocksdbTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -222,6 +224,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private volatile Directories directories;
 
     public final TableMetrics metric;
+    public final RocksdbTableMetrics rocksMetric;
     public volatile long sampleLatencyNanos;
     private final ScheduledFuture<?> latencyCalculator;
 
@@ -444,6 +447,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         indexManager = new SecondaryIndexManager(this);
         viewManager = keyspace.viewManager.forTable(metadata);
         metric = new TableMetrics(this);
+        rocksMetric = new RocksdbTableMetrics(this);
         fileIndexGenerator.set(generation);
         sampleLatencyNanos = TimeUnit.MILLISECONDS.toNanos(DatabaseDescriptor.getReadRpcTimeout() / 2);
 
