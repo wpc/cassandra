@@ -37,14 +37,17 @@ import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.ParameterizedClass;
 import org.apache.cassandra.db.*;
+import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.schema.CompressionParams;
 import org.apache.cassandra.io.compress.ICompressor;
 import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
+import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.io.util.DataOutputBufferFixed;
 import org.apache.cassandra.metrics.CommitLogMetrics;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 
 import static org.apache.cassandra.db.commitlog.CommitLogSegment.*;
@@ -243,46 +246,56 @@ public class CommitLog implements CommitLogMBean
      * Add a Mutation to the commit log.
      *
      * @param mutation the Mutation to add to the log
+     * @throws IOException
      */
-    public ReplayPosition add(Mutation mutation)
+    public ReplayPosition add(Mutation mutation) throws WriteTimeoutException
     {
         assert mutation != null;
 
-        int size = (int) Mutation.serializer.serializedSize(mutation, MessagingService.current_version);
-
-        int totalSize = size + ENTRY_OVERHEAD_SIZE;
-        if (totalSize > MAX_MUTATION_SIZE)
+        try (DataOutputBuffer dob = DataOutputBuffer.scratchBuffer.get())
         {
-            throw new IllegalArgumentException(String.format("Mutation of %s bytes is too large for the maximum size of %s",
-                                                             totalSize, MAX_MUTATION_SIZE));
-        }
+            Mutation.serializer.serialize(mutation, dob, MessagingService.current_version);
+            int size = dob.getLength();
 
-        Allocation alloc = allocator.allocate(mutation, (int) totalSize);
-        CRC32 checksum = new CRC32();
-        final ByteBuffer buffer = alloc.getBuffer();
-        try (BufferedDataOutputStreamPlus dos = new DataOutputBufferFixed(buffer))
-        {
-            // checksummed length
-            dos.writeInt(size);
-            updateChecksumInt(checksum, size);
-            buffer.putInt((int) checksum.getValue());
+            int totalSize = size + ENTRY_OVERHEAD_SIZE;
+            if (totalSize > MAX_MUTATION_SIZE)
+            {
+                throw new IllegalArgumentException(String.format("Mutation of %s is too large for the maximum size of %s",
+                                                                 FBUtilities.prettyPrintMemory(totalSize),
+                                                                 FBUtilities.prettyPrintMemory(MAX_MUTATION_SIZE)));
+            }
 
-            // checksummed mutation
-            Mutation.serializer.serialize(mutation, dos, MessagingService.current_version);
-            updateChecksum(checksum, buffer, buffer.position() - size, size);
-            buffer.putInt((int) checksum.getValue());
+            Allocation alloc = allocator.allocate(mutation, totalSize);
+            CRC32 checksum = new CRC32();
+            final ByteBuffer buffer = alloc.getBuffer();
+            try (BufferedDataOutputStreamPlus dos = new DataOutputBufferFixed(buffer))
+            {
+                // checksummed length
+                dos.writeInt(size);
+                updateChecksumInt(checksum, size);
+                buffer.putInt((int) checksum.getValue());
+
+                // checksummed mutation
+                dos.write(dob.getData(), 0, size);
+                updateChecksum(checksum, buffer, buffer.position() - size, size);
+                buffer.putInt((int) checksum.getValue());
+            }
+            catch (IOException e)
+            {
+                throw new FSWriteError(e, alloc.getSegment().getPath());
+            }
+            finally
+            {
+                alloc.markWritten();
+            }
+
+            executor.finishWriteFor(alloc);
+            return alloc.getReplayPosition();
         }
         catch (IOException e)
         {
-            throw new FSWriteError(e, alloc.getSegment().getPath());
+            throw new FSWriteError(e, allocator.allocatingFrom().getPath());
         }
-        finally
-        {
-            alloc.markWritten();
-        }
-
-        executor.finishWriteFor(alloc);
-        return alloc.getReplayPosition();
     }
 
     /**

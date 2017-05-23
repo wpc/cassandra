@@ -164,7 +164,7 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
 
     public UnfilteredRowIterator unfilteredIterator()
     {
-        return unfilteredIterator(ColumnFilter.all(metadata()), Slices.ALL, false);
+        return unfilteredIterator(metadata().getAllColumnFilter(), Slices.ALL, false);
     }
 
     public UnfilteredRowIterator unfilteredIterator(ColumnFilter selection, Slices slices, boolean reversed)
@@ -192,7 +192,6 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
         Slice.Bound end = slice.end() == Slice.Bound.TOP ? null : slice.end();
         Iterator<Row> rowIter = BTree.slice(current.tree, metadata.comparator, start, true, end, true, desc(reversed));
         Iterator<RangeTombstone> deleteIter = current.deletionInfo.rangeIterator(slice, reversed);
-
         return merge(rowIter, deleteIter, selection, reversed, current, staticRow);
     }
 

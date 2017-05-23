@@ -631,7 +631,7 @@ public final class SystemKeyspace
 
     private static Map<UUID, ByteBuffer> truncationAsMapEntry(ColumnFamilyStore cfs, long truncatedAt, ReplayPosition position)
     {
-        try (DataOutputBuffer out = new DataOutputBuffer())
+        try (DataOutputBuffer out = DataOutputBuffer.scratchBuffer.get())
         {
             ReplayPosition.serializer.serialize(position, out);
             out.writeLong(truncatedAt);

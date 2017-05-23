@@ -21,11 +21,14 @@ import java.io.IOException;
 
 import com.google.common.collect.Collections2;
 
+import net.nicoulaj.compilecommand.annotations.Inline;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.io.util.DataInputPlus;
+import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.utils.SearchIterator;
+import org.apache.cassandra.utils.WrappedException;
 
 /**
  * Serialize/deserialize a single Unfiltered (both on-wire and on-disk).
@@ -166,9 +169,32 @@ public class UnfilteredSerializer
 
         if (header.isForSSTable())
         {
-            out.writeUnsignedVInt(serializedRowBodySize(row, header, previousUnfilteredSize, version));
-            out.writeUnsignedVInt(previousUnfilteredSize);
+            try (DataOutputBuffer dob = DataOutputBuffer.scratchBuffer.get())
+            {
+                serializeRowBody(row, flags, header, dob);
+
+                out.writeUnsignedVInt(dob.position() + TypeSizes.sizeofUnsignedVInt(previousUnfilteredSize));
+                // We write the size of the previous unfiltered to make reverse queries more efficient (and simpler).
+                // This is currently not used however and using it is tbd.
+                out.writeUnsignedVInt(previousUnfilteredSize);
+                out.write(dob.getData(), 0, dob.getLength());
+            }
         }
+        else
+        {
+            serializeRowBody(row, flags, header, out);
+        }
+    }
+
+    @Inline
+    private void serializeRowBody(Row row, int flags, SerializationHeader header, DataOutputPlus out)
+    throws IOException
+    {
+        boolean isStatic = row.isStatic();
+
+        Columns headerColumns = header.columns(isStatic);
+        LivenessInfo pkLiveness = row.primaryKeyLivenessInfo();
+        Row.Deletion deletion = row.deletion();
 
         if ((flags & HAS_TIMESTAMP) != 0)
             header.writeTimestamp(pkLiveness.timestamp(), out);
@@ -180,24 +206,41 @@ public class UnfilteredSerializer
         if ((flags & HAS_DELETION) != 0)
             header.writeDeletionTime(deletion.time(), out);
 
-        if (!hasAllColumns)
+        if ((flags & HAS_ALL_COLUMNS) == 0)
             Columns.serializer.serializeSubset(Collections2.transform(row, ColumnData::column), headerColumns, out);
 
         SearchIterator<ColumnDefinition, ColumnDefinition> si = headerColumns.iterator();
-        for (ColumnData data : row)
-        {
-            // We can obtain the column for data directly from data.column(). However, if the cell/complex data
-            // originates from a sstable, the column we'll get will have the type used when the sstable was serialized,
-            // and if that type have been recently altered, that may not be the type we want to serialize the column
-            // with. So we use the ColumnDefinition from the "header" which is "current". Also see #11810 for what
-            // happens if we don't do that.
-            ColumnDefinition column = si.next(data.column());
-            assert column != null;
 
-            if (data.column.isSimple())
-                Cell.serializer.serialize((Cell) data, column, out, pkLiveness, header);
-            else
-                writeComplexColumn((ComplexColumnData) data, column, hasComplexDeletion, pkLiveness, header, out);
+        try
+        {
+            row.apply(cd -> {
+                // We can obtain the column for data directly from data.column(). However, if the cell/complex data
+                // originates from a sstable, the column we'll get will have the type used when the sstable was serialized,
+                // and if that type have been recently altered, that may not be the type we want to serialize the column
+                // with. So we use the ColumnDefinition from the "header" which is "current". Also see #11810 for what
+                // happens if we don't do that.
+                ColumnDefinition column = si.next(cd.column());
+                assert column != null : cd.column.toString();
+
+                try
+                {
+                    if (cd.column.isSimple())
+                        Cell.serializer.serialize((Cell) cd, column, out, pkLiveness, header);
+                    else
+                        writeComplexColumn((ComplexColumnData) cd, column, (flags & HAS_COMPLEX_DELETION) != 0, pkLiveness, header, out);
+                }
+                catch (IOException e)
+                {
+                    throw new WrappedException(e);
+                }
+            }, false);
+        }
+        catch (WrappedException e)
+        {
+            if (e.getCause() instanceof IOException)
+                throw (IOException) e.getCause();
+
+            throw e;
         }
     }
 
@@ -317,7 +360,7 @@ public class UnfilteredSerializer
 
         return size;
     }
-
+    
     private long serializedSize(RangeTombstoneMarker marker, SerializationHeader header, long previousUnfilteredSize, int version)
     {
         assert !header.isForSSTable();
@@ -482,12 +525,31 @@ public class UnfilteredSerializer
             builder.addRowDeletion(hasDeletion ? new Row.Deletion(header.readDeletionTime(in), deletionIsShadowable) : Row.Deletion.LIVE);
 
             Columns columns = hasAllColumns ? headerColumns : Columns.serializer.deserializeSubset(headerColumns, in);
-            for (ColumnDefinition column : columns)
+
+            final LivenessInfo livenessInfo = rowLiveness;
+
+            try
             {
-                if (column.isSimple())
-                    readSimpleColumn(column, in, header, helper, builder, rowLiveness);
-                else
-                    readComplexColumn(column, in, header, helper, hasComplexDeletion, builder, rowLiveness);
+                columns.apply(column -> {
+                    try
+                    {
+                        if (column.isSimple())
+                            readSimpleColumn(column, in, header, helper, builder, livenessInfo);
+                        else
+                            readComplexColumn(column, in, header, helper, hasComplexDeletion, builder, livenessInfo);
+                    }
+                    catch (IOException e)
+                    {
+                        throw new WrappedException(e);
+                    }
+                }, false);
+            }
+            catch (WrappedException e)
+            {
+                if (e.getCause() instanceof IOException)
+                    throw (IOException) e.getCause();
+
+                throw e;
             }
 
             return builder.build();

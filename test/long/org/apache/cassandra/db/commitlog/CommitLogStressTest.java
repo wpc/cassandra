@@ -44,6 +44,8 @@ import com.google.common.util.concurrent.RateLimiter;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import io.netty.util.concurrent.FastThreadLocalThread;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.UpdateBuilder;
@@ -225,7 +227,7 @@ public class CommitLogStressTest
                           discardedRun ? " with discarded run" : "");
         commitLog.allocator.enableReserveSegmentCreation();
 
-        final List<CommitlogExecutor> threads = new ArrayList<>();
+        final List<CommitlogThread> threads = new ArrayList<>();
         ScheduledExecutorService scheduled = startThreads(commitLog, threads);
 
         discardedPos = ReplayPosition.NONE;
@@ -237,7 +239,7 @@ public class CommitLogStressTest
             scheduled.shutdown();
             scheduled.awaitTermination(2, TimeUnit.SECONDS);
 
-            for (CommitlogExecutor t : threads)
+            for (CommitlogThread t : threads)
             {
                 t.join();
                 if (t.rp.compareTo(discardedPos) > 0)
@@ -261,7 +263,7 @@ public class CommitLogStressTest
 
         int hash = 0;
         int cells = 0;
-        for (CommitlogExecutor t : threads)
+        for (CommitlogThread t : threads)
         {
             t.join();
             hash += t.hash;
@@ -326,12 +328,12 @@ public class CommitLogStressTest
         Assert.assertTrue(ratios.isEmpty());
     }
 
-    public ScheduledExecutorService startThreads(final CommitLog commitLog, final List<CommitlogExecutor> threads)
+    public ScheduledExecutorService startThreads(final CommitLog commitLog, final List<CommitlogThread> threads)
     {
         stop = false;
         for (int ii = 0; ii < NUM_THREADS; ii++)
         {
-            final CommitlogExecutor t = new CommitlogExecutor(commitLog, new Random(ii));
+            final CommitlogThread t = new CommitlogThread(commitLog, new Random(ii));
             threads.add(t);
             t.start();
         }
@@ -349,7 +351,7 @@ public class CommitLogStressTest
                 long freeMemory = runtime.freeMemory();
                 long temp = 0;
                 long sz = 0;
-                for (CommitlogExecutor cle : threads)
+                for (CommitlogThread cle : threads)
                 {
                     temp += cle.counter.get();
                     sz += cle.dataSize;
@@ -397,7 +399,7 @@ public class CommitLogStressTest
         return slice;
     }
 
-    public class CommitlogExecutor extends Thread
+    public class CommitlogThread extends FastThreadLocalThread
     {
         final AtomicLong counter = new AtomicLong();
         int hash = 0;
@@ -408,7 +410,7 @@ public class CommitLogStressTest
 
         volatile ReplayPosition rp;
 
-        public CommitlogExecutor(CommitLog commitLog, Random rand)
+        public CommitlogThread(CommitLog commitLog, Random rand)
         {
             this.commitLog = commitLog;
             this.random = rand;
