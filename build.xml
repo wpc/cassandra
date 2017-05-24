@@ -277,6 +277,7 @@
       <!-- define the remote repositories we use -->
       <artifact:remoteRepository id="central"   url="${artifact.remoteRepository.central}"/>
       <artifact:remoteRepository id="apache"    url="${artifact.remoteRepository.apache}"/>
+      <artifact:remoteRepository id="nexus"    url="http://nexus.vip.facebook.com:8181/nexus/content/groups/public"/>
 
       <macrodef name="install">
         <attribute name="pomFile"/>
@@ -501,6 +502,16 @@
         <dependency groupId="org.apache.ant" artifactId="ant-junit" version="1.9.4" />
       </artifact:pom>
 
+      <artifact:pom id="fb-deps-pom"
+                    artifactId="cassandra-build-deps">
+        <parent groupId="org.apache.cassandra"
+                artifactId="cassandra-parent"
+                version="${version}"/>
+        <dependency groupId="org.json" artifactId="json" version="20160212" />
+        <dependency groupId="com.facebook" artifactId="rfe-scubadata-scubadata-java" version="2016-07-07T17.33.57-8890cc" />
+        <dependency groupId="com.facebook.scribe" artifactId="scribe-client" version="0.7.0-SNAPSHOT" />
+      </artifact:pom>
+
       <artifact:pom id="coverage-deps-pom"
                     artifactId="cassandra-coverage-deps">
         <parent groupId="org.apache.cassandra"
@@ -628,6 +639,7 @@
                              dependencyRefsBuildFile="${build.dir}/build-dependencies.xml">
           <remoteRepository refid="central"/>
           <remoteRepository refid="apache"/>
+          <remoteRepository refid="nexus"/>
       </artifact:dependencies>
       <!-- retrieve -source.jar artifacts using the reference-pom with the artifacts that have these -->
       <artifact:dependencies pomRefId="build-deps-pom-sources"
@@ -636,7 +648,16 @@
                              dependencyRefsBuildFile="${build.dir}/build-dependencies-sources.xml">
           <remoteRepository refid="central"/>
           <remoteRepository refid="apache"/>
+          <remoteRepository refid="nexus"/>
       </artifact:dependencies>
+
+      <artifact:dependencies pomRefId="fb-deps-pom"
+                             filesetId="fb-build-dependency-jars"
+                             cacheDependencyRefs="true"
+                             dependencyRefsBuildFile="${build.dir}/fb-build-dependencies.xml">
+          <remoteRepository refid="nexus"/>
+      </artifact:dependencies>
+
       <copy todir="${build.dir.lib}/jars">
           <fileset refid="build-dependency-jars"/>
           <mapper type="flatten"/>
@@ -645,6 +666,16 @@
           <fileset refid="build-dependency-sources"/>
           <mapper type="flatten"/>
       </copy>
+
+      <copy todir="${build.dir.lib}/jars">
+          <fileset refid="fb-build-dependency-jars"/>
+          <mapper type="flatten"/>
+      </copy>
+      <copy todir="${basedir}/lib">
+          <fileset refid="fb-build-dependency-jars"/>
+          <mapper type="flatten"/>
+      </copy>
+
       <!-- code coverage tools -->
       <artifact:dependencies pomRefId="coverage-deps-pom"
                              filesetId="coverage-dependency-jars">
