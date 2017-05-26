@@ -21,7 +21,51 @@ package org.apache.cassandra.rocksdb.encoding;
 
 import java.nio.ByteBuffer;
 
+import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.TimestampType;
+
 public interface RowKeyInputAdapter
 {
-    Object convert(ByteBuffer input);
+
+    public static final RowKeyInputAdapter defalutAdapter = new RowKeyInputAdapter()
+    {
+        public Object compose(AbstractType type, ByteBuffer input)
+        {
+            return type.compose(input);
+        }
+
+        public ByteBuffer decompose(AbstractType type, Object orderlyValue)
+        {
+            return type.decompose(orderlyValue);
+        }
+    };
+    
+    public static final RowKeyInputAdapter bytesAdapter = new RowKeyInputAdapter()
+    {
+        public Object compose(AbstractType type, ByteBuffer input)
+        {
+            return input.array();
+        }
+
+        public ByteBuffer decompose(AbstractType type, Object orderlyValue)
+        {
+            return ByteBuffer.wrap((byte[]) orderlyValue);
+        }
+    };
+
+    public static final RowKeyInputAdapter timestampAdapter = new RowKeyInputAdapter()
+    {
+        public Object compose(AbstractType type, ByteBuffer input)
+        {
+            return TimestampType.instance.compose(input).getTime();
+        }
+
+        public ByteBuffer decompose(AbstractType type, Object orderlyValue)
+        {
+            return TimestampType.instance.fromTimeInMillis((Long) orderlyValue);
+        }
+    };
+
+    Object compose(AbstractType type, ByteBuffer input);
+    ByteBuffer decompose(AbstractType type, Object orderlyValue);
 }

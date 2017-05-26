@@ -74,7 +74,7 @@ import org.apache.hadoop.io.Writable;
  * Header section.
  *
  * <h1> Zero Nibble Terminated Binary Coded Decimals </h1>
- * We convert decimal Strings into Binary Coded Decimal by mapping 
+ * We convert decimal Strings into Binary Coded Decimal by mapping
  * the ASCII characters '0' &hellip; '9' to integers 1 &hellip; 10. Each ASCII 
  * digit is encoded into a 4-bit nibble. There are two nibbles per byte, stored
  * in big-endian order. A nibble of 0 is used as terminator to indicate the end

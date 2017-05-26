@@ -35,6 +35,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.lifecycle.*;
 import org.apache.cassandra.db.filter.*;
 import org.apache.cassandra.db.partitions.*;
+import org.apache.cassandra.rocksdb.RocksDBPartition;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.exceptions.RequestExecutionException;
@@ -509,121 +510,8 @@ public class SinglePartitionReadCommand extends ReadCommand
 
     public UnfilteredRowIterator queryRocksDBLegacy(ColumnFamilyStore cfs)
     {
-        ByteBuffer key = partitionKey().getKey();
-
-        // clustering
-        NavigableSet<Clustering> clusterings = ((ClusteringIndexNamesFilter) clusteringIndexFilter).requestedRows();
-        Clustering clustering = clusterings.first();
-        byte[] rocksDBKey = RowKeyEncoder.encode(key.duplicate(), clustering, metadata());
-
-        // fetch the value of RocksDB
-        List<ColumnData> dataBuffer = new ArrayList<>();
-        try {
-            byte[] value = cfs.db.get(rocksDBKey);
-            Tracing.trace("Fetched data from rocksdb");
-            if (value != null && value.length != 0) {
-              RowValueEncoder.decode(metadata(), columnFilter(), ByteBuffer.wrap(value), dataBuffer);
-            }
-        } catch (RocksDBException e) {
-            e.printStackTrace();
-        }
-
-        Iterator<List<ColumnData>> rowIter;
-        if (dataBuffer.isEmpty())
-        {
-            rowIter = Collections.emptyIterator();
-        }
-        else
-        {
-            rowIter = Collections.singletonList(dataBuffer).iterator();
-        }
-
-        AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
-                                                                                   partitionKey(),
-                                                                                   DeletionTime.LIVE,
-                                                                                   columnFilter().fetchedColumns(),
-                                                                                   null,
-                                                                                   false,
-                                                                                   EncodingStats.NO_STATS)
-        {
-            protected Unfiltered computeNext()
-            {
-                if (!rowIter.hasNext())
-                    return endOfData();
-
-                return BTreeRow.create(clustering,
-                                       LivenessInfo.EMPTY,
-                                       Row.Deletion.regular(DeletionTime.LIVE),
-                                       BTree.build(rowIter.next(), UpdateFunction.<ColumnData>noOp()));
-            }
-        };
-
-        return iterator;
-    }
-
-    public UnfilteredRowIterator queryRocksDB(ColumnFamilyStore cfs)
-    {
-        ByteBuffer key = partitionKey().getKey();
-        Iterator<ColumnDefinition> iter_col = columnFilter().fetchedColumns().iterator();
-
-        //List<Clustering> values = new ArrayList<>();
-        List<ColumnData> dataBuffer = new ArrayList<>();
-        while (iter_col.hasNext())
-        {
-            ColumnDefinition col_def = iter_col.next();
-            ByteBuffer row_key = partitionKey().getKey().duplicate();
-            ByteBuffer col_name = col_def.name.bytes.duplicate();
-            ByteBuffer rocksdb_key = ByteBuffer.allocate(key.capacity() + col_name.capacity()).put(row_key).put(col_name);
-            //logger.debug("DDDDDikang: query key: " + new String(rocksdb_key.array()) + " cf: " + cfs.name);
-            try
-            {
-                byte[] value = cfs.db.get(rocksdb_key.array());
-                //values.add(cfs.metadata.comparator.make(ByteBuffer.wrap(value)));
-                if (value == null)
-                    continue;
-                //logger.debug(new String(value));
-                Cell cell = new BufferCell(col_def, FBUtilities.timestampMicros(), Cell.NO_TTL, Cell.NO_DELETION_TIME, ByteBuffer.wrap(value), null);
-                dataBuffer.add(cell);
-            }
-            catch (RocksDBException e)
-            {
-                e.printStackTrace();
-            }
-        }
-
-        Iterator<List<ColumnData>> rowIter;
-        if (dataBuffer.isEmpty())
-        {
-            rowIter = Collections.emptyIterator();
-        }
-        else
-        {
-            rowIter = Collections.singletonList(dataBuffer).iterator();
-        }
-
-        AbstractUnfilteredRowIterator iterator = new AbstractUnfilteredRowIterator(cfs.metadata,
-                                                 partitionKey(),
-                                                 DeletionTime.LIVE,
-                                                 columnFilter().fetchedColumns(),
-                                                 null,
-                                                 false,
-                                                 EncodingStats.NO_STATS)
-        {
-            protected Unfiltered computeNext()
-            {
-                if (!rowIter.hasNext())
-                    return endOfData();
-
-                return BTreeRow.create(Clustering.EMPTY,
-                                       LivenessInfo.EMPTY,
-                                       Row.Deletion.regular(DeletionTime.LIVE),
-                                       BTree.build(rowIter.next(), UpdateFunction.<ColumnData>noOp()));
-            }
-        };
-
-        //logger.info(iterator.next().toString(cfs.metadata));
-
-        return iterator;
+        Partition partition = new RocksDBPartition(cfs.db, partitionKey(), metadata());
+        return clusteringIndexFilter().getUnfilteredRowIterator(columnFilter(), partition);
     }
 
     @Override

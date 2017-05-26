@@ -48,6 +48,7 @@ import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.serializers.SimpleDateSerializer;
 import org.apache.cassandra.utils.Hex;
+import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.UUIDGen;
 
 import static org.apache.cassandra.rocksdb.encoding.RowKeyEncoder.encode;
@@ -205,14 +206,14 @@ public class RowKeyEncoderTest
     @Test
     public void encodeMultipleKeysPerserveOrders() throws Exception
     {
-        KeyPart smallVarInt = new KeyPart(new BigInteger("-10000"), IntegerType.instance);
-        KeyPart largeVarInt = new KeyPart(new BigInteger("3234324324242342"), IntegerType.instance);
+        Pair<AbstractType, ByteBuffer> smallVarInt = createKeyPart(new BigInteger("-10000"), IntegerType.instance);
+        Pair<AbstractType, ByteBuffer> largeVarInt = createKeyPart(new BigInteger("3234324324242342"), IntegerType.instance);
 
-        KeyPart smallBigInt = new KeyPart(-100L, LongType.instance);
-        KeyPart largeBigInt = new KeyPart(2343434324L, LongType.instance);
+        Pair<AbstractType, ByteBuffer> smallBigInt = createKeyPart(-100L, LongType.instance);
+        Pair<AbstractType, ByteBuffer> largeBigInt = createKeyPart(2343434324L, LongType.instance);
 
-        KeyPart smallTimedUUID = new KeyPart(UUIDGen.getTimeUUID(0L), TimeUUIDType.instance);
-        KeyPart largeTimedUUID = new KeyPart(UUIDGen.getTimeUUID(System.currentTimeMillis()), TimeUUIDType.instance);
+        Pair<AbstractType, ByteBuffer> smallTimedUUID = createKeyPart(UUIDGen.getTimeUUID(0L), TimeUUIDType.instance);
+        Pair<AbstractType, ByteBuffer> largeTimedUUID = createKeyPart(UUIDGen.getTimeUUID(System.currentTimeMillis()), TimeUUIDType.instance);
 
         assertKeysAreInOrder(encode(smallVarInt, smallBigInt, smallTimedUUID),
                              encode(smallVarInt, smallBigInt, largeTimedUUID),
@@ -224,12 +225,17 @@ public class RowKeyEncoderTest
                              encode(largeVarInt, largeBigInt, largeTimedUUID));
     }
 
+    private Pair<AbstractType, ByteBuffer> createKeyPart(Object value, AbstractType type)
+    {
+        return Pair.create(type, type.getSerializer().serialize(value));
+    }
+
     private void assertKeysAreInOrder(AbstractType type, Object... keyVals)
     {
         byte[][] keys = new byte[keyVals.length][];
         for (int i = 0; i < keyVals.length; i++)
         {
-            keys[i] = encode(new KeyPart(keyVals[i], type));
+            keys[i] = encode(createKeyPart(keyVals[i], type));
         }
         assertKeysAreInOrder(keys);
     }

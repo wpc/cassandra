@@ -19,7 +19,6 @@
 package org.apache.cassandra.rocksdb;
 
 import java.io.File;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.UUID;
@@ -29,23 +28,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.marshal.IntegerType;
-import org.apache.cassandra.db.marshal.LongType;
-import org.apache.cassandra.db.marshal.TimeUUIDType;
-import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.rocksdb.encoding.KeyPart;
-import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
-import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.UUIDGen;
-import org.rocksdb.ReadOptions;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-
-import static org.apache.cassandra.rocksdb.encoding.RowKeyEncoder.encode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class BasicSelectTest extends CQLTester
 {
@@ -104,11 +88,10 @@ public class BasicSelectTest extends CQLTester
         execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", 9L, "v1");
         execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", 20L, "v2");
 
-        assertRows(execute("SELECT v FROM %s WHERE p=? and c=?", "p1", 12L),
-                   row("v3"));
-        assertKeyOrderInRocksDB(encode(new KeyPart("p1", UTF8Type.instance), new KeyPart(9L, LongType.instance)),
-                                encode(new KeyPart("p1", UTF8Type.instance), new KeyPart(12L, LongType.instance)),
-                                encode(new KeyPart("p1", UTF8Type.instance), new KeyPart(20L, LongType.instance)));
+        assertRows(execute("SELECT v FROM %s WHERE p=?", "p1"),
+                   row("v1"),
+                   row("v3"),
+                   row("v2"));
     }
 
     @Test
@@ -129,46 +112,53 @@ public class BasicSelectTest extends CQLTester
         execute("INSERT INTO %s(p, c1, c2, v) values (?, ?, ?, ?)",
                 p1, 9L, uuid3, ByteBuffer.wrap("v3".getBytes()));
 
-        assertRows(execute("SELECT v FROM %s WHERE p=? and c1=? and c2=?",
-                           p1, 9L, uuid3),
-                   row(ByteBuffer.wrap("v3".getBytes())));
-        KeyPart keyPart1 = new KeyPart(p1, IntegerType.instance);
-        KeyPart keyPart2 = new KeyPart(9L, LongType.instance);
-        assertKeyOrderInRocksDB(encode(keyPart1, keyPart2, new KeyPart(uuid1, TimeUUIDType.instance)),
-                                encode(keyPart1, keyPart2, new KeyPart(uuid2, TimeUUIDType.instance)),
-                                encode(keyPart1, keyPart2, new KeyPart(uuid3, TimeUUIDType.instance)));
+        assertRows(execute("SELECT c1, c2, v FROM %s WHERE p=?", p1),
+                   row(9L, uuid1, ByteBuffer.wrap("v2".getBytes())),
+                   row(9L, uuid2, ByteBuffer.wrap("v1".getBytes())),
+                   row(9L, uuid3, ByteBuffer.wrap("v3".getBytes())));
     }
 
-
-    private void assertKeyOrderInRocksDB(byte[]... keys) throws IOException
+    @Test
+    public void testSelectWholePartitionRangeQuery() throws Throwable
     {
-        Iterable<ColumnFamilyStore> cfss = StorageService.instance.getValidColumnFamilies(false, false, KEYSPACE, currentTable());
-        ColumnFamilyStore cfs = cfss.iterator().next();
-        RocksDB rocksDB = cfs.db;
-        ReadOptions readOptions = new ReadOptions();
-        readOptions = readOptions.setTotalOrderSeek(true);
-        assertEquals(keys.length, iterLength(rocksDB.newIterator()));
-        try (RocksIterator rocksIterator = rocksDB.newIterator(readOptions))
-        {
-            rocksIterator.seekToFirst();
-            for (int i = 0; i < keys.length; i++)
-            {
-                assertTrue(rocksIterator.isValid());
-                assertEquals(Bytes.toStringBinary(keys[i]), Bytes.toStringBinary(rocksIterator.key()));
-                rocksIterator.next();
-            }
-        }
+        createTable("CREATE TABLE %s (a int, b int, c int, d int, e int, f text, PRIMARY KEY (a, b, c, d, e) )");
+
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 2, '2')");
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 1, '1')");
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (1, 1, 1, 2, 1, '1')");
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 3, '3')");
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 5, '5')");
+        execute("INSERT INTO %s (a, b, c, d, e, f) VALUES (2, 1, 1, 1, 5, '5')");
+
+        assertRows(execute("SELECT a, b, c, d, e, f FROM %s WHERE a = 1"),
+                   row(1, 1, 1, 1, 1, "1"),
+                   row(1, 1, 1, 1, 2, "2"),
+                   row(1, 1, 1, 1, 3, "3"),
+                   row(1, 1, 1, 1, 5, "5"),
+                   row(1, 1, 1, 2, 1, "1"));
     }
 
-    private int iterLength(RocksIterator rocksIterator)
+    @Test
+    public void testRangeQueryWithMerge() throws Throwable
     {
-        int i = 0;
-        rocksIterator.seekToFirst();
-        while (rocksIterator.isValid())
-        {
-            i++;
-            rocksIterator.next();
-        }
-        return i;
+        createTable("CREATE TABLE %s (a int, b int, c int, d int, e int, f text, g text, PRIMARY KEY (a, b, c, d, e) )");
+
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (1, 1, 1, 1, 2, '2', '0')");
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (1, 1, 1, 1, 1, '1', '0')");
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (1, 1, 1, 2, 1, '1', '0')");
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (1, 1, 1, 1, 3, '3', '0')");
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (1, 1, 1, 1, 5, '5', '0')");
+        execute("INSERT INTO %s (a, b, c, d, e, f, g) VALUES (2, 1, 1, 1, 5, '5', '0')");
+
+        execute("DELETE FROM %s WHERE a=1 AND b=1 AND c=1 AND d=1 AND e=1");
+        execute("DELETE FROM %s WHERE a=1 AND b=1 AND c=1 AND d=1 AND e=3");
+        execute("UPDATE %s SET f='6' WHERE a=1 AND b=1 AND c=1 AND d=1 AND e=5");
+        execute("UPDATE %s SET g='1' WHERE a=1 AND b=1 AND c=1 AND d=1 AND e=5");
+
+        assertRows(execute("SELECT a, b, c, d, e, f, g FROM %s WHERE a = 1"),
+                   row(1, 1, 1, 1, 2, "2", "0"),
+                   row(1, 1, 1, 1, 5, "6", "1"),
+                   row(1, 1, 1, 2, 1, "1", "0"));
     }
+
 }
