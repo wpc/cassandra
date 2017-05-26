@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
+import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.rmi.registry.LocateRegistry;
@@ -149,6 +150,32 @@ public class CassandraDaemon
         this.runManaged = runManaged;
         this.startupChecks = new StartupChecks().withDefaultTests();
         this.setupCompleted = false;
+    }
+
+    private Server initCustomThriftServer(InetAddress rpcAddr, int rpcPort, int listenBacklog)
+    {
+        String customThriftServerClass = System.getProperty("cassandra.custom_thrift_class");
+        Server server = null;
+
+        if (customThriftServerClass != null)
+        {
+            try
+            {
+                Class<Server> cls = FBUtilities.classForName(customThriftServerClass, "CustomThriftService");
+                Constructor<Server> ctor = cls.getConstructor(InetAddress.class, int.class, int.class);
+                server = ctor.newInstance(rpcAddr, rpcPort, listenBacklog);
+                logger.info("Using {} as Customized thrift class", customThriftServerClass);
+            } catch (Exception e)
+            {
+                JVMStabilityInspector.inspectThrowable(e);
+                logger.warn("Cannot load class " + customThriftServerClass + ", using default thrift server.", e);
+            }
+        }
+
+        if (server == null)
+            server = new ThriftServer(rpcAddr, rpcPort, listenBacklog);
+
+        return server;
     }
 
     /**
@@ -390,7 +417,7 @@ public class CassandraDaemon
         InetAddress rpcAddr = DatabaseDescriptor.getRpcAddress();
         int rpcPort = DatabaseDescriptor.getRpcPort();
         int listenBacklog = DatabaseDescriptor.getRpcListenBacklog();
-        thriftServer = new ThriftServer(rpcAddr, rpcPort, listenBacklog);
+        thriftServer = initCustomThriftServer(rpcAddr, rpcPort, listenBacklog);
 
         // Native transport
         nativeTransportService = new NativeTransportService();

@@ -135,7 +135,7 @@ public class CassandraServer implements Cassandra.Iface
     {
         assert !cell.isCounter();
 
-        Column thrift_column = new Column(name).setValue(cell.value).setTimestamp(cell.timestamp);
+        Column thrift_column = new Column(name.duplicate()).setValue(cell.value.duplicate()).setTimestamp(cell.timestamp);
         if (cell.isExpiring())
             thrift_column.setTtl(cell.ttl);
         return thrift_column;
@@ -152,7 +152,7 @@ public class CassandraServer implements Cassandra.Iface
     private CounterColumn thriftifySubCounter(CFMetaData metadata, LegacyLayout.LegacyCell cell)
     {
         assert cell.isCounter();
-        return new CounterColumn(cell.name.encode(metadata), CounterContext.instance().total(cell.value));
+        return new CounterColumn(cell.name.encode(metadata), CounterContext.instance().total(cell.value.duplicate()));
     }
 
     private List<ColumnOrSuperColumn> thriftifySuperColumns(CFMetaData metadata,
@@ -167,7 +167,7 @@ public class CassandraServer implements Cassandra.Iface
             while (cells.hasNext())
             {
                 LegacyLayout.LegacyCell cell = cells.next();
-                thriftSuperColumns.add(thriftifyColumnWithName(metadata, cell, cell.name.superColumnSubName()));
+                thriftSuperColumns.add(thriftifyColumnWithName(metadata, cell, cell.name.superColumnSubName().duplicate()));
             }
             // Generally, cells come reversed if the query is reverse. However, this is not the case within a super column because
             // internally a super column is a map within a row and those are never returned reversed.
@@ -191,7 +191,7 @@ public class CassandraServer implements Cassandra.Iface
         while (cells.hasNext())
         {
             LegacyLayout.LegacyCell cell = cells.next();
-            ByteBuffer scName = cell.name.superColumnName();
+            ByteBuffer scName = cell.name.superColumnName().duplicate();
             if (current == null || !scName.equals(current.bufferForName()))
             {
                 // Generally, cells come reversed if the query is reverse. However, this is not the case within a super column because
@@ -202,7 +202,7 @@ public class CassandraServer implements Cassandra.Iface
                 current = new SuperColumn(scName, new ArrayList<>());
                 thriftSuperColumns.add(new ColumnOrSuperColumn().setSuper_column(current));
             }
-            current.getColumns().add(thriftifySubColumn(cell, cell.name.superColumnSubName()));
+            current.getColumns().add(thriftifySubColumn(cell, cell.name.superColumnSubName().duplicate()));
         }
 
         if (current != null && reversed)
@@ -229,7 +229,7 @@ public class CassandraServer implements Cassandra.Iface
                 current = new CounterSuperColumn(scName, new ArrayList<>());
                 thriftSuperColumns.add(new ColumnOrSuperColumn().setCounter_super_column(current));
             }
-            current.getColumns().add(thriftifySubCounter(metadata, cell).setName(cell.name.superColumnSubName()));
+            current.getColumns().add(thriftifySubCounter(metadata, cell).setName(cell.name.superColumnSubName().duplicate()));
         }
         return thriftSuperColumns;
     }
@@ -1662,7 +1662,7 @@ public class CassandraServer implements Cassandra.Iface
                 try (RowIterator partition = iter.next())
                 {
                     List<ColumnOrSuperColumn> thriftifiedColumns = thriftifyPartition(partition, column_parent.super_column != null, partition.isReverseOrder(), cellLimit);
-                    keySlices.add(new KeySlice(partition.partitionKey().getKey(), thriftifiedColumns));
+                    keySlices.add(new KeySlice(partition.partitionKey().getKey().duplicate(), thriftifiedColumns));
                 }
             }
 

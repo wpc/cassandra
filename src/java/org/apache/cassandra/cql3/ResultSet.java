@@ -109,9 +109,9 @@ public class ResultSet
         {
             ColumnSpecification spec = metadata.names.get(i);
             ByteBuffer colName = ByteBufferUtil.bytes(spec.name.toString());
-            schema.name_types.put(colName, UTF8);
+            schema.name_types.put(colName.duplicate(), UTF8);
             AbstractType<?> normalizedType = spec.type instanceof ReversedType ? ((ReversedType)spec.type).baseType : spec.type;
-            schema.value_types.put(colName, normalizedType.toString());
+            schema.value_types.put(colName.duplicate(), normalizedType.toString());
 
         }
 
@@ -122,7 +122,7 @@ public class ResultSet
             for (int i = 0; i < metadata.columnCount; i++)
             {
                 Column col = new Column(ByteBufferUtil.bytes(metadata.names.get(i).name.toString()));
-                col.setValue(row.get(i));
+                col.setValue(row.get(i).duplicate());
                 thriftCols.add(col);
             }
             // The key of CqlRow shoudn't be needed in CQL3
