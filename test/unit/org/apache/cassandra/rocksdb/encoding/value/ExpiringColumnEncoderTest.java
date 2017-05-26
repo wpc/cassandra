@@ -31,6 +31,7 @@ import org.junit.Test;
 import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class ExpiringColumnEncoderTest
 {
@@ -75,6 +76,6 @@ public class ExpiringColumnEncoderTest
         deserialized.value().get(value);
         assertEquals(new String(value), sData);
         assertEquals(deserialized.ttl(), ttl);
-        assertEquals(deserialized.localDeletionTime(), BufferCell.NO_DELETION_TIME);
+        assertTrue(deserialized.localDeletionTime() > 0);
     }
 }

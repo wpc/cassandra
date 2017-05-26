@@ -36,6 +36,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 
 public class RowValueEncoderTest
@@ -52,7 +54,8 @@ public class RowValueEncoderTest
         ;
         for (int i = 0; i < columnNum; i++)
         {
-            builder.addRegularColumn(new ColumnIdentifier("" + i, true), BytesType.instance);
+            String columnName = "" + i;
+            builder.addRegularColumn(ColumnIdentifier.getInterned(ByteBuffer.wrap(columnName.getBytes()), BytesType.instance), BytesType.instance);
         }
         return builder.build();
     }
@@ -105,6 +108,7 @@ public class RowValueEncoderTest
         return builder.build();
     }
 
+    @Test
     public void testEncodeAndDecodeRowDeletion()
     {
         CFMetaData metaData = buildCFMetaDate(3);
@@ -121,6 +125,7 @@ public class RowValueEncoderTest
         assertEquals(columns.size(), 0);
     }
 
+    @Test
     public void testEncodeAndDecodeRow()
     {
         CFMetaData metaData = buildCFMetaDate(3);
