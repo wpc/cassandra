@@ -50,6 +50,7 @@ import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
 import org.apache.cassandra.io.util.WrappedDataOutputStreamPlus;
+import org.apache.cassandra.metrics.MessagingMetrics;
 import org.apache.cassandra.tracing.TraceState;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.CoalescingStrategies;
@@ -311,6 +312,7 @@ public class OutboundTcpConnection extends Thread
     {
         try
         {
+            MessagingMetrics.addCrossRegionCounter(qm.message.verb, poolReference.endPoint());
             byte[] sessionBytes = qm.message.parameters.get(Tracing.TRACE_HEADER);
             if (sessionBytes != null)
             {

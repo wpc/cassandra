@@ -1728,6 +1728,7 @@ public class StorageProxy implements StorageProxyMBean
                                                  keyspace,
                                                  executor.handler.endpoints);
 
+                ReadRepairMetrics.addFullDataQueryCounter();
                 for (InetAddress endpoint : executor.getContactedReplicas())
                 {
                     MessageOut<ReadCommand> message = command.createMessage(MessagingService.instance().getVersion(endpoint));

@@ -35,6 +35,7 @@ import org.apache.cassandra.db.partitions.*;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.db.transform.*;
 import org.apache.cassandra.exceptions.ReadTimeoutException;
+import org.apache.cassandra.metrics.ReadRepairMetrics;
 import org.apache.cassandra.net.*;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
@@ -451,6 +452,7 @@ public class DataResolver extends ResponseResolver
                     // on-timeout behavior that a "real" mutation gets
                     Tracing.trace("Sending read-repair-mutation to {}", sources[i]);
                     MessageOut<Mutation> msg = new Mutation(repairs[i]).createMessage(MessagingService.Verb.READ_REPAIR);
+                    ReadRepairMetrics.addReadRepairWriteCounter(sources[i]);
                     repairResults.add(MessagingService.instance().sendRR(msg, sources[i]));
                 }
             }
