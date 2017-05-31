@@ -1340,7 +1340,7 @@ public abstract class ReadCommand implements ReadQuery
                 // See CASSANDRA-11087.
                 if (metadata.isStaticCompactTable() && cellName.clustering.equals(Clustering.STATIC_CLUSTERING))
                 {
-                    clusterings.add(new Clustering(cellName.column.name.bytes));
+                    clusterings.add(Clustering.make(cellName.column.name.bytes));
                     selectionBuilder.add(metadata.compactValueColumn());
                 }
                 else

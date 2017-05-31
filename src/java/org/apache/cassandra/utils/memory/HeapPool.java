@@ -18,10 +18,6 @@
  */
 package org.apache.cassandra.utils.memory;
 
-import java.nio.ByteBuffer;
-
-import org.apache.cassandra.utils.concurrent.OpOrder;
-
 public class HeapPool extends MemtablePool
 {
     public HeapPool(long maxOnHeapMemory, float cleanupThreshold, Runnable cleaner)
@@ -29,16 +25,15 @@ public class HeapPool extends MemtablePool
         super(maxOnHeapMemory, 0, cleanupThreshold, cleaner);
     }
 
-    public boolean needToCopyOnHeap()
-    {
-        return false;
-    }
-
     public MemtableAllocator newAllocator()
     {
-        return new Allocator(this);
+        // TODO
+        throw new UnsupportedOperationException();
+        //return new Allocator(this);
     }
 
+    // TODO
+    /*
     private static class Allocator extends MemtableBufferAllocator
     {
         Allocator(HeapPool pool)
@@ -51,5 +46,5 @@ public class HeapPool extends MemtablePool
             super.onHeap().allocate(size, opGroup);
             return ByteBuffer.allocate(size);
         }
-    }
+    }*/
 }

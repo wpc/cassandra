@@ -162,7 +162,7 @@ public class KeysSearcher extends CassandraIndexSearcher
             // is the indexed name and so we need to materialize the partition.
             ImmutableBTreePartition result = ImmutableBTreePartition.create(iterator);
             iterator.close();
-            Row data = result.getRow(new Clustering(index.getIndexedColumn().name.bytes));
+            Row data = result.getRow(Clustering.make(index.getIndexedColumn().name.bytes));
             if (data == null)
                 return null;
 
@@ -174,7 +174,7 @@ public class KeysSearcher extends CassandraIndexSearcher
             {
                 // Index is stale, remove the index entry and ignore
                 index.deleteStaleEntry(index.getIndexCfs().decorateKey(indexedValue),
-                                         new Clustering(index.getIndexedColumn().name.bytes),
+                                         Clustering.make(index.getIndexedColumn().name.bytes),
                                          new DeletionTime(indexHit.primaryKeyLivenessInfo().timestamp(), nowInSec),
                                          writeOp);
                 return null;

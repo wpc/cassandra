@@ -397,6 +397,8 @@ concurrent_materialized_view_writes: 32
 # Specify the way Cassandra allocates and manages memtable memory.
 # Options are:
 #   heap_buffers:    on heap nio buffers
+#   offheap_buffers: off heap (direct) nio buffers
+#   offheap_objects: off heap objects
 #
 # Note: offheap_buffers are not supported in Cassandra 3.0 - 3.3.
 # They have been re-introduced in Cassandra 3.4. For details see

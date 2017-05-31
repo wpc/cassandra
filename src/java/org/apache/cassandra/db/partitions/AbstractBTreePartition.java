@@ -139,6 +139,11 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
             private final SearchIterator<Clustering, Row> rawIter = new BTreeSearchIterator<>(current.tree, metadata.comparator, desc(reversed));
             private final DeletionTime partitionDeletion = current.deletionInfo.getPartitionDeletion();
 
+            public boolean hasNext()
+            {
+                return rawIter.hasNext();
+            }
+
             public Row next(Clustering clustering)
             {
                 if (clustering == Clustering.STATIC_CLUSTERING)
@@ -164,7 +169,7 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
 
     public UnfilteredRowIterator unfilteredIterator()
     {
-        return unfilteredIterator(metadata().getAllColumnFilter(), Slices.ALL, false);
+        return unfilteredIterator(ColumnFilter.all(metadata()), Slices.ALL, false);
     }
 
     public UnfilteredRowIterator unfilteredIterator(ColumnFilter selection, Slices slices, boolean reversed)
@@ -178,7 +183,7 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
         if (slices.size() == 0)
         {
             DeletionTime partitionDeletion = current.deletionInfo.getPartitionDeletion();
-            return UnfilteredRowIterators.noRowsIterator(metadata, partitionKey, staticRow, partitionDeletion, reversed);
+            return UnfilteredRowIterators.noRowsIterator(metadata, partitionKey(), staticRow, partitionDeletion, reversed);
         }
 
         return slices.size() == 1
@@ -196,9 +201,9 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
     }
 
     private RowAndDeletionMergeIterator merge(Iterator<Row> rowIter, Iterator<RangeTombstone> deleteIter,
-                                                     ColumnFilter selection, boolean reversed, Holder current, Row staticRow)
+                                              ColumnFilter selection, boolean reversed, Holder current, Row staticRow)
     {
-        return new RowAndDeletionMergeIterator(metadata, partitionKey, current.deletionInfo.getPartitionDeletion(),
+        return new RowAndDeletionMergeIterator(metadata, partitionKey(), current.deletionInfo.getPartitionDeletion(),
                                                selection, staticRow, reversed, current.stats,
                                                rowIter, deleteIter,
                                                canHaveShadowedData());
@@ -217,14 +222,14 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
         private AbstractIterator(Holder current, ColumnFilter selection, boolean isReversed)
         {
             this(current,
-                 AbstractBTreePartition.this.staticRow(current, selection, false),
-                 selection, isReversed);
+                    AbstractBTreePartition.this.staticRow(current, selection, false),
+                    selection, isReversed);
         }
 
         private AbstractIterator(Holder current, Row staticRow, ColumnFilter selection, boolean isReversed)
         {
             super(AbstractBTreePartition.this.metadata,
-                  AbstractBTreePartition.this.partitionKey,
+                  AbstractBTreePartition.this.partitionKey(),
                   current.deletionInfo.getPartitionDeletion(),
                   selection.fetchedColumns(), // non-selected columns will be filtered in subclasses by RowAndDeletionMergeIterator
                                               // it would also be more precise to return the intersection of the selection and current.columns,
@@ -351,10 +356,7 @@ public abstract class AbstractBTreePartition implements Partition, Iterable<Row>
         BTree.Builder<Row> builder = BTree.builder(metadata.comparator, initialRowCapacity);
         builder.auto(false);
         while (rows.hasNext())
-        {
-            Row row = rows.next();
-            builder.add(row);
-        }
+            builder.add(rows.next());
 
         if (reversed)
             builder.reverse();

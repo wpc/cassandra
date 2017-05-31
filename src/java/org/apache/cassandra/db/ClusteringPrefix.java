@@ -74,7 +74,7 @@ public interface ClusteringPrefix extends IMeasurableMemory, Clusterable
          */
         public final int comparedToClustering;
 
-        private Kind(int comparison, int comparedToClustering)
+        Kind(int comparison, int comparedToClustering)
         {
             this.comparison = comparison;
             this.comparedToClustering = comparedToClustering;
@@ -502,7 +502,7 @@ public interface ClusteringPrefix extends IMeasurableMemory, Clusterable
         {
             assert nextIsRow;
             deserializeAll();
-            Clustering clustering = new Clustering(nextValues);
+            Clustering clustering = Clustering.make(nextValues);
             nextValues = null;
             return clustering;
         }

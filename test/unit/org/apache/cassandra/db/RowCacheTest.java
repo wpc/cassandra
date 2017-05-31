@@ -553,7 +553,7 @@ public class RowCacheTest
         for (int i = offset; i < offset + numberOfRows; i++)
         {
             DecoratedKey key = Util.dk("key" + i);
-            Clustering cl = new Clustering(ByteBufferUtil.bytes("col" + i));
+            Clustering cl = Clustering.make(ByteBufferUtil.bytes("col" + i));
             Util.getAll(Util.cmd(store, key).build());
         }
     }
