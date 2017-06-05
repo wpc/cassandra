@@ -38,6 +38,7 @@ import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.gms.VersionedValue;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.ftpserver.command.impl.STOR;
 
@@ -194,6 +195,8 @@ public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILa
                 continue;
             subsnitchOrderedScores.add(score);
         }
+        if (Tracing.isTracing())
+            Tracing.trace("sortByProximityWithBadness: after sorting by proximity, addresses order change to {}, with scores {}", addresses, subsnitchOrderedScores);
 
         // Sort the scores and then compare them (positionally) to the scores in the subsnitch order.
         // If any of the subsnitch-ordered scores exceed the optimal/sorted score by BADNESS_THRESHOLD, use
@@ -202,11 +205,14 @@ public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILa
         Collections.sort(sortedScores);
 
         Iterator<Double> sortedScoreIterator = sortedScores.iterator();
-        for (Double subsnitchScore : subsnitchOrderedScores)
+        for (int i = 0; i < subsnitchOrderedScores.size(); i++)
         {
+            Double subsnitchScore = subsnitchOrderedScores.get(i);
             if (subsnitchScore > (sortedScoreIterator.next() * (1.0 + BADNESS_THRESHOLD)))
             {
                 sortByProximityWithScore(address, addresses);
+                if (Tracing.isTracing())
+                    Tracing.trace("address {} with subsnitchScore {} causing sortByProximityWithBadness roll back to sortByProximityWithScore", addresses.get(i), subsnitchScore);
                 return;
             }
         }
