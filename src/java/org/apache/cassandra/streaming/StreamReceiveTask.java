@@ -44,6 +44,7 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBSStableWriter;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.utils.JVMStabilityInspector;
@@ -253,7 +254,7 @@ public class StreamReceiveTask extends StreamTask
 
                 if (cfs.isRocksDBBacked())
                 {
-                    RocksDBStreamUtils.ingestRocksSstables(cfs.db, task.rocksTables);
+                    RocksDBStreamUtils.ingestRocksSstables(RocksEngine.getRocksDBInstance(cfs), task.rocksTables);
                 }
                 task.session.taskCompleted(task);
             }

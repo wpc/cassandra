@@ -39,7 +39,6 @@ import com.google.common.util.concurrent.*;
 
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.metrics.RocksdbTableMetrics;
-import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +51,6 @@ import org.apache.cassandra.db.commitlog.ReplayPosition;
 import org.apache.cassandra.db.compaction.*;
 import org.apache.cassandra.db.filter.ClusteringIndexFilter;
 import org.apache.cassandra.db.filter.DataLimits;
-import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.view.TableViews;
 import org.apache.cassandra.db.lifecycle.*;
 import org.apache.cassandra.db.partitions.CachedPartition;
@@ -74,7 +71,8 @@ import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
-import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
+import org.apache.cassandra.rocksdb.engine.StorageEngine;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
@@ -85,8 +83,6 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.rocksdb.*;
-import org.rocksdb.BloomFilter;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -229,62 +225,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private final ScheduledFuture<?> latencyCalculator;
 
     private volatile boolean compactionSpaceCheck = true;
-    public RocksDB db = null;
-    private Options options = null;
-    public Statistics rocksdbStats = null;
 
-    public static final String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", "rocksdb");
-    public static final String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
+    public StorageEngine engine = null;
 
 
     public static void shutdownPostFlushExecutor() throws InterruptedException
     {
         postFlushExecutor.shutdown();
         postFlushExecutor.awaitTermination(60, TimeUnit.SECONDS);
-    }
-
-    private void openRocksDB()
-    {
-
-        if (keyspace.getName().equals(ROCKSDB_KEYSPACE))
-        {
-            options = new Options().setCreateIfMissing(true);
-            try
-            {
-                final long writeBufferSize = 8 * 512 * 1024 * 1024L;
-                final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
-
-                options.setAllowConcurrentMemtableWrite(true);
-                options.setEnableWriteThreadAdaptiveYield(true);
-                options.setBytesPerSync(1024*1024);
-                options.setWalBytesPerSync(1024*1024);
-                options.setMaxBackgroundCompactions(20);
-                options.setBaseBackgroundCompactions(20);
-                options.setMaxSubcompactions(8);
-                options.setCompressionType(CompressionType.LZ4_COMPRESSION);
-                options.setWriteBufferSize(writeBufferSize);
-                options.setMaxBytesForLevelBase(4 * writeBufferSize);
-                options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
-                options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
-                options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-                options.setMergeOperatorName("cassandra");
-
-                final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
-                final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-                tableOptions.setFilter(bloomFilter);
-                options.setTableFormatConfig(tableOptions);
-
-                rocksdbStats = options.statisticsPtr();
-                String rocksDBTableDir = ROCKSDB_DIR + "/" + keyspace.getName() + "/" + name;
-                FileUtils.createDirectory(ROCKSDB_DIR);
-                FileUtils.createDirectory(rocksDBTableDir);
-                db = RocksDB.open(options, rocksDBTableDir);
-            }
-            catch (RocksDBException e)
-            {
-                e.printStackTrace();
-            }
-        }
     }
 
     public void reload()
@@ -314,7 +262,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
 
-        openRocksDB();
+        if (engine != null)
+        {
+            engine.openColumnFamilyStore(keyspace.getName(),
+                                         name,
+                                         metadata);
+        }
     }
 
     void scheduleFlush()
@@ -438,6 +391,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         this.keyspace = keyspace;
         this.metadata = metadata;
+        engine = keyspace.engine;
         name = columnFamilyName;
         minCompactionThreshold = new DefaultValue<>(metadata.params.compaction.minCompactionThreshold());
         maxCompactionThreshold = new DefaultValue<>(metadata.params.compaction.maxCompactionThreshold());
@@ -530,7 +484,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             oldMBeanName= null;
         }
 
-        openRocksDB();
+        if (engine != null)
+        {
+            engine.openColumnFamilyStore(keyspace.getName(),
+                                         name,
+                                         metadata);
+        }
     }
 
     public Directories getDirectories()
@@ -1272,47 +1231,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     }
 
-    public void applyRocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition commitLogPosition)
-    {
-        DecoratedKey partitionKey = update.partitionKey();
-        AbstractType<?> keyValidator = update.metadata().getKeyValidator();
-
-        List<ColumnDefinition> clusteringColumns = update.metadata().clusteringColumns();
-
-        for (Row row: update)
-        {
-            applyRowToRocksDB(partitionKey, row, keyValidator, clusteringColumns);
-        }
-
-        Row staticRow = update.staticRow();
-        if (!staticRow.isEmpty())
-        {
-            applyRowToRocksDB(partitionKey, staticRow, keyValidator, clusteringColumns);
-        }
-
-    }
-
-    private void applyRowToRocksDB(DecoratedKey partitionKey, Row row, AbstractType<?> keyValidator, List<ColumnDefinition> clusteringColumns)
-    {
-
-        Clustering clustering = row.clustering();
-
-        byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, clustering, metadata);
-        byte[] rocksDBValue = RowValueEncoder.encode(metadata, row);
-
-        // value colummns
-        try
-        {
-            db.merge(rocksDBKey, rocksDBValue);
-        }
-        catch (RocksDBException e)
-        {
-            logger.error(e.toString(), e);
-        }
-    }
-
     public boolean isRocksDBBacked() {
-        return keyspace.getName().equals(ROCKSDB_KEYSPACE);
+        return keyspace.getName().equals(RocksEngine.ROCKSDB_KEYSPACE);
     }
 
     /**

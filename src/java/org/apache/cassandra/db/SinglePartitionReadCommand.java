@@ -35,8 +35,6 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.lifecycle.*;
 import org.apache.cassandra.db.filter.*;
 import org.apache.cassandra.db.partitions.*;
-import org.apache.cassandra.rocksdb.RocksDBPartition;
-import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
@@ -45,7 +43,6 @@ import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.ClientState;
@@ -55,16 +52,9 @@ import org.apache.cassandra.thrift.ThriftResultsMerger;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.SearchIterator;
-import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.BTreeSet;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.memory.HeapAllocator;
-
-import org.apache.cassandra.utils.btree.UpdateFunction;
-import org.rocksdb.RocksDBException;
-
-import static org.apache.cassandra.db.ColumnFamilyStore.ROCKSDB_KEYSPACE;
-
 
 /**
  * A read command that selects a (part of a) single partition.
@@ -501,17 +491,11 @@ public class SinglePartitionReadCommand extends ReadCommand
     {
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
-        if (cfs.keyspace.getName().equals(ROCKSDB_KEYSPACE))
-            return queryRocksDBLegacy(cfs);
+        if (cfs.engine != null)
+            return cfs.engine.queryStorage(cfs, this);
 
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();
         return queryMemtableAndDiskInternal(cfs, copyOnHeap);
-    }
-
-    public UnfilteredRowIterator queryRocksDBLegacy(ColumnFamilyStore cfs)
-    {
-        Partition partition = new RocksDBPartition(cfs.db, partitionKey(), metadata());
-        return clusteringIndexFilter().getUnfilteredRowIterator(columnFilter(), partition);
     }
 
     @Override

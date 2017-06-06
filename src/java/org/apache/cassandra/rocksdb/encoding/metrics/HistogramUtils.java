@@ -21,12 +21,13 @@ package org.apache.cassandra.rocksdb.encoding.metrics;
 import java.io.OutputStream;
 
 import com.codahale.metrics.Histogram;
-import com.codahale.metrics.Sampling;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformSnapshot;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.rocksdb.HistogramData;
 import org.rocksdb.HistogramType;
+import org.rocksdb.Statistics;
 
 public class HistogramUtils
 {
@@ -39,21 +40,27 @@ public class HistogramUtils
     static class RocksHistogram extends Histogram {
         public final ColumnFamilyStore cfs;
         public final HistogramType type;
+        public final Statistics stats;
 
         public RocksHistogram(ColumnFamilyStore cfs, HistogramType type) {
             super(null);
             this.cfs = cfs;
             this.type = type;
+
+            if (cfs.keyspace.getName().equals(RocksEngine.ROCKSDB_KEYSPACE))
+                stats = ((RocksEngine)cfs.engine).rocksDBStats.get(cfs.metadata.cfId);
+            else
+                stats = null;
         }
 
         public Snapshot getSnapshot()
         {
-            if (cfs.rocksdbStats == null)
+            if (stats == null)
             {
                 return EMPTY_SNAPSHOT;
             }
 
-            final HistogramData histogramData = cfs.rocksdbStats.getHistogramData(type);
+            final HistogramData histogramData = stats.getHistogramData(type);
             return new Snapshot()
             {
                 public double getValue(double v)

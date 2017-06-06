@@ -46,6 +46,7 @@ import org.apache.cassandra.gms.*;
 import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.messages.*;
@@ -395,7 +396,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
                 continue;
             }
             sections.add(new RocksdbStreamingSections(cfStore.metadata.cfId,
-                                                      cfStore.db,
+                                                      RocksEngine.getRocksDBInstance(cfStore),
                                                       ranges));
         }
         return sections;

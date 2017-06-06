@@ -135,10 +135,6 @@ public class TableMetrics
     /** CAS Commit metrics */
     public final LatencyMetrics casCommit;
 
-    public final Gauge<Double> rocksdbReadAvg;
-    public final Gauge<Double> rocksdbReadP99;
-
-
     public final Timer coordinatorReadLatency;
     public final Timer coordinatorScanLatency;
 
@@ -222,28 +218,6 @@ public class TableMetrics
         {
             samplers.put(sampler, new TopKSampler<>());
         }
-
-        rocksdbReadAvg = createTableGauge("rocksdbReadAvg", new Gauge<Double>()
-        {
-            public Double getValue()
-            {
-                if (cfs.rocksdbStats == null)
-                    return 0.0;
-
-                return cfs.rocksdbStats.getHistogramData(HistogramType.DB_GET).getAverage();
-            }
-        });
-
-        rocksdbReadP99 = createTableGauge("rocksdbReadP99", new Gauge<Double>()
-        {
-            public Double getValue()
-            {
-                if (cfs.rocksdbStats == null)
-                    return 0.0;
-
-                return cfs.rocksdbStats.getHistogramData(HistogramType.DB_GET).getPercentile99();
-            }
-        });
 
         memtableColumnsCount = createTableGauge("MemtableColumnsCount", new Gauge<Long>()
         {

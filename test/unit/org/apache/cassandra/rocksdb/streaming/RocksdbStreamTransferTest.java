@@ -41,6 +41,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamPlan;
 import org.apache.cassandra.streaming.StreamResultFuture;
@@ -115,7 +116,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(outCfs.db);
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBInstance(outCfs));
             List<Range<Token>> ranges = new ArrayList<>();
             ranges.add(
                       new Range<Token>(RocksDBStreamUtils.getMinToken(inCfs.getPartitioner()),
@@ -167,7 +168,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(outCfs.db);
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBInstance(outCfs));
             transferRanges(inCfs, ranges);
         } finally
         {
@@ -218,7 +219,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(outCfs.db);
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBInstance(outCfs));
             List<Range<Token>> ranges = new ArrayList<>();
 
             IPartitioner partitioner = inCfs.getPartitioner();

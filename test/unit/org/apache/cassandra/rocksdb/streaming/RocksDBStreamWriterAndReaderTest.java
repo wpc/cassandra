@@ -27,6 +27,7 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -53,7 +54,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         assertRows(execute("SELECT v FROM %s WHERE p=?", "merge"), row("old"));
 
         // Write Rocksdb entries into stream.
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(cfs.db,
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(cfs),
                                                              Arrays.asList(
                                                                           new Range(RocksDBStreamUtils.getMinToken(tokenPartioner),
                                                                                     RocksDBStreamUtils.getMaxToken(tokenPartioner))),
@@ -77,7 +78,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         RocksDBStreamReader reader = new RocksDBStreamReader(new RocksDBMessageHeader(cfs.metadata.cfId, 0), createDummySession());
         DataInputBuffer in = new DataInputBuffer(out.buffer(), false);
         RocksDBSStableWriter sstableWriter = reader.read(in);
-        RocksDBStreamUtils.ingestRocksSstables(cfs.db, Arrays.asList(sstableWriter));
+        RocksDBStreamUtils.ingestRocksSstables(RocksEngine.getRocksDBInstance(cfs), Arrays.asList(sstableWriter));
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)

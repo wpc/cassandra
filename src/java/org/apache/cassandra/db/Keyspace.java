@@ -45,6 +45,8 @@ import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.metrics.KeyspaceMetrics;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
+import org.apache.cassandra.rocksdb.engine.StorageEngine;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.tracing.Tracing;
@@ -52,8 +54,6 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.concurrent.OpOrder;
-
-import static org.apache.cassandra.db.ColumnFamilyStore.ROCKSDB_KEYSPACE;
 
 /**
  * It represents a Keyspace.
@@ -67,6 +67,8 @@ public class Keyspace
     private static int TEST_FAIL_MV_LOCKS_COUNT = Integer.getInteger("cassandra.test.fail_mv_locks_count", 0);
 
     public final KeyspaceMetrics metric;
+
+    public final StorageEngine engine;
 
     // It is possible to call Keyspace.open without a running daemon, so it makes sense to ensure
     // proper directories here as well as in CassandraDaemon.
@@ -307,6 +309,11 @@ public class Keyspace
             initCf(cfm, loadSSTables);
         }
         this.viewManager.reload();
+
+        if (keyspaceName.equals(RocksEngine.ROCKSDB_KEYSPACE))
+            engine = new RocksEngine();
+        else
+            engine = null;
     }
 
     private Keyspace(KeyspaceMetadata metadata)
@@ -315,6 +322,10 @@ public class Keyspace
         createReplicationStrategy(metadata);
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
+        if (metadata.name.equals(RocksEngine.ROCKSDB_KEYSPACE))
+            engine = new RocksEngine();
+        else
+            engine = null;
     }
 
     public static Keyspace mockKS(KeyspaceMetadata metadata)
@@ -550,40 +561,42 @@ public class Keyspace
                     logger.error("Attempting to mutate non-existant table {} ({}.{})", upd.metadata().cfId, upd.metadata().ksName, upd.metadata().cfName);
                     continue;
                 }
-                AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
 
-                if (requiresViewUpdate)
+                if (engine != null)
                 {
-                    try
-                    {
-                        Tracing.trace("Creating materialized view mutations from base table replica");
-                        viewManager.forTable(upd.metadata()).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
-                    }
-                    catch (Throwable t)
-                    {
-                        JVMStabilityInspector.inspectThrowable(t);
-                        logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s.%s",
-                                     upd.metadata().ksName, upd.metadata().cfName), t);
-                        throw t;
-                    }
-                }
-
-                Tracing.trace("Adding to {} memtable", upd.metadata().cfName);
-                UpdateTransaction indexTransaction = updateIndexes
-                                                     ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
-                                                     : UpdateTransaction.NO_OP;
-
-                if (this.getName().equals(System.getProperty("cassandra.rocksdb.keyspace", ROCKSDB_KEYSPACE)))
-                {
-                    cfs.applyRocksdb(upd, indexTransaction, opGroup, replayPosition);
+                    engine.apply(cfs, upd, writeCommitLog);
                 }
                 else
                 {
-                    cfs.apply(upd, indexTransaction, opGroup, replayPosition);
-                }
 
-                if (requiresViewUpdate)
-                    baseComplete.set(System.currentTimeMillis());
+                    AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
+
+                    if (requiresViewUpdate)
+                    {
+                        try
+                        {
+                            Tracing.trace("Creating materialized view mutations from base table replica");
+                            viewManager.forTable(upd.metadata()).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
+                        }
+                        catch (Throwable t)
+                        {
+                            JVMStabilityInspector.inspectThrowable(t);
+                            logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s.%s",
+                                                       upd.metadata().ksName, upd.metadata().cfName), t);
+                            throw t;
+                        }
+                    }
+
+                    Tracing.trace("Adding to {} memtable", upd.metadata().cfName);
+                    UpdateTransaction indexTransaction = updateIndexes
+                                                         ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
+                                                         : UpdateTransaction.NO_OP;
+
+                    cfs.apply(upd, indexTransaction, opGroup, replayPosition);
+
+                    if (requiresViewUpdate)
+                        baseComplete.set(System.currentTimeMillis());
+                }
             }
 
             if (future != null) {
