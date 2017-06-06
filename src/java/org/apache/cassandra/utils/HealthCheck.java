@@ -18,53 +18,37 @@
 package org.apache.cassandra.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.cassandra.gms.ApplicationState;
+import org.apache.cassandra.gms.EndpointState;
 import org.apache.cassandra.gms.Gossiper;
+import org.apache.cassandra.gms.VersionedValue;
+
+import java.net.InetAddress;
+import java.util.Map;
+import java.util.Set;
 
 public class HealthCheck
 {
-    private static final double THRESHOLD = 0.5;
-
     HealthCheck()
     {
     }
 
     @VisibleForTesting
-    public static int getStatus()
+    public static int getNumLiveDataNodes()
     {
-        Status status;
-        // Gossip is Running
+        int liveNodes = 0;
         if ( Gossiper.instance.isEnabled())
         {
-            int liveNodes = Gossiper.instance.getLiveMembers().size();
-            int unreachableNodes = Gossiper.instance.getUnreachableMembers().size();
+            Set<Map.Entry<InetAddress, EndpointState>> EndpointStates = Gossiper.instance.getEndpointStates();
 
-            // Check condition for nodes in the cluster. Need to be discussed.
-            if (liveNodes/(double)(liveNodes + unreachableNodes) < THRESHOLD)
-                status = Status.WARNING;
-            else
-                status = Status.ALIVE;
-        }
-        else
-            status = Status.WARNING;
-
-        return status.getValue();
-    }
-
-    // Copy from com.facebook.swift.fb303.FbStatus
-    enum Status
-    {
-        DEAD(0), STARTING(1), ALIVE(2), STOPPING(3), STOPPED(4), WARNING(5);
-
-        private final int value;
-
-        Status(int value)
-        {
-            this.value = value;
+            for (Map.Entry<InetAddress, EndpointState> item : EndpointStates) {
+                EndpointState endpointState = item.getValue();
+                VersionedValue tokens = endpointState.getApplicationState(ApplicationState.TOKENS);
+                if (tokens != null && endpointState.isAlive())
+                    liveNodes++;
+            }
         }
 
-        public int getValue()
-        {
-            return value;
-        }
+        return liveNodes;
     }
 }

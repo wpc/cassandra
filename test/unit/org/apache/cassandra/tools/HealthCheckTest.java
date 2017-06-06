@@ -18,8 +18,13 @@
 package org.apache.cassandra.tools;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.RandomPartitioner;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.EndpointState;
 import org.apache.cassandra.gms.Gossiper;
+import org.apache.cassandra.gms.VersionedValue;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.apache.cassandra.utils.HealthCheck;
@@ -43,8 +48,11 @@ public class HealthCheckTest
             InetAddress.getByName("127.0.0.9")
         };
 
+        IPartitioner partitioner = RandomPartitioner.instance;
         for (InetAddress host : hosts) {
             Gossiper.instance.initializeNodeUnsafe(host, UUID.randomUUID(), 1);
+            Set<Token> tokens = Collections.singleton(partitioner.getRandomToken());
+            Gossiper.instance.injectApplicationState(host, ApplicationState.TOKENS, new VersionedValue.VersionedValueFactory(partitioner).tokens(tokens));
             EndpointState localstate = Gossiper.instance.getEndpointStateForEndpoint(host);
             Gossiper.instance.realMarkAlive(host, localstate);
         }
@@ -53,10 +61,10 @@ public class HealthCheckTest
     @Test
     public void check() throws UnknownHostException
     {
-        assertEquals(5, HealthCheck.getStatus());
+        assertEquals(0, HealthCheck.getNumLiveDataNodes());
 
         SchemaLoader.startGossiper();
-        assertEquals(2, HealthCheck.getStatus());
+        assertEquals(4, HealthCheck.getNumLiveDataNodes());
 
         InetAddress[] deadhosts = {
             InetAddress.getByName("127.0.0.2"),
@@ -68,6 +76,6 @@ public class HealthCheckTest
             EndpointState localstate = Gossiper.instance.getEndpointStateForEndpoint(host);
             Gossiper.instance.markDead(host, localstate);
         }
-        assertEquals(5, HealthCheck.getStatus());
+        assertEquals(1, HealthCheck.getNumLiveDataNodes());
     }
 }
