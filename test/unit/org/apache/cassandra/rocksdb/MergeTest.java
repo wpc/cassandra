@@ -28,27 +28,8 @@ import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.utils.FBUtilities;
 
-public class MergeTest extends CQLTester
+public class MergeTest extends RocksdbCqlTest
 {
-    @BeforeClass
-    public static void classSetUp() throws Exception
-    {
-        System.setProperty("cassandra.rocksdb.keyspace", CQLTester.KEYSPACE);
-        System.setProperty("cassandra.rocksdb.dir", "/tmp/rocksdbmergetest");
-        File rocksdbdir = new File("/tmp/rocksdbmergetest");
-        if (rocksdbdir.exists())
-        {
-            FileUtils.deleteRecursive(rocksdbdir);
-        }
-    }
-
-    @AfterClass
-    public static void classTeardown() throws Exception
-    {
-        System.clearProperty("cassandra.rocksdb.keyspace");
-        System.clearProperty("cassandra.rocksdb.dir");
-    }
-
 
     @Test
     public void testSimpleColumnMerge() throws Throwable

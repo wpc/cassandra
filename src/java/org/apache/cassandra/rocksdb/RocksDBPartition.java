@@ -132,7 +132,7 @@ public class RocksDBPartition implements Partition
     {
         try
         {
-            byte[] key = RowKeyEncoder.encode(partitionKey.getKey(), clustering, metadata);
+            byte[] key = RowKeyEncoder.encode(partitionKey, clustering, metadata);
             byte[] values = db.get(key);
 
             return makeRow(values, columnFilter, clustering);
@@ -158,8 +158,7 @@ public class RocksDBPartition implements Partition
     private UnfilteredRowIterator sliceIterator(Slice slice, ColumnFilter columnFilter, boolean reversed)
     {
         //TODO: support column_start and column_end using bound info from slice
-        byte[] partitionKeyBytes = RowKeyEncoder.encode(Pair.create(metadata.partitionKeyColumns().get(0).type,
-                                                                    partitionKey.getKey()));
+        byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
         RocksIterator rocksIterator = db.newIterator();
         rocksIterator.seek(partitionKeyBytes);

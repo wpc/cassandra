@@ -21,6 +21,7 @@ package org.apache.cassandra.rocksdb.encoding;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.Map;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.Clustering;
+import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.db.marshal.BooleanType;
@@ -47,11 +49,15 @@ import org.apache.cassandra.db.marshal.TimeUUIDType;
 import org.apache.cassandra.db.marshal.TimestampType;
 import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.db.marshal.UUIDType;
+import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.dht.RandomPartitioner;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.encoding.orderly.BigDecimalRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.DoubleRowKey;
+import org.apache.cassandra.rocksdb.encoding.orderly.FixedIntegerRowKey;
+import org.apache.cassandra.rocksdb.encoding.orderly.FixedLongRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.FloatRowKey;
-import org.apache.cassandra.rocksdb.encoding.orderly.IntegerRowKey;
-import org.apache.cassandra.rocksdb.encoding.orderly.LongRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.RowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.StructRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.UTF8RowKey;
@@ -85,19 +91,19 @@ public class RowKeyEncoder
         rowKeyEncodingPolicies.put(InetAddressType.instance,
                                    new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
         rowKeyEncodingPolicies.put(Int32Type.instance,
-                                   new RowKeyEncodingPolicy(() -> new IntegerRowKey(), defalutAdapter));
+                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(IntegerType.instance,
                                    new RowKeyEncodingPolicy(() -> new BigIntegerRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(LongType.instance,
-                                   new RowKeyEncodingPolicy(() -> new LongRowKey(), defalutAdapter));
+                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(ShortType.instance,
                                    new RowKeyEncodingPolicy(() -> new ShortRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(SimpleDateType.instance,
-                                   new RowKeyEncodingPolicy(() -> new IntegerRowKey(), defalutAdapter));
+                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(TimeType.instance,
-                                   new RowKeyEncodingPolicy(() -> new LongRowKey(), defalutAdapter));
+                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(TimestampType.instance,
-                                   new RowKeyEncodingPolicy(() -> new LongRowKey(), timestampAdapter));
+                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), timestampAdapter));
         rowKeyEncodingPolicies.put(TimeUUIDType.instance,
                                    new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defalutAdapter));
         rowKeyEncodingPolicies.put(UTF8Type.instance,
@@ -106,18 +112,49 @@ public class RowKeyEncoder
                                    new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defalutAdapter));
     }
 
-    public static byte[] encode(ByteBuffer partitionKey, Clustering clustering, CFMetaData metaData)
+    public static byte[] encode(DecoratedKey partitionKey, Clustering clustering, CFMetaData metaData)
     {
         ColumnDefinition partitionKeyColumn = metaData.partitionKeyColumns().get(0);
         List<ColumnDefinition> clusteringColumns = metaData.clusteringColumns();
-        Pair<AbstractType, ByteBuffer>[] keyParts = new Pair[(clusteringColumns.size() + 1)];
-        keyParts[0] = Pair.create(partitionKeyColumn.type, partitionKey);
+        Pair<AbstractType, ByteBuffer>[] keyParts = new Pair[(clusteringColumns.size() + 2)];
+        keyParts[0] = createTokenKeyPart(partitionKey.getToken(), metaData.partitioner);
+        keyParts[1] = Pair.create(partitionKeyColumn.type, partitionKey.getKey());
         for (int i = 0; i < clusteringColumns.size(); i++)
         {
-            keyParts[i + 1] = Pair.create(clusteringColumns.get(i).type, clustering.get(i));
+            keyParts[i + 2] = Pair.create(clusteringColumns.get(i).type, clustering.get(i));
         }
 
         return encode(keyParts);
+    }
+
+    public static byte[] encode(DecoratedKey partitionKey, CFMetaData metadata)
+    {
+        ColumnDefinition partitionKeyColumn = metadata.partitionKeyColumns().get(0);
+        Pair<AbstractType, ByteBuffer>[] keyParts = new Pair[2];
+        keyParts[0] = createTokenKeyPart(partitionKey.getToken(), metadata.partitioner);
+        keyParts[1] = Pair.create(partitionKeyColumn.type, partitionKey.getKey());
+        return encode(keyParts);
+    }
+
+    private static Pair<AbstractType, ByteBuffer> createTokenKeyPart(Token token, IPartitioner partitioner)
+    {
+        AbstractType type = getTokenDataType(partitioner);
+        return Pair.create(type, type.decompose(token.getTokenValue()));
+    }
+
+    private static AbstractType getTokenDataType(IPartitioner partitioner)
+    {
+        if (partitioner == Murmur3Partitioner.instance)
+        {
+            return LongType.instance;
+        }
+
+        if (partitioner == RandomPartitioner.instance)
+        {
+            return IntegerType.instance;
+        }
+
+        throw new RuntimeException("Partitioner: " + partitioner.getClass().getName() + " is not supported yet");
     }
 
 
@@ -150,7 +187,8 @@ public class RowKeyEncoder
     {
         List<ColumnDefinition> partitionKeyColumns = metadata.partitionKeyColumns();
         List<ColumnDefinition> clusteringColumns = metadata.clusteringColumns();
-        List<AbstractType> types = new ArrayList<>(partitionKeyColumns.size() + clusteringColumns.size());
+        List<AbstractType> types = new ArrayList<>(partitionKeyColumns.size() + clusteringColumns.size() + 1);
+        types.add(getTokenDataType(metadata.partitioner));
         for (ColumnDefinition partitionKeyColumn : partitionKeyColumns)
         {
             types.add(partitionKeyColumn.type);
@@ -160,7 +198,9 @@ public class RowKeyEncoder
             types.add(clusteringColumn.type);
         }
 
-        return decode(key, types);
+        ByteBuffer[] decoded = decode(key, types);
+        assert decoded.length > 1;
+        return Arrays.copyOfRange(decoded, 1, decoded.length - 1);
     }
 
     private static ByteBuffer[] decode(byte[] key, List<AbstractType> types)

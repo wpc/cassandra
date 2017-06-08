@@ -1276,30 +1276,30 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public void applyRocksdb(PartitionUpdate update, UpdateTransaction indexer, OpOrder.Group opGroup, ReplayPosition commitLogPosition)
     {
-        ByteBuffer key = update.partitionKey().getKey();
+        DecoratedKey partitionKey = update.partitionKey();
         AbstractType<?> keyValidator = update.metadata().getKeyValidator();
 
         List<ColumnDefinition> clusteringColumns = update.metadata().clusteringColumns();
 
         for (Row row: update)
         {
-            applyRowToRocksDB(key, row, keyValidator, clusteringColumns);
+            applyRowToRocksDB(partitionKey, row, keyValidator, clusteringColumns);
         }
 
         Row staticRow = update.staticRow();
         if (!staticRow.isEmpty())
         {
-            applyRowToRocksDB(key, staticRow, keyValidator, clusteringColumns);
+            applyRowToRocksDB(partitionKey, staticRow, keyValidator, clusteringColumns);
         }
 
     }
 
-    private void applyRowToRocksDB(ByteBuffer key, Row row, AbstractType<?> keyValidator, List<ColumnDefinition> clusteringColumns)
+    private void applyRowToRocksDB(DecoratedKey partitionKey, Row row, AbstractType<?> keyValidator, List<ColumnDefinition> clusteringColumns)
     {
 
         Clustering clustering = row.clustering();
 
-        byte[] rocksDBKey = RowKeyEncoder.encode(key.duplicate(), clustering, metadata);
+        byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, clustering, metadata);
         byte[] rocksDBValue = RowValueEncoder.encode(metadata, row);
 
         // value colummns

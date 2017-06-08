@@ -18,40 +18,16 @@
 
 package org.apache.cassandra.rocksdb;
 
-import java.io.File;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.utils.UUIDGen;
 
-public class BasicSelectTest extends CQLTester
+public class BasicSelectTest extends RocksdbCqlTest
 {
-    @BeforeClass
-    public static void classSetUp() throws Exception
-    {
-        System.setProperty("cassandra.rocksdb.keyspace", CQLTester.KEYSPACE);
-        System.setProperty("cassandra.rocksdb.dir", "/tmp/rocksdbtest");
-        File rocksdbdir = new File("/tmp/rocksdbtest");
-        if (rocksdbdir.exists())
-        {
-            FileUtils.deleteRecursive(rocksdbdir);
-        }
-    }
-
-    @AfterClass
-    public static void classTeardown() throws Exception
-    {
-        System.clearProperty("cassandra.rocksdb.keyspace");
-        System.clearProperty("cassandra.rocksdb.dir");
-    }
-
 
     @Test
     public void testSelectSingleColumn() throws Throwable
@@ -160,5 +136,4 @@ public class BasicSelectTest extends CQLTester
                    row(1, 1, 1, 1, 5, "6", "1"),
                    row(1, 1, 1, 2, 1, "1", "0"));
     }
-
 }
