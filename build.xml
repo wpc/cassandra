@@ -505,7 +505,7 @@
         <dependency groupId="org.json" artifactId="json" version="20160212" />
         <dependency groupId="com.facebook" artifactId="rfe-scubadata-scubadata-java" version="2016-07-07T17.33.57-8890cc" />
         <dependency groupId="com.facebook.scribe" artifactId="scribe-client" version="0.7.0-SNAPSHOT" />
-        <dependency groupId="org.rocksdb" artifactId="rocksdbjni" version="5.3.0" scope="system" systemPath="${basedir}/lib/rocksdbjni-5.3.0.jar"/>
+        <dependency groupId="org.rocksdb" artifactId="rocksdbjni" version="5.6.0" scope="system" systemPath="${basedir}/lib/rocksdbjni-5.6.0.jar"/>
       </artifact:pom>
 
       <artifact:pom id="coverage-deps-pom"
