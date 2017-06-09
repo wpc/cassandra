@@ -73,7 +73,7 @@ public class ReadCallback implements IAsyncCallbackWithFailure<ReadResponse>
     {
         this(resolver,
              consistencyLevel,
-             consistencyLevel.blockFor(Keyspace.open(command.metadata().ksName)),
+             consistencyLevel.blockFor(Keyspace.open(command.metadata().ksName), ConsistencyLevel.Usage.READ),
              command,
              Keyspace.open(command.metadata().ksName),
              filteredEndpoints);
@@ -198,7 +198,7 @@ public class ReadCallback implements IAsyncCallbackWithFailure<ReadResponse>
 
     public void assureSufficientLiveNodes() throws UnavailableException
     {
-        consistencyLevel.assureSufficientLiveNodes(keyspace, endpoints);
+        consistencyLevel.assureSufficientLiveNodes(keyspace, endpoints, ConsistencyLevel.Usage.READ);
     }
 
     public boolean isLatencyForSnitch()
@@ -232,9 +232,9 @@ public class ReadCallback implements IAsyncCallbackWithFailure<ReadResponse>
                     traceState.trace("Digest mismatch: {}", e.toString());
                 if (logger.isDebugEnabled())
                     logger.debug("Digest mismatch:", e);
-                
+
                 ReadRepairMetrics.repairedBackground.mark();
-                
+
                 final DataResolver repairResolver = new DataResolver(keyspace, command, consistencyLevel, endpoints.size());
                 AsyncRepairCallback repairHandler = new AsyncRepairCallback(repairResolver, endpoints.size());
 

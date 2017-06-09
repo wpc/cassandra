@@ -31,7 +31,6 @@ import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.WriteType;
 import org.apache.cassandra.exceptions.*;
-import org.apache.cassandra.net.IAsyncCallback;
 import org.apache.cassandra.net.IAsyncCallbackWithFailure;
 import org.apache.cassandra.net.MessageIn;
 import org.apache.cassandra.utils.concurrent.SimpleCondition;
@@ -114,7 +113,7 @@ public abstract class AbstractWriteResponseHandler<T> implements IAsyncCallbackW
     {
         // During bootstrap, we have to include the pending endpoints or we may fail the consistency level
         // guarantees (see #833)
-        return consistencyLevel.blockFor(keyspace) + pendingEndpoints.size();
+        return consistencyLevel.blockFor(keyspace, ConsistencyLevel.Usage.WRITE) + pendingEndpoints.size();
     }
 
     /** 
@@ -143,7 +142,7 @@ public abstract class AbstractWriteResponseHandler<T> implements IAsyncCallbackW
 
     public void assureSufficientLiveNodes() throws UnavailableException
     {
-        consistencyLevel.assureSufficientLiveNodes(keyspace, Iterables.filter(Iterables.concat(naturalEndpoints, pendingEndpoints), isAlive));
+        consistencyLevel.assureSufficientLiveNodes(keyspace, Iterables.filter(Iterables.concat(naturalEndpoints, pendingEndpoints), isAlive), ConsistencyLevel.Usage.WRITE);
     }
 
     protected void signal()

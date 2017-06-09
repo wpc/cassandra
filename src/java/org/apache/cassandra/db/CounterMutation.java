@@ -142,12 +142,12 @@ public class CounterMutation implements IMutation
             try
             {
                 if (!lock.tryLock(timeout, TimeUnit.NANOSECONDS))
-                    throw new WriteTimeoutException(WriteType.COUNTER, consistency(), 0, consistency().blockFor(keyspace));
+                    throw new WriteTimeoutException(WriteType.COUNTER, consistency(), 0, consistency().blockFor(keyspace, ConsistencyLevel.Usage.WRITE));
                 locks.add(lock);
             }
             catch (InterruptedException e)
             {
-                throw new WriteTimeoutException(WriteType.COUNTER, consistency(), 0, consistency().blockFor(keyspace));
+                throw new WriteTimeoutException(WriteType.COUNTER, consistency(), 0, consistency().blockFor(keyspace, ConsistencyLevel.Usage.WRITE));
             }
         }
     }

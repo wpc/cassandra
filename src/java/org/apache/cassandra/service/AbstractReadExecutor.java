@@ -159,7 +159,7 @@ public abstract class AbstractReadExecutor
         List<InetAddress> targetReplicas = consistencyLevel.filterForQuery(keyspace, allReplicas, repairDecision);
 
         // Throw UAE early if we don't have enough replicas.
-        consistencyLevel.assureSufficientLiveNodes(keyspace, targetReplicas);
+        consistencyLevel.assureSufficientLiveNodes(keyspace, targetReplicas, ConsistencyLevel.Usage.READ);
 
         if (repairDecision != ReadRepairDecision.NONE)
         {
@@ -174,7 +174,7 @@ public abstract class AbstractReadExecutor
         // 11980: Disable speculative retry if using EACH_QUORUM in order to prevent miscounting DC responses
         if (retry.equals(SpeculativeRetryParam.NONE)
             || consistencyLevel == ConsistencyLevel.EACH_QUORUM
-            || consistencyLevel.blockFor(keyspace) == allReplicas.size())
+            || consistencyLevel.blockFor(keyspace, ConsistencyLevel.Usage.READ) == allReplicas.size())
             return new NeverSpeculatingReadExecutor(keyspace, command, consistencyLevel, targetReplicas);
 
         if (targetReplicas.size() == allReplicas.size())

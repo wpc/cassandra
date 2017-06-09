@@ -285,7 +285,7 @@ public class StorageProxy implements StorageProxyMBean
                 // continue to retry
             }
 
-            throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(keyspaceName)));
+            throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(keyspaceName), ConsistencyLevel.Usage.WRITE));
         }
         catch (WriteTimeoutException|ReadTimeoutException e)
         {
@@ -454,7 +454,7 @@ public class StorageProxy implements StorageProxyMBean
             return Pair.create(ballot, contentions);
         }
 
-        throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(metadata.ksName)));
+        throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(metadata.ksName), ConsistencyLevel.Usage.WRITE));
     }
 
     /**
@@ -1066,7 +1066,7 @@ public class StorageProxy implements StorageProxyMBean
         List<InetAddress> naturalEndpoints = StorageService.instance.getNaturalEndpoints(keyspaceName, tk);
         Collection<InetAddress> pendingEndpoints = StorageService.instance.getTokenMetadata().pendingEndpointsFor(tk, keyspaceName);
         AbstractWriteResponseHandler<IMutation> writeHandler = rs.getWriteResponseHandler(naturalEndpoints, pendingEndpoints, consistency_level, null, writeType);
-        BatchlogResponseHandler<IMutation> batchHandler = new BatchlogResponseHandler<>(writeHandler, batchConsistencyLevel.blockFor(keyspace), cleanup);
+        BatchlogResponseHandler<IMutation> batchHandler = new BatchlogResponseHandler<>(writeHandler, batchConsistencyLevel.blockFor(keyspace, ConsistencyLevel.Usage.WRITE), cleanup);
         return new WriteResponseHandlerWrapper(batchHandler, mutation);
     }
 
@@ -1091,7 +1091,7 @@ public class StorageProxy implements StorageProxyMBean
             long delay = Math.max(0, System.currentTimeMillis() - baseComplete.get());
             viewWriteMetrics.viewWriteLatency.update(delay, TimeUnit.MILLISECONDS);
         }, writeType);
-        BatchlogResponseHandler<IMutation> batchHandler = new ViewWriteMetricsWrapped(writeHandler, batchConsistencyLevel.blockFor(keyspace), cleanup);
+        BatchlogResponseHandler<IMutation> batchHandler = new ViewWriteMetricsWrapped(writeHandler, batchConsistencyLevel.blockFor(keyspace, ConsistencyLevel.Usage.WRITE), cleanup);
         return new WriteResponseHandlerWrapper(batchHandler, mutation);
     }
 
@@ -1417,7 +1417,7 @@ public class StorageProxy implements StorageProxyMBean
         List<InetAddress> endpoints = StorageService.instance.getLiveNaturalEndpoints(keyspace, key);
         if (endpoints.isEmpty())
             // TODO have a way to compute the consistency level
-            throw new UnavailableException(cl, cl.blockFor(keyspace), 0);
+            throw new UnavailableException(cl, cl.blockFor(keyspace, ConsistencyLevel.Usage.WRITE), 0);
 
         List<InetAddress> localEndpoints = new ArrayList<InetAddress>();
         for (InetAddress endpoint : endpoints)
@@ -1555,7 +1555,7 @@ public class StorageProxy implements StorageProxyMBean
             }
             catch (WriteTimeoutException e)
             {
-                throw new ReadTimeoutException(consistencyLevel, 0, consistencyLevel.blockFor(Keyspace.open(metadata.ksName)), false);
+                throw new ReadTimeoutException(consistencyLevel, 0, consistencyLevel.blockFor(Keyspace.open(metadata.ksName), ConsistencyLevel.Usage.WRITE), false);
             }
             catch (WriteFailureException e)
             {
@@ -1761,7 +1761,7 @@ public class StorageProxy implements StorageProxyMBean
                     logger.trace("Timed out waiting on digest mismatch repair requests");
                 // the caught exception here will have CL.ALL from the repair command,
                 // not whatever CL the initial command was at (CASSANDRA-7947)
-                int blockFor = consistency.blockFor(Keyspace.open(command.metadata().ksName));
+                int blockFor = consistency.blockFor(Keyspace.open(command.metadata().ksName), ConsistencyLevel.Usage.READ);
                 throw new ReadTimeoutException(consistency, blockFor-1, blockFor, true);
             }
         }
@@ -1937,7 +1937,7 @@ public class StorageProxy implements StorageProxyMBean
                 List<InetAddress> merged = intersection(current.liveEndpoints, next.liveEndpoints);
 
                 // Check if there is enough endpoint for the merge to be possible.
-                if (!consistency.isSufficientLiveNodes(keyspace, merged))
+                if (!consistency.isSufficientLiveNodes(keyspace, merged, ConsistencyLevel.Usage.READ))
                     break;
 
                 List<InetAddress> filteredMerged = consistency.filterForQuery(keyspace, merged);
@@ -2087,7 +2087,7 @@ public class StorageProxy implements StorageProxyMBean
 
             DataResolver resolver = new DataResolver(keyspace, rangeCommand, consistency, toQuery.filteredEndpoints.size());
 
-            int blockFor = consistency.blockFor(keyspace);
+            int blockFor = consistency.blockFor(keyspace, ConsistencyLevel.Usage.READ);
             int minResponses = Math.min(toQuery.filteredEndpoints.size(), blockFor);
             List<InetAddress> minimalEndpoints = toQuery.filteredEndpoints.subList(0, minResponses);
             ReadCallback handler = new ReadCallback(resolver, consistency, rangeCommand, minimalEndpoints);

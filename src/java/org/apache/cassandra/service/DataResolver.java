@@ -181,7 +181,7 @@ public class DataResolver extends ResponseResolver
             catch (TimeoutException ex)
             {
                 // We got all responses, but timed out while repairing
-                int blockFor = consistency.blockFor(keyspace);
+                int blockFor = consistency.blockFor(keyspace, ConsistencyLevel.Usage.READ);
                 if (Tracing.isTracing())
                     Tracing.trace("Timed out while read-repairing after receiving all {} data and digest responses", blockFor);
                 else
