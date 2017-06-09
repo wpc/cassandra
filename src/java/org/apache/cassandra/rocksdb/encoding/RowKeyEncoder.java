@@ -62,6 +62,7 @@ import org.apache.cassandra.rocksdb.encoding.orderly.RowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.StructRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.UTF8RowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.VariableLengthByteArrayRowKey;
+import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.Pair;
 
 import static org.apache.cassandra.rocksdb.encoding.RowKeyInputAdapter.bytesAdapter;
@@ -134,6 +135,11 @@ public class RowKeyEncoder
         keyParts[0] = createTokenKeyPart(partitionKey.getToken(), metadata.partitioner);
         keyParts[1] = Pair.create(partitionKeyColumn.type, partitionKey.getKey());
         return encode(keyParts);
+    }
+
+    public static byte[] encodeToken(Token token)
+    {
+        return encode(createTokenKeyPart(token, token.getPartitioner()));
     }
 
     private static Pair<AbstractType, ByteBuffer> createTokenKeyPart(Token token, IPartitioner partitioner)

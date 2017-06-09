@@ -18,17 +18,9 @@
 
 package org.apache.cassandra.rocksdb;
 
-import java.io.File;
-
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.utils.FBUtilities;
-
-public class MergeTest extends RocksdbCqlTest
+public class MergeTest extends RocksDBTestBase
 {
 
     @Test

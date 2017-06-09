@@ -49,7 +49,7 @@ import org.rocksdb.RocksIterator;
 
 import static junit.framework.Assert.assertEquals;
 
-public class PartitionOrderTest extends RocksdbCqlTest
+public class PartitionOrderTest extends RocksDBTestBase
 {
 
     public static final int SAMPLES = 100;

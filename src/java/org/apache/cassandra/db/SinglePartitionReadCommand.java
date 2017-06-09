@@ -63,7 +63,7 @@ import org.apache.cassandra.utils.memory.HeapAllocator;
 import org.apache.cassandra.utils.btree.UpdateFunction;
 import org.rocksdb.RocksDBException;
 
-import static org.apache.cassandra.db.ColumnFamilyStore.DEFAULT_ROCKSDB_KEYSPACE;
+import static org.apache.cassandra.db.ColumnFamilyStore.ROCKSDB_KEYSPACE;
 
 
 /**
@@ -501,7 +501,7 @@ public class SinglePartitionReadCommand extends ReadCommand
     {
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
-        if (cfs.keyspace.getName().equals(System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE)))
+        if (cfs.keyspace.getName().equals(ROCKSDB_KEYSPACE))
             return queryRocksDBLegacy(cfs);
 
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();

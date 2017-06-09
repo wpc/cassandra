@@ -53,7 +53,7 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 
-import static org.apache.cassandra.db.ColumnFamilyStore.DEFAULT_ROCKSDB_KEYSPACE;
+import static org.apache.cassandra.db.ColumnFamilyStore.ROCKSDB_KEYSPACE;
 
 /**
  * It represents a Keyspace.
@@ -573,7 +573,7 @@ public class Keyspace
                                                      ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
                                                      : UpdateTransaction.NO_OP;
 
-                if (this.getName().equals(System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE)))
+                if (this.getName().equals(System.getProperty("cassandra.rocksdb.keyspace", ROCKSDB_KEYSPACE)))
                 {
                     cfs.applyRocksdb(upd, indexTransaction, opGroup, replayPosition);
                 }

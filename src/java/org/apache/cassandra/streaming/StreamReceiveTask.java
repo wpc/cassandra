@@ -44,10 +44,15 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBSStableWriter;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamingUtils;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.Throwables;
 import org.apache.cassandra.utils.concurrent.Refs;
+import org.rocksdb.IngestExternalFileOptions;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 /**
  * Task that manages receiving files for the session for certain ColumnFamily.
@@ -71,8 +76,10 @@ public class StreamReceiveTask extends StreamTask
 
     //  holds references to SSTables received
     protected Collection<SSTableReader> sstables;
+    protected Collection<RocksDBSStableWriter> rocksTables;
 
     private int remoteSSTablesReceived = 0;
+    private int remoteRocksFileReceived = 0;
 
     public StreamReceiveTask(StreamSession session, UUID cfId, int totalFiles, long totalSize)
     {
@@ -83,6 +90,7 @@ public class StreamReceiveTask extends StreamTask
         // this should be revisited at a later date, so that LifecycleTransaction manages all sstable state changes
         this.txn = LifecycleTransaction.offline(OperationType.STREAM);
         this.sstables = new ArrayList<>(totalFiles);
+        this.rocksTables = new ArrayList<>();
     }
 
     /**
@@ -115,7 +123,25 @@ public class StreamReceiveTask extends StreamTask
         txn.update(finished, false);
         sstables.addAll(finished);
 
-        if (remoteSSTablesReceived == totalFiles)
+        if (remoteSSTablesReceived + remoteRocksFileReceived == totalFiles)
+        {
+            done = true;
+            executor.submit(new OnCompletionRunnable(this));
+        }
+    }
+
+    public synchronized void received(RocksDBSStableWriter sstable)
+    {
+        if (done)
+        {
+            logger.warn("[{}] Received sstable {} on already finished stream received task. Aborting sstable.", session.planId(),
+                        sstable.getFilename());
+            Throwables.maybeFail(sstable.abort(null));
+            return;
+        }
+        remoteRocksFileReceived ++;
+        rocksTables.add(sstable);
+        if (remoteSSTablesReceived + remoteRocksFileReceived == totalFiles)
         {
             done = true;
             executor.submit(new OnCompletionRunnable(this));
@@ -226,6 +252,11 @@ public class StreamReceiveTask extends StreamTask
                             }
                         }
                     }
+                }
+
+                if (cfs.isRocksDBBacked())
+                {
+                    RocksDBStreamingUtils.ingestRocksSstables(cfs.db, task.rocksTables);
                 }
                 task.session.taskCompleted(task);
             }

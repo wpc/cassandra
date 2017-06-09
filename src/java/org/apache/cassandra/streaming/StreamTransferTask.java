@@ -24,14 +24,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Iterables;
 
 import org.apache.cassandra.concurrent.NamedThreadFactory;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBOutgoingMessage;
 import org.apache.cassandra.streaming.messages.OutgoingFileMessage;
+import org.apache.cassandra.streaming.messages.OutgoingMessage;
+import org.apache.cassandra.streaming.messages.StreamMessage;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.concurrent.Ref;
-import org.apache.cassandra.utils.concurrent.RefCounted;
+import org.rocksdb.RocksDB;
 
 /**
  * StreamTransferTask sends sections of SSTable files in certain ColumnFamily.
@@ -44,7 +48,7 @@ public class StreamTransferTask extends StreamTask
     private boolean aborted = false;
 
     @VisibleForTesting
-    protected final Map<Integer, OutgoingFileMessage> files = new HashMap<>();
+    protected final Map<Integer, OutgoingMessage> files = new HashMap<>();
     private final Map<Integer, ScheduledFuture> timeoutTasks = new HashMap<>();
 
     private long totalSize;
@@ -62,6 +66,12 @@ public class StreamTransferTask extends StreamTask
         totalSize += message.header.size();
     }
 
+    public synchronized void addTransferRocksdbFile(UUID cfId, RocksDB db, Collection<Range<Token>> ranges)
+    {
+        RocksDBOutgoingMessage message = new RocksDBOutgoingMessage(cfId, sequenceNumber.getAndIncrement(), db, ranges);
+        files.put(message.sequenceNumber, message);
+    }
+
     /**
      * Received ACK for file at {@code sequenceNumber}.
      *
@@ -76,7 +86,7 @@ public class StreamTransferTask extends StreamTask
             if (timeout != null)
                 timeout.cancel(false);
 
-            OutgoingFileMessage file = files.remove(sequenceNumber);
+            OutgoingMessage file = files.remove(sequenceNumber);
             if (file != null)
                 file.complete();
 
@@ -99,7 +109,7 @@ public class StreamTransferTask extends StreamTask
         timeoutTasks.clear();
 
         Throwable fail = null;
-        for (OutgoingFileMessage file : files.values())
+        for (OutgoingMessage file : files.values())
         {
             try
             {
@@ -126,20 +136,11 @@ public class StreamTransferTask extends StreamTask
         return totalSize;
     }
 
-    public synchronized Collection<OutgoingFileMessage> getFileMessages()
+    public synchronized Collection<? extends StreamMessage> getFileMessages()
     {
         // We may race between queuing all those messages and the completion of the completion of
         // the first ones. So copy the values to avoid a ConcurrentModificationException
         return new ArrayList<>(files.values());
-    }
-
-    public synchronized OutgoingFileMessage createMessageForRetry(int sequenceNumber)
-    {
-        // remove previous time out task to be rescheduled later
-        ScheduledFuture future = timeoutTasks.remove(sequenceNumber);
-        if (future != null)
-            future.cancel(false);
-        return files.get(sequenceNumber);
     }
 
     /**

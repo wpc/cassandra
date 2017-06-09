@@ -37,6 +37,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
+import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.metrics.RocksdbTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.slf4j.Logger;
@@ -67,7 +68,6 @@ import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.Descriptor;
-import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.*;
 import org.apache.cassandra.io.sstable.format.big.BigFormat;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
@@ -233,8 +233,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private Options options = null;
     public Statistics rocksdbStats = null;
 
-    public static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
-    public static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
+    public static final String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", "rocksdb");
+    public static final String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
 
 
     public static void shutdownPostFlushExecutor() throws InterruptedException
@@ -245,10 +245,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     private void openRocksDB()
     {
-        String rocksDBKeyspace = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
-        String rocksDBDir = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
 
-        if (keyspace.getName().equals(rocksDBKeyspace))
+        if (keyspace.getName().equals(ROCKSDB_KEYSPACE))
         {
             options = new Options().setCreateIfMissing(true);
             try
@@ -277,8 +275,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 options.setTableFormatConfig(tableOptions);
 
                 rocksdbStats = options.statisticsPtr();
-                String rocksDBTableDir = rocksDBDir + "/" + keyspace.getName() + "/" + name;
-                FileUtils.createDirectory(rocksDBDir);
+                String rocksDBTableDir = ROCKSDB_DIR + "/" + keyspace.getName() + "/" + name;
+                FileUtils.createDirectory(ROCKSDB_DIR);
                 FileUtils.createDirectory(rocksDBTableDir);
                 db = RocksDB.open(options, rocksDBTableDir);
             }
@@ -1311,6 +1309,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         {
             logger.error(e.toString(), e);
         }
+    }
+
+    public boolean isRocksDBBacked() {
+        return keyspace.getName().equals(ROCKSDB_KEYSPACE);
     }
 
     /**

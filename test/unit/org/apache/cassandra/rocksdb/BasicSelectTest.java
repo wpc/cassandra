@@ -26,7 +26,7 @@ import org.junit.Test;
 
 import org.apache.cassandra.utils.UUIDGen;
 
-public class BasicSelectTest extends RocksdbCqlTest
+public class BasicSelectTest extends RocksDBTestBase
 {
 
     @Test
