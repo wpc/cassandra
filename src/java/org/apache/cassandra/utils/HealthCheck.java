@@ -18,6 +18,7 @@
 package org.apache.cassandra.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.EndpointState;
 import org.apache.cassandra.gms.Gossiper;
@@ -50,5 +51,10 @@ public class HealthCheck
         }
 
         return liveNodes;
+    }
+
+    public static Set<String> getKeyspaces()
+    {
+        return Schema.instance.getKeyspaces();
     }
 }
