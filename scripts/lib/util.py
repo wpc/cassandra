@@ -13,12 +13,12 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
+USE_PROXY = False
 try:
-    socket.gethostbyname('fwdproxy')
-    USE_PROXY = True
+    if socket.gethostname().endswith('facebook.com'):
+        USE_PROXY = True
 except:
     logging.debug('Can\'t access fwdproxy, probably running locally.')
-    USE_PROXY = False
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 
