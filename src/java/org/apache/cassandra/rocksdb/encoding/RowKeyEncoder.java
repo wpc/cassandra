@@ -200,7 +200,7 @@ public class RowKeyEncoder
 
         ByteBuffer[] decoded = decode(key, types);
         assert decoded.length > 1;
-        return Arrays.copyOfRange(decoded, 1, decoded.length - 1);
+        return Arrays.copyOfRange(decoded, 1, decoded.length);
     }
 
     private static ByteBuffer[] decode(byte[] key, List<AbstractType> types)
