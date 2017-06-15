@@ -19,7 +19,6 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 
 import org.slf4j.Logger;
@@ -44,7 +43,7 @@ public class RocksDBStreamWriter
     public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges, StreamSession session)
     {
         this.db = db;
-        this.ranges = ranges;
+        this.ranges = RocksDBStreamUtils.normalizeRanges(ranges);
         this.session = session;
     }
 
@@ -64,7 +63,7 @@ public class RocksDBStreamWriter
                     byte[] key = iterator.key();
                     if (FBUtilities.compareUnsigned(key, stop) >= 0)
                         break;
-                    out.write(RocksDBStreamingUtils.MORE);
+                    out.write(RocksDBStreamUtils.MORE);
                     out.writeInt(key.length);
                     out.write(key);
                     byte[] value = iterator.value();
@@ -79,6 +78,6 @@ public class RocksDBStreamWriter
             }
         }
         LOGGER.info("Number of rocksdb entries written: " + streamedPairs);
-        out.write(RocksDBStreamingUtils.EOF);
+        out.write(RocksDBStreamUtils.EOF);
     }
 }

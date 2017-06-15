@@ -19,8 +19,6 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.IOException;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 
 import com.google.common.base.Throwables;
 import org.slf4j.Logger;
@@ -67,7 +65,7 @@ public class RocksDBStreamReader
         try
         {
             writer = new RocksDBSStableWriter(header.cfId);
-            while(input.readByte() != RocksDBStreamingUtils.EOF[0]) {
+            while(input.readByte() != RocksDBStreamUtils.EOF[0]) {
                 int length = input.readInt();
                 byte[] key = new byte[length];
                 input.readFully(key);

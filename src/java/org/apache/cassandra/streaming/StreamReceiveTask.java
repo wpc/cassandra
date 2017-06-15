@@ -45,14 +45,11 @@ import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.rocksdb.streaming.RocksDBSStableWriter;
-import org.apache.cassandra.rocksdb.streaming.RocksDBStreamingUtils;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.Throwables;
 import org.apache.cassandra.utils.concurrent.Refs;
-import org.rocksdb.IngestExternalFileOptions;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
 
 /**
  * Task that manages receiving files for the session for certain ColumnFamily.
@@ -256,7 +253,7 @@ public class StreamReceiveTask extends StreamTask
 
                 if (cfs.isRocksDBBacked())
                 {
-                    RocksDBStreamingUtils.ingestRocksSstables(cfs.db, task.rocksTables);
+                    RocksDBStreamUtils.ingestRocksSstables(cfs.db, task.rocksTables);
                 }
                 task.session.taskCompleted(task);
             }

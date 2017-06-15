@@ -61,28 +61,4 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
         RocksDBTestBase.classTeardown();
         System.clearProperty("cassandra.rocksdb.stream.dir");
     }
-
-    public static Token getMaxToken(IPartitioner partitioner)
-    {
-        if (partitioner instanceof Murmur3Partitioner)
-        {
-            return new Murmur3Partitioner.LongToken(Murmur3Partitioner.MAXIMUM);
-        } else if (partitioner instanceof RandomPartitioner)
-        {
-            return new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM);
-        }
-        throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
-    }
-
-    public static Token getMinToken(IPartitioner partitioner)
-    {
-        if (partitioner instanceof Murmur3Partitioner)
-        {
-            return Murmur3Partitioner.MINIMUM;
-        } else if (partitioner instanceof RandomPartitioner)
-        {
-            return RandomPartitioner.MINIMUM;
-        }
-        throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
-    }
 }

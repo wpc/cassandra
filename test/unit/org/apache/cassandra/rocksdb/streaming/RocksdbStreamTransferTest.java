@@ -117,7 +117,9 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         {
             RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(outCfs.db);
             List<Range<Token>> ranges = new ArrayList<>();
-            ranges.add(new Range<Token>(getMinToken(inCfs.getPartitioner()), getMaxToken(inCfs.getPartitioner())));
+            ranges.add(
+                      new Range<Token>(RocksDBStreamUtils.getMinToken(inCfs.getPartitioner()),
+                                       RocksDBStreamUtils.getMaxToken(inCfs.getPartitioner())));
             transferRanges(inCfs, ranges);
         } finally
         {
@@ -156,8 +158,8 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
 
         IPartitioner partitioner = inCfs.getPartitioner();
         List<Range<Token>> ranges = new ArrayList<>();
-        Token minToken = getMinToken(partitioner);
-        Token maxToken = getMaxToken(partitioner);
+        Token minToken = RocksDBStreamUtils.getMinToken(partitioner);
+        Token maxToken = RocksDBStreamUtils.getMaxToken(partitioner);
         Token midToken = partitioner.midpoint(maxToken, maxToken);
         ranges.add(new Range<Token>(minToken, midToken));
 
@@ -185,6 +187,54 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
             {
                 assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i));
             }
+        }
+    }
+
+
+    @Test
+    public void testTransferFullRangeWhereLeftIsLarger() throws Throwable
+    {
+        int numberOfKeys = 1000;
+
+        // Create table one and insert some data for streaming.
+        createTable("CREATE TABLE %s (p TEXT, v TEXT, PRIMARY KEY (p))");
+        ColumnFamilyStore outCfs = getCurrentColumnFamilyStore();
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            execute("INSERT INTO %s(p, v) values (?, ?)", "p" + i, "v" + i);
+        }
+
+        // Create table two and for receiving streamed data.
+        createTable("CREATE TABLE %s (p TEXT, v TEXT, PRIMARY KEY (p))");
+        ColumnFamilyStore inCfs = getCurrentColumnFamilyStore();
+
+        // Verifies all data are not streamed.
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i));
+        }
+
+        // Use customized outgoing message serializer so that table one is streamed to table two.
+        StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
+        try
+        {
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(outCfs.db);
+            List<Range<Token>> ranges = new ArrayList<>();
+
+            IPartitioner partitioner = inCfs.getPartitioner();
+            Token rangeEnd = partitioner.midpoint(RocksDBStreamUtils.getMinToken(partitioner), RocksDBStreamUtils.getMaxToken(partitioner));
+            Token rangeStart = partitioner.midpoint(RocksDBStreamUtils.getMinToken(partitioner), RocksDBStreamUtils.getMaxToken(partitioner)).increaseSlightly();
+            ranges.add(new Range<Token>(rangeStart, rangeEnd));
+            transferRanges(inCfs, ranges);
+        } finally
+        {
+            RocksDBOutgoingMessage.SERIALIZER = replaced;
+        }
+
+        // Verifies all data are streamed.
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i), row("v" + i));
         }
     }
 

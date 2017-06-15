@@ -20,7 +20,6 @@ package org.apache.cassandra.rocksdb.streaming;
 
 import java.util.Arrays;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.junit.Test;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -56,8 +55,8 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         // Write Rocksdb entries into stream.
         RocksDBStreamWriter writer = new RocksDBStreamWriter(cfs.db,
                                                              Arrays.asList(
-                                                                          new Range(getMinToken(tokenPartioner),
-                                                                                    getMaxToken(tokenPartioner))),
+                                                                          new Range(RocksDBStreamUtils.getMinToken(tokenPartioner),
+                                                                                    RocksDBStreamUtils.getMaxToken(tokenPartioner))),
                                                              createDummySession());
         DataOutputBuffer out = new DataOutputBuffer(BUFFER_SIZE);
         writer.write(out);
@@ -78,7 +77,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         RocksDBStreamReader reader = new RocksDBStreamReader(new RocksDBMessageHeader(cfs.metadata.cfId, 0), createDummySession());
         DataInputBuffer in = new DataInputBuffer(out.buffer(), false);
         RocksDBSStableWriter sstableWriter = reader.read(in);
-        RocksDBStreamingUtils.ingestRocksSstables(cfs.db, Arrays.asList(sstableWriter));
+        RocksDBStreamUtils.ingestRocksSstables(cfs.db, Arrays.asList(sstableWriter));
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)

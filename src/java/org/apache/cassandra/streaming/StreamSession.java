@@ -47,7 +47,6 @@ import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.metrics.StreamingMetrics;
 import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
-import org.apache.cassandra.rocksdb.streaming.RocksDBStreamingUtils;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.messages.*;
 import org.apache.cassandra.utils.FBUtilities;
