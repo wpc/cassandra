@@ -301,6 +301,11 @@ public class Keyspace
         assert metadata != null : "Unknown keyspace " + keyspaceName;
         createReplicationStrategy(metadata);
 
+        if (keyspaceName.equals(RocksEngine.ROCKSDB_KEYSPACE))
+            engine = new RocksEngine();
+        else
+            engine = null;
+
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
         for (CFMetaData cfm : metadata.tablesAndViews())
@@ -309,11 +314,6 @@ public class Keyspace
             initCf(cfm, loadSSTables);
         }
         this.viewManager.reload();
-
-        if (keyspaceName.equals(RocksEngine.ROCKSDB_KEYSPACE))
-            engine = new RocksEngine();
-        else
-            engine = null;
     }
 
     private Keyspace(KeyspaceMetadata metadata)
