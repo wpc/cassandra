@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.rocksdb.engine;
+package org.apache.cassandra.rocksdb;
 
+import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -34,10 +35,18 @@ import org.apache.cassandra.db.partitions.Partition;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.engine.StorageEngine;
+import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
+import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.rocksdb.RocksDBPartition;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
+import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.streaming.StreamSummary;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CompactionPriority;
@@ -134,6 +143,22 @@ public class RocksEngine implements StorageEngine
 
     }
 
+    public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
+                                                            UUID cfId,
+                                                            Collection<Range<Token>> ranges)
+    {
+        RocksDBStreamTransferTask task = new RocksDBStreamTransferTask(session, cfId);
+        task.addTransferRocksdbFile(cfId,
+                                    RocksEngine.getRocksDBInstance(cfId),
+                                    ranges);
+        return task;
+    }
+
+    public AbstractStreamReceiveTask getStreamReceiveTask(StreamSession session, StreamSummary summary)
+    {
+        return new RocksDBStreamReceiveTask(session, summary.cfId, summary.files, summary.totalSize);
+    }
+
     private void applyRowToRocksDB(ColumnFamilyStore cfs,
                                    DecoratedKey partitionKey,
                                    Row row)
@@ -160,6 +185,16 @@ public class RocksEngine implements StorageEngine
         if (cfs.engine instanceof RocksEngine)
         {
             return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId);
+        }
+        return null;
+    }
+
+    public static RocksDB getRocksDBInstance(UUID cfId)
+    {
+        ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
+        if (cfs != null && cfs.engine instanceof RocksEngine)
+        {
+            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfId);
         }
         return null;
     }

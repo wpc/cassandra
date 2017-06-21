@@ -24,7 +24,7 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformSnapshot;
 import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.rocksdb.engine.RocksEngine;
+import org.apache.cassandra.rocksdb.RocksEngine;
 import org.rocksdb.HistogramData;
 import org.rocksdb.HistogramType;
 import org.rocksdb.Statistics;

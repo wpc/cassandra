@@ -15,32 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.cassandra.streaming;
 
-import java.util.List;
+package org.apache.cassandra.rocksdb.streaming;
+
+import java.util.Collection;
 import java.util.UUID;
 
-import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
-import org.apache.cassandra.streaming.messages.OutgoingFileMessage;
-import org.apache.cassandra.utils.Pair;
-import org.apache.cassandra.utils.concurrent.Ref;
+import org.apache.cassandra.streaming.StreamSession;
+import org.rocksdb.RocksDB;
 
 /**
  * StreamTransferTask sends sections of SSTable files in certain ColumnFamily.
  */
-public class StreamTransferTask extends AbstractStreamTransferTask
+public class RocksDBStreamTransferTask extends AbstractStreamTransferTask
 {
-    public StreamTransferTask(StreamSession session, UUID cfId)
+    public RocksDBStreamTransferTask(StreamSession session, UUID cfId)
     {
         super(session, cfId);
     }
 
-    public synchronized void addTransferFile(Ref<SSTableReader> ref, long estimatedKeys, List<Pair<Long, Long>> sections, long repairedAt)
+    public synchronized void addTransferRocksdbFile(UUID cfId, RocksDB db, Collection<Range<Token>> ranges)
     {
-        assert ref.get() != null && cfId.equals(ref.get().metadata.cfId);
-        OutgoingFileMessage message = new OutgoingFileMessage(ref, sequenceNumber.getAndIncrement(), estimatedKeys, sections, repairedAt, session.keepSSTableLevel());
-        files.put(message.header.sequenceNumber, message);
-        totalSize += message.header.size();
+        RocksDBOutgoingMessage message = new RocksDBOutgoingMessage(cfId, sequenceNumber.getAndIncrement(), db, ranges);
+        files.put(message.sequenceNumber, message);
     }
 }

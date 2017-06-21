@@ -19,7 +19,6 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,9 +40,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.rocksdb.engine.RocksEngine;
-import org.apache.cassandra.thrift.Column;
-import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;

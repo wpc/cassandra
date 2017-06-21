@@ -41,7 +41,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.rocksdb.engine.RocksEngine;
+import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamPlan;
 import org.apache.cassandra.streaming.StreamResultFuture;
@@ -161,7 +161,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         List<Range<Token>> ranges = new ArrayList<>();
         Token minToken = RocksDBStreamUtils.getMinToken(partitioner);
         Token maxToken = RocksDBStreamUtils.getMaxToken(partitioner);
-        Token midToken = partitioner.midpoint(maxToken, maxToken);
+        Token midToken = partitioner.midpoint(minToken, maxToken);
         ranges.add(new Range<Token>(minToken, midToken));
 
         // Use customized outgoing message serializer so that table one is streamed to table two.
@@ -257,7 +257,6 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
 
     private void transferRanges(ColumnFamilyStore cfs, List<Range<Token>> ranges) throws Exception
     {
-        IPartitioner p = cfs.getPartitioner();
         StreamPlan streamPlan = new StreamPlan("StreamingTransferTest").transferRanges(LOCAL, cfs.keyspace.getName(), ranges, cfs.getColumnFamilyName());
         streamPlan.execute().get();
         verifyConnectionsAreClosed();
@@ -298,7 +297,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
                 RocksDBMessageHeader.SERIALIZER.seriliaze(message.header, out);
                 RocksDBStreamWriter writer = new RocksDBStreamWriter(alternativeDBToStreamFrom, message.ranges, session);
                 writer.write(out);
-                session.rocksdbSent(message.cfId, message.sequenceNumber, 0);
+                session.fileSent(message.cfId, message.sequenceNumber, 0);
             }
             finally
             {

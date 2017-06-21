@@ -27,9 +27,7 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
-import org.apache.cassandra.rocksdb.engine.RocksEngine;
-import org.apache.cassandra.streaming.StreamSession;
-import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.rocksdb.RocksEngine;
 
 public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
 {

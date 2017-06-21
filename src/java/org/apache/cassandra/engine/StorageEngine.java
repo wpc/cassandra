@@ -16,29 +16,25 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.rocksdb.engine;
+package org.apache.cassandra.engine;
+
+import java.util.Collection;
+import java.util.UUID;
 
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
+import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
+import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.streaming.StreamSummary;
 
 public interface StorageEngine
 {
-    /*
-    public abstract Keyspace openKeyspace(String keyspaceName);
-    public abstract Keyspace createKeyspace(String keyspaceName);
-    public abstract void dropKeyspace(String keyspaceName);
-    public abstract void clearKeyspace(String keyspaceName);
-
-    public abstract ColumnFamilyStore getColumnFamilyStore(String cfName);
-    public abstract Collection<ColumnFamilyStore> getColumnFamilyStores();
-    public abstract ColumnFamilyStore createColumnFamilyStore(String columnFamily,
-                                                              CFMetaData metadata);
-
-    public abstract List<Future<?>> flush();
-    */
 
     void openColumnFamilyStore(String keyspaceName,
                                String columnFamilyName,
@@ -50,4 +46,13 @@ public interface StorageEngine
 
     UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs,
                                        SinglePartitionReadCommand readCommand);
+
+    /* Streaming API
+     */
+    AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
+                                                     UUID cfId,
+                                                     Collection<Range<Token>> ranges);
+
+    AbstractStreamReceiveTask getStreamReceiveTask(StreamSession session,
+                                                   StreamSummary summary);
 }

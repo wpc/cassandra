@@ -51,7 +51,7 @@ public class OutgoingFileMessage extends OutgoingMessage
             try
             {
                 message.serialize(out, version, session);
-                session.fileSent(message.header);
+                session.fileSent(message.header.cfId, message.header.sequenceNumber, message.header.size());
             }
             finally
             {

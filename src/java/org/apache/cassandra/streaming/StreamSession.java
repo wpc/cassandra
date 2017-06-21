@@ -46,16 +46,18 @@ import org.apache.cassandra.gms.*;
 import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.metrics.StreamingMetrics;
-import org.apache.cassandra.rocksdb.engine.RocksEngine;
+import org.apache.cassandra.engine.StorageEngine;
+import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
+import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.messages.*;
+import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.concurrent.Ref;
 import org.apache.cassandra.utils.concurrent.Refs;
-import org.rocksdb.RocksDB;
 
 /**
  * Handles the streaming a one or more section of one of more sstables to and from a specific
@@ -140,9 +142,9 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     protected final Set<StreamRequest> requests = Sets.newConcurrentHashSet();
     // streaming tasks are created and managed per ColumnFamily ID
     @VisibleForTesting
-    protected final ConcurrentHashMap<UUID, StreamTransferTask> transfers = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, AbstractStreamTransferTask> transfers = new ConcurrentHashMap<>();
     // data receivers, filled after receiving prepare message
-    private final Map<UUID, StreamReceiveTask> receivers = new ConcurrentHashMap<>();
+    private final Map<UUID, AbstractStreamReceiveTask> receivers = new ConcurrentHashMap<>();
     private final StreamingMetrics metrics;
     /* can be null when session is created in remote */
     private final StreamConnectionFactory factory;
@@ -211,10 +213,13 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     }
 
 
-    public LifecycleTransaction getTransaction(UUID cfId)
+    public LifecycleTransaction getTransaction(ColumnFamilyStore cfs)
     {
-        assert receivers.containsKey(cfId);
-        return receivers.get(cfId).getTransaction();
+        assert receivers.containsKey(cfs.metadata.cfId);
+
+        if (cfs.isRocksDBBacked())
+            return null;
+        return ((StreamReceiveTask)receivers.get(cfs.metadata.cfId)).getTransaction();
     }
 
     /**
@@ -275,26 +280,35 @@ public class StreamSession implements IEndpointStateChangeSubscriber
      *
      * Used in repair - a streamed sstable in repair will be marked with the given repairedAt time
      *
-     * @param keyspace Transfer keyspace
+     * @param keyspaceName Transfer keyspace
      * @param ranges Transfer ranges
      * @param columnFamilies Transfer ColumnFamilies
      * @param flushTables flush tables?
      * @param repairedAt the time the repair started.
      */
-    public synchronized void addTransferRanges(String keyspace, Collection<Range<Token>> ranges, Collection<String> columnFamilies, boolean flushTables, long repairedAt)
+    public synchronized void addTransferRanges(String keyspaceName, Collection<Range<Token>> ranges, Collection<String> columnFamilies, boolean flushTables, long repairedAt)
     {
         failIfFinished();
-        Collection<ColumnFamilyStore> stores = getColumnFamilyStores(keyspace, columnFamilies);
+
+        Keyspace keyspace = Keyspace.open(keyspaceName);
+        StorageEngine engine = keyspace.engine;
+        Collection<ColumnFamilyStore> stores = getColumnFamilyStores(keyspaceName, columnFamilies);
+        List<Range<Token>> normalizedRanges = Range.normalize(ranges);
+
+        if (engine != null)
+        {
+            for (ColumnFamilyStore cfs : stores)
+                transfers.put(cfs.metadata.cfId, engine.getStreamTransferTask(this, cfs.metadata.cfId, normalizedRanges));
+            return;
+        }
+
         if (flushTables)
             flushSSTables(stores);
 
-        List<Range<Token>> normalizedRanges = Range.normalize(ranges);
         List<SSTableStreamingSections> sections = getSSTableSectionsForRanges(normalizedRanges, stores, repairedAt, isIncremental);
-        List<RocksdbStreamingSections> rocksdbSections = getRocksSSTableSectionsForRanges(normalizedRanges, stores);
         try
         {
             addTransferFiles(sections);
-            addTransferRocksDbSections(rocksdbSections);
         }
         finally
         {
@@ -333,10 +347,6 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         {
             for (ColumnFamilyStore cfStore : stores)
             {
-                if (cfStore.isRocksDBBacked())
-                {
-                    continue;
-                }
                 final List<Range<PartitionPosition>> keyRanges = new ArrayList<>(ranges.size());
                 for (Range<Token> range : ranges)
                     keyRanges.add(Range.makeRowRange(range));
@@ -384,24 +394,6 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         }
     }
 
-    @VisibleForTesting
-    public static List<RocksdbStreamingSections> getRocksSSTableSectionsForRanges(Collection<Range<Token>> ranges, Collection<ColumnFamilyStore> stores)
-    {
-
-        List<RocksdbStreamingSections> sections = new ArrayList<>(stores.size());
-        for (ColumnFamilyStore cfStore : stores)
-        {
-            if (!cfStore.isRocksDBBacked())
-            {
-                continue;
-            }
-            sections.add(new RocksdbStreamingSections(cfStore.metadata.cfId,
-                                                      RocksEngine.getRocksDBInstance(cfStore),
-                                                      ranges));
-        }
-        return sections;
-    }
-
 
     public synchronized void addTransferFiles(Collection<SSTableStreamingSections> sstableDetails)
     {
@@ -419,7 +411,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
             }
 
             UUID cfId = details.ref.get().metadata.cfId;
-            StreamTransferTask task = transfers.get(cfId);
+            AbstractStreamTransferTask task = transfers.get(cfId);
             if (task == null)
             {
                 //guarantee atomicity
@@ -428,29 +420,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
                 if (task == null)
                     task = newTask;
             }
-            task.addTransferFile(details.ref, details.estimatedKeys, details.sections, details.repairedAt);
-            iter.remove();
-        }
-    }
-
-    public synchronized void addTransferRocksDbSections(Collection<RocksdbStreamingSections> sstableDetails)
-    {
-        failIfFinished();
-        Iterator<RocksdbStreamingSections> iter = sstableDetails.iterator();
-        while (iter.hasNext())
-        {
-            RocksdbStreamingSections sections = iter.next();
-
-            UUID cfId = sections.cfId;
-            StreamTransferTask task = transfers.get(cfId);
-            if (task == null)
-            {
-                StreamTransferTask newTask = new StreamTransferTask(this, cfId);
-                task = transfers.putIfAbsent(cfId, newTask);
-                if (task == null)
-                    task = newTask;
-            }
-            task.addTransferRocksdbFile(sections.cfId, sections.db, sections.ranges);
+            ((StreamTransferTask)task).addTransferFile(details.ref, details.estimatedKeys, details.sections, details.repairedAt);
             iter.remove();
         }
     }
@@ -468,20 +438,6 @@ public class StreamSession implements IEndpointStateChangeSubscriber
             this.sections = sections;
             this.estimatedKeys = estimatedKeys;
             this.repairedAt = repairedAt;
-        }
-    }
-
-    public static class RocksdbStreamingSections
-    {
-        public final RocksDB db;
-        public final UUID cfId;
-        public final Collection<Range<Token>> ranges;
-
-        public RocksdbStreamingSections(UUID cfId, RocksDB db, Collection<Range<Token>> ranges)
-        {
-            this.cfId = cfId;
-            this.db = db;
-            this.ranges = ranges;
         }
     }
 
@@ -574,7 +530,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         state(State.PREPARING);
         PrepareMessage prepare = new PrepareMessage();
         prepare.requests.addAll(requests);
-        for (StreamTransferTask task : transfers.values())
+        for (AbstractStreamTransferTask task : transfers.values())
             prepare.summaries.add(task.getSummary());
         handler.sendMessage(prepare);
 
@@ -624,7 +580,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         if (!requests.isEmpty())
         {
             PrepareMessage prepare = new PrepareMessage();
-            for (StreamTransferTask task : transfers.values())
+            for (AbstractStreamTransferTask task : transfers.values())
                 prepare.summaries.add(task.getSummary());
             handler.sendMessage(prepare);
         }
@@ -637,26 +593,27 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     /**
      * Call back after sending FileMessageHeader.
      *
-     * @param header sent header
+     *
      */
-    public void fileSent(FileMessageHeader header)
+    /*public void fileSent(FileMessageHeader header)
     {
         long headerSize = header.size();
         StreamingMetrics.totalOutgoingBytes.inc(headerSize);
         metrics.outgoingBytes.inc(headerSize);
         // schedule timeout for receiving ACK
-        StreamTransferTask task = transfers.get(header.cfId);
+        AbstractStreamTransferTask task = transfers.get(header.cfId);
         if (task != null)
         {
             task.scheduleTimeout(header.sequenceNumber, 12, TimeUnit.HOURS);
         }
-    }
+    }*/
 
-    public void rocksdbSent(UUID cfId, int sequenceNumber, long outgoingBytes)
+    public void fileSent(UUID cfId, int sequenceNumber, long outgoingBytes)
     {
         StreamingMetrics.totalOutgoingBytes.inc(outgoingBytes);
         metrics.outgoingBytes.inc(outgoingBytes);
-        StreamTransferTask task = transfers.get(cfId);
+        AbstractStreamTransferTask task = transfers.get(cfId);
+        // schedule timeout for receiving ACK
         if (task != null)
         {
             task.scheduleTimeout(sequenceNumber, 12, TimeUnit.HOURS);
@@ -670,25 +627,14 @@ public class StreamSession implements IEndpointStateChangeSubscriber
      */
     public void receive(IncomingFileMessage message)
     {
-        long headerSize = message.header.size();
-        StreamingMetrics.totalIncomingBytes.inc(headerSize);
-        metrics.incomingBytes.inc(headerSize);
-        // send back file received message
-        handler.sendMessage(new ReceivedMessage(message.header.cfId, message.header.sequenceNumber));
-        receivers.get(message.header.cfId).received(message.sstable);
+        UUID cfId = message.header.cfId;
+        receivers.get(cfId).receive(handler, message, metrics);
     }
 
     public void receive(RocksDBIncomingMessage message)
     {
-        // TODO(chenshen): size info is missing for rocksdb.
-        // long headerSize = message.header.size();
-        // StreamingMetrics.totalIncomingBytes.inc(headerSize);
-        // metrics.incomingBytes.inc(headerSize);
-        // send back file received message
-        handler.sendMessage(new ReceivedMessage(message.header.cfId, message.header.sequenceNumber));
-        receivers.get(message.header.cfId).received(message.sstable);
-        StreamingMetrics.totalIncomingBytes.inc(message.sstable.getIncomingBytes());
-        metrics.incomingBytes.inc(message.sstable.getIncomingBytes());
+        UUID cfId = message.header.cfId;
+        receivers.get(cfId).receive(handler, message, metrics);
     }
 
     public void progress(Descriptor desc, ProgressInfo.Direction direction, long bytes, long total)
@@ -746,13 +692,13 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         return new SessionInfo(peer, index, connecting, receivingSummaries, transferSummaries, state);
     }
 
-    public synchronized void taskCompleted(StreamReceiveTask completedTask)
+    public synchronized void receiveTaskCompleted(StreamTask completedTask)
     {
         receivers.remove(completedTask.cfId);
         maybeCompleted();
     }
 
-    public synchronized void taskCompleted(StreamTransferTask completedTask)
+    public synchronized void transferTaskCompleted(StreamTask completedTask)
     {
         transfers.remove(completedTask.cfId);
         maybeCompleted();
@@ -818,7 +764,13 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     {
         failIfFinished();
         if (summary.files > 0)
-            receivers.put(summary.cfId, new StreamReceiveTask(this, summary.cfId, summary.files, summary.totalSize));
+        {
+            ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(summary.cfId);
+            if (cfs.isRocksDBBacked())
+                receivers.put(summary.cfId, cfs.engine.getStreamReceiveTask(this, summary));
+            else
+                receivers.put(summary.cfId, new StreamReceiveTask(this, summary.cfId, summary.files, summary.totalSize));
+        }
     }
 
     private void startStreamingFiles()
@@ -826,13 +778,13 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         streamResult.handleSessionPrepared(this);
 
         state(State.STREAMING);
-        for (StreamTransferTask task : transfers.values())
+        for (AbstractStreamTransferTask task : transfers.values())
         {
             Collection<? extends StreamMessage> messages = task.getFileMessages();
             if (messages.size() > 0)
                 handler.sendMessages(messages);
             else
-                taskCompleted(task); // there is no file to send
+                transferTaskCompleted(task); // there is no file to send
         }
     }
 }

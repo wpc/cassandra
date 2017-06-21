@@ -21,19 +21,22 @@ package org.apache.cassandra.rocksdb.streaming;
 import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Collection;
-import java.util.List;
 import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.messages.OutgoingMessage;
-import org.apache.cassandra.utils.Pair;
 import org.rocksdb.RocksDB;
 
 public class RocksDBOutgoingMessage extends OutgoingMessage
 {
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBOutgoingMessage.class);
+
     public static Serializer<RocksDBOutgoingMessage> SERIALIZER = new Serializer<RocksDBOutgoingMessage>()
     {
         public RocksDBOutgoingMessage deserialize(ReadableByteChannel in, int version, StreamSession session) throws IOException
@@ -47,11 +50,11 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
             try 
             {
                 long outgoingBytes = message.serialize(out, session);
-                session.rocksdbSent(message.cfId, message.sequenceNumber, outgoingBytes);
+                session.fileSent(message.cfId, message.sequenceNumber, outgoingBytes);
             }
             finally
             {
-                message.finishTransfer();;
+                message.finishTransfer();
             }
         }
     };

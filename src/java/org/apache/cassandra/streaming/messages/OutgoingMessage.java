@@ -18,9 +18,6 @@
 
 package org.apache.cassandra.streaming.messages;
 
-/**
- * Created by chenshen on 6/5/17.
- */
 public abstract class OutgoingMessage extends StreamMessage
 {
     protected OutgoingMessage(Type type)
