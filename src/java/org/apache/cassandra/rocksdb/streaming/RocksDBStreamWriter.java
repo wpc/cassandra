@@ -28,6 +28,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.streaming.StreamManager;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 import org.rocksdb.RocksDB;
@@ -39,12 +40,14 @@ public class RocksDBStreamWriter
     private final RocksDB db;
     private final Collection<Range<Token>> ranges;
     private final StreamSession session;
+    private final StreamManager.StreamRateLimiter limiter;
 
     public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges, StreamSession session)
     {
         this.db = db;
         this.ranges = RocksDBStreamUtils.normalizeRanges(ranges);
         this.session = session;
+        this.limiter = StreamManager.getRateLimiter(session.peer);
     }
 
     public void write(DataOutputStreamPlus out) throws IOException
@@ -61,12 +64,13 @@ public class RocksDBStreamWriter
                 while (iterator.isValid())
                 {
                     byte[] key = iterator.key();
+                    byte[] value = iterator.value();
                     if (FBUtilities.compareUnsigned(key, stop) >= 0)
                         break;
+                    limiter.acquire(RocksDBStreamUtils.MORE.length + Integer.BYTES * 2 + key.length + value.length);
                     out.write(RocksDBStreamUtils.MORE);
                     out.writeInt(key.length);
                     out.write(key);
-                    byte[] value = iterator.value();
                     out.writeInt(value.length);
                     out.write(value);
                     streamedPairs++;
