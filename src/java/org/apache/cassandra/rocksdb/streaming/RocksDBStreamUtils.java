@@ -19,39 +19,65 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.commons.lang.NotImplementedException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.thrift.Column;
+import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 public class RocksDBStreamUtils
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
     public static final byte[] EOF = new byte[]{'\0'};
     public static final byte[] MORE = new byte[]{'1'};
 
-    public static void ingestRocksSstables(RocksDB db, Collection<RocksDBSStableWriter> rocksTables) throws RocksDBException
+    public static RocksDB getRocksdb(UUID cfId)
     {
+        Pair<String, String> kscf = Schema.instance.getCF(cfId);
+        ColumnFamilyStore cfs = null;
+        if (kscf != null)
+            cfs = Keyspace.open(kscf.left).getColumnFamilyStore(kscf.right);
+
+        if (kscf == null || cfs == null)
+        {
+            LOGGER.warn("CF " + cfId + " was dropped during streaming");
+            return null;
+        }
+        return RocksEngine.getRocksDBInstance(cfs);
+    }
+
+    public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
+    {
+        RocksDB db = getRocksdb(cfId);
+        if (db == null)
+            return;
+
         final IngestExternalFileOptions ingestExternalFileOptions =
         new IngestExternalFileOptions();
-        List<String> files = new ArrayList<>(rocksTables.size());
-        for (RocksDBSStableWriter writer : rocksTables)
-        {
-            files.add(writer.getFile().getAbsolutePath());
-        }
-        db.ingestExternalFile(files,
+        db.ingestExternalFile(Arrays.asList(sstFile),
                               ingestExternalFileOptions);
+        ingestExternalFileOptions.close();
     }
 
     /**

@@ -22,6 +22,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
@@ -30,53 +33,85 @@ import org.rocksdb.SstFileWriter;
 
 public class RocksDBSStableWriter
 {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBSStableWriter.class);
     private static final File TMP_STREAM_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
+    // While streaming, split the stream into 64 MB sst files.
+    private static long SSTABLE_INGEST_THRESHOLD = Long.parseLong(System.getProperty("cassandra.rocksdb.stream.sst_size", "67108864"));
     private final UUID cfId;
     private final EnvOptions envOptions;
     private final Options options;
-    private final File sstable;
-    private final SstFileWriter sstableWriter;
-
-    public File getFile()
-    {
-        return sstable;
-    }
+    private File sstable = null;
+    private SstFileWriter sstableWriter = null;
+    private long currentSstableSize;
+    private volatile int sstableIngested;
 
     public RocksDBSStableWriter(UUID cfId) throws IOException, RocksDBException
     {
         this.cfId = cfId;
+        this.currentSstableSize = 0;
+        this.sstableIngested = 0;
+        this.envOptions = new EnvOptions();
+        this.options = new Options();
+    }
+
+    private synchronized void createSstable() throws IOException, RocksDBException
+    {
         sstable = File.createTempFile(cfId.toString(), ".sst", TMP_STREAM_PATH);
         sstable.deleteOnExit();
-        envOptions = new EnvOptions();
-        options = new Options();
         sstableWriter = new SstFileWriter(envOptions, options);
         sstableWriter.open(sstable.getAbsolutePath());
+        LOGGER.info("Created " + sstable + " for receiving streamed data.");
     }
 
-    public String getFilename()
+    private synchronized void IngestSstable() throws RocksDBException
     {
-        return sstable.getAbsolutePath();
+
+        LOGGER.info("Flushing " + sstable + ", estimated size: " + currentSstableSize + ", flushing threshold: " + SSTABLE_INGEST_THRESHOLD);
+        try
+        {
+            if (sstableWriter != null)
+                sstableWriter.finish();
+            if (sstable != null && sstable.exists())
+            {
+                sstableIngested += 1;
+                RocksDBStreamUtils.ingestRocksSstable(cfId, sstable.getAbsolutePath());
+            }
+        } finally
+        {
+            if (sstableWriter != null)
+                sstableWriter.close();
+            sstableWriter = null;
+            if (sstable != null)
+            {
+                sstable.delete();
+                sstable = null;
+            }
+            currentSstableSize = 0;
+        }
     }
 
-    public UUID getCfId()
+    public synchronized void write(byte[] key, byte[] value) throws IOException, RocksDBException
     {
-        return cfId;
-    }
+        if (sstableWriter == null)
+            createSstable();
 
-    public void write(byte[] key, byte[] value) throws IOException, RocksDBException
-    {
         Slice keySlice = new Slice(key);
         Slice valueSlice = new Slice(value);
         sstableWriter.merge(keySlice, valueSlice);
         keySlice.close();
         valueSlice.close();
+
+        currentSstableSize += key.length + value.length;
+        if (currentSstableSize >= SSTABLE_INGEST_THRESHOLD)
+            IngestSstable();
     }
 
-    public void close() throws IOException
+    public synchronized void close() throws IOException
     {
         try
         {
-            sstableWriter.finish();
+            IngestSstable();
         }
         catch (RocksDBException e)
         {
@@ -84,23 +119,24 @@ public class RocksDBSStableWriter
         }
         finally
         {
-            sstableWriter.close();
             options.close();
             envOptions.close();
         }
     }
 
-    public Throwable abort(Throwable e)
+    public synchronized Throwable abort(Throwable e)
     {
         try
         {
             close();
         }
         catch (IOException re) {}
-        finally
-        {
-            sstable.delete();
-        }
         return e;
     }
+
+    public int getSstableIngested()
+    {
+        return sstableIngested;
+    }
+
 }

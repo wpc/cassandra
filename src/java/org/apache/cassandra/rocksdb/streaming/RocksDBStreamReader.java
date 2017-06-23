@@ -83,6 +83,10 @@ public class RocksDBStreamReader
             }
             throw Throwables.propagate(e);
         }
+
+        LOGGER.info("[Stream #{}] received {} rocskdb sstables from #{} from {}, ks = '{}', table = '{}'.",
+                    session.planId(), writer.getSstableIngested(), header.sequenceNumber, session.peer, cfs.keyspace.getName(),
+                    cfs.getColumnFamilyName());
         writer.close();
         return writer;
     }

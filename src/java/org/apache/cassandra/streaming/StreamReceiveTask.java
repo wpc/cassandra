@@ -132,8 +132,7 @@ public class StreamReceiveTask extends StreamTask
     {
         if (done)
         {
-            logger.warn("[{}] Received sstable {} on already finished stream received task. Aborting sstable.", session.planId(),
-                        sstable.getFilename());
+            logger.warn("[{}] Received sstable on already finished stream received task. Aborting sstable.", session.planId());
             Throwables.maybeFail(sstable.abort(null));
             return;
         }
@@ -250,11 +249,6 @@ public class StreamReceiveTask extends StreamTask
                             }
                         }
                     }
-                }
-
-                if (cfs.isRocksDBBacked())
-                {
-                    RocksDBStreamUtils.ingestRocksSstables(RocksEngine.getRocksDBInstance(cfs), task.rocksTables);
                 }
                 task.session.taskCompleted(task);
             }

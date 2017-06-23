@@ -78,7 +78,6 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         RocksDBStreamReader reader = new RocksDBStreamReader(new RocksDBMessageHeader(cfs.metadata.cfId, 0), createDummySession());
         DataInputBuffer in = new DataInputBuffer(out.buffer(), false);
         RocksDBSStableWriter sstableWriter = reader.read(in);
-        RocksDBStreamUtils.ingestRocksSstables(RocksEngine.getRocksDBInstance(cfs), Arrays.asList(sstableWriter));
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)

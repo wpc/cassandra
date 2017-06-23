@@ -73,6 +73,6 @@ public class RocksDBIncomingMessage extends StreamMessage
     @Override
     public String toString()
     {
-        return "Rocskdb File (" + header + ", file: " + sstable.getFilename() + ")";
+        return "Rocskdb File (" + header + ")";
     }
 }

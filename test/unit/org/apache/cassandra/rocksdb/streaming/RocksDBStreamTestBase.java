@@ -47,6 +47,7 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
         STREAM_DIR = Paths.get("/tmp/rocksdbstream/", UUID.randomUUID().toString());
         DB_DIR = Paths.get(STREAM_DIR.toAbsolutePath().toString(), "db");
         System.setProperty("cassandra.rocksdb.stream.dir", STREAM_DIR.toString());
+        System.setProperty("cassandra.rocksdb.stream.sst_size", "100");
         File streamDir = STREAM_DIR.toFile();
         if (streamDir.exists())
         {
@@ -60,5 +61,6 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
     {
         RocksDBTestBase.classTeardown();
         System.clearProperty("cassandra.rocksdb.stream.dir");
+        System.clearProperty("cassandra.rocksdb.stream.sst_size");
     }
 }

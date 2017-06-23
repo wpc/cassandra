@@ -77,6 +77,7 @@ public class RocksDBStreamWriter
                 iterator.close();
             }
         }
+        LOGGER.info("Ranges streamed: " + ranges);
         LOGGER.info("Number of rocksdb entries written: " + streamedPairs);
         out.write(RocksDBStreamUtils.EOF);
     }
