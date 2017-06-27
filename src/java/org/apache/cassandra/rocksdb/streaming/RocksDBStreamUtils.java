@@ -41,6 +41,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.engine.RocksEngine;
 import org.apache.cassandra.thrift.Column;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
@@ -52,7 +53,7 @@ public class RocksDBStreamUtils
     public static final byte[] EOF = new byte[]{'\0'};
     public static final byte[] MORE = new byte[]{'1'};
 
-    public static RocksDB getRocksdb(UUID cfId)
+    public static ColumnFamilyStore getColumnFamilyStore(UUID cfId)
     {
         Pair<String, String> kscf = Schema.instance.getCF(cfId);
         ColumnFamilyStore cfs = null;
@@ -62,22 +63,31 @@ public class RocksDBStreamUtils
         if (kscf == null || cfs == null)
         {
             LOGGER.warn("CF " + cfId + " was dropped during streaming");
-            return null;
         }
+        return cfs;
+    }
+
+    public static RocksDB getRocksdb(UUID cfId)
+    {
+        ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
+        if (cfs == null)
+            return null;
         return RocksEngine.getRocksDBInstance(cfs);
     }
 
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
+        ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
         RocksDB db = getRocksdb(cfId);
-        if (db == null)
+        if (cfs == null || db == null)
             return;
-
+        long startTime = System.currentTimeMillis();
         final IngestExternalFileOptions ingestExternalFileOptions =
         new IngestExternalFileOptions();
         db.ingestExternalFile(Arrays.asList(sstFile),
                               ingestExternalFileOptions);
         ingestExternalFileOptions.close();
+        cfs.rocksMetric.rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
     }
 
     /**

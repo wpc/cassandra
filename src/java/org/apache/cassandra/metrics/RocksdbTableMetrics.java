@@ -47,6 +47,7 @@ public class RocksdbTableMetrics
     public final Histogram rocksdbNumFilesInSingleCompactionHistogram;
     public final Histogram rocksdbDbSeekHistogram;
     public final Histogram rocksdbWriteStallHistogram;
+    public final Histogram rocksdbIngestTimeHistogram;
 
     public RocksdbTableMetrics(ColumnFamilyStore cfs) {
         factory = new RocksTableMetricNameFactory(cfs);
@@ -89,6 +90,7 @@ public class RocksdbTableMetrics
                                                   HistogramUtils.createHistogram(cfs, HistogramType.DB_SEEK));
         rocksdbWriteStallHistogram = Metrics.register(factory.createMetricName("WriteStall"),
                                                       HistogramUtils.createHistogram(cfs, HistogramType.WRITE_STALL));
+        rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
     }
 
     static class RocksTableMetricNameFactory implements MetricNameFactory
