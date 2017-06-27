@@ -42,6 +42,7 @@ import org.apache.cassandra.db.marshal.InetAddressType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.IntegerType;
 import org.apache.cassandra.db.marshal.LongType;
+import org.apache.cassandra.db.marshal.ReversedType;
 import org.apache.cassandra.db.marshal.ShortType;
 import org.apache.cassandra.db.marshal.SimpleDateType;
 import org.apache.cassandra.db.marshal.TimeType;
@@ -58,6 +59,7 @@ import org.apache.cassandra.rocksdb.encoding.orderly.DoubleRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.FixedIntegerRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.FixedLongRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.FloatRowKey;
+import org.apache.cassandra.rocksdb.encoding.orderly.Order;
 import org.apache.cassandra.rocksdb.encoding.orderly.RowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.StructRowKey;
 import org.apache.cassandra.rocksdb.encoding.orderly.UTF8RowKey;
@@ -241,12 +243,20 @@ public class RowKeyEncoder
 
     private static ByteBuffer decomposeOrderlyValue(Object orderlyValue, AbstractType type)
     {
+        if(type instanceof ReversedType) {
+            type = ((ReversedType) type).baseType;
+        }
         return rowKeyEncodingPolicies.get(type).decompose(type, orderlyValue);
     }
 
     private static Object composeValueForOrderly(Pair<AbstractType, ByteBuffer> keyPart)
     {
-        return rowKeyEncodingPolicies.get(keyPart.left).compose(keyPart.left, keyPart.right);
+
+        AbstractType type = keyPart.left;
+        if(type instanceof ReversedType) {
+            type = ((ReversedType) type).baseType;
+        }
+        return rowKeyEncodingPolicies.get(type).compose(type, keyPart.right);
     }
 
     private static RowKey getOrderlyRowKey(Pair<AbstractType, ByteBuffer> keyPart)
@@ -256,6 +266,14 @@ public class RowKeyEncoder
 
     private static RowKey getOrderlyRowKey(AbstractType type)
     {
+        if(type instanceof ReversedType) {
+            RowKey rowKey = getOrderlyRowKey(((ReversedType) type).baseType);
+            rowKey.setOrder(Order.DESCENDING);
+            return rowKey;
+        }
+        if(!rowKeyEncodingPolicies.containsKey(type)) {
+            throw new UnsupportedOperationException(type.toString() + " is not supported for Rocksdb engine yet");
+        }
         return rowKeyEncodingPolicies.get(type).getOrderlyRowKey();
     }
 }

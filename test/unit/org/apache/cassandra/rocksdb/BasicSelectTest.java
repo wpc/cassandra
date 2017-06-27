@@ -143,4 +143,71 @@ public class BasicSelectTest extends RocksDBTestBase
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
         assertRows(execute("SELECT * FROM %s WHERE p=? AND c=?", "p1", "k1"));
     }
+
+    public void testRangeQueryWithDescClusteringKey() throws Throwable
+    {
+        long now = System.currentTimeMillis();
+        UUID uuid1 = UUIDGen.getTimeUUID(now, 1L);
+        UUID uuid2 = UUIDGen.getTimeUUID(now, 2L);
+        UUID uuid3 = UUIDGen.getTimeUUID(now, 3L);
+        BigInteger p1 = new BigInteger("535959550");
+
+        createTable("CREATE TABLE %s (" +
+                    "key varint, " +
+                    "column1 timeuuid, " +
+                    "value text, " +
+                    "PRIMARY KEY (key, column1))" +
+                    "WITH CLUSTERING ORDER BY (column1 DESC)");
+
+        execute("INSERT INTO %s(key, column1, value) values (?, ?, ?)",
+                p1, uuid2, "v1");
+        execute("INSERT INTO %s(key, column1, value) values (?, ?, ?)",
+                p1, uuid1, "v2");
+        execute("INSERT INTO %s(key, column1, value) values (?, ?, ?)",
+                p1, uuid3, "v3");
+
+        assertRows(execute("SELECT * FROM %s WHERE key=?", p1),
+                   row(p1, uuid3, "v3"),
+                   row(p1, uuid2, "v1"),
+                   row(p1, uuid1, "v2"));
+
+    }
+
+    @Test
+    public void testRangeQueryWithMixedOrderClusteringKey() throws Throwable
+    {
+        long now = System.currentTimeMillis();
+        UUID uuid1 = UUIDGen.getTimeUUID(now, 1L);
+        UUID uuid2 = UUIDGen.getTimeUUID(now, 2L);
+        UUID uuid3 = UUIDGen.getTimeUUID(now, 3L);
+        UUID uuid4 = UUIDGen.getTimeUUID(now, 4L);
+        BigInteger p1 = new BigInteger("535959550");
+        BigInteger big0 = BigInteger.valueOf(0);
+        BigInteger big1 = BigInteger.valueOf(1);
+
+        createTable("CREATE TABLE %s (" +
+                    "key varint, " +
+                    "column1 varint, " +
+                    "column2 timeuuid, " +
+                    "value text, " +
+                    "PRIMARY KEY (key, column1, column2))" +
+                    "WITH CLUSTERING ORDER BY (column1 ASC, column2 DESC)");
+
+
+        execute("INSERT INTO %s(key, column1, column2, value) values (?, ?, ?, ?)",
+                p1, big0, uuid2, "v1");
+        execute("INSERT INTO %s(key, column1, column2, value) values (?, ?, ?, ?)",
+                p1, big0, uuid1, "v2");
+        execute("INSERT INTO %s(key, column1, column2, value) values (?, ?, ?, ?)",
+                p1, big0, uuid3, "v3");
+        execute("INSERT INTO %s(key, column1, column2, value) values (?, ?, ?, ?)",
+                p1, big1, uuid4, "v4");
+
+
+        assertRows(execute("SELECT * FROM %s WHERE key=?", p1),
+                   row(p1, big0, uuid3, "v3"),
+                   row(p1, big0, uuid2, "v1"),
+                   row(p1, big0, uuid1, "v2"),
+                   row(p1, big1, uuid4, "v4"));
+    }
 }
