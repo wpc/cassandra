@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.NotImplementedException;
 
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
@@ -139,5 +141,16 @@ public class RocksDBStreamUtils
             return RandomPartitioner.MINIMUM;
         }
         throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
+    }
+
+    public static String toString(Cell cell)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cell tombstone:").append(cell.isTombstone())
+            .append(", expiring:").append(cell.isExpiring())
+            .append(", timestamp:").append(cell.timestamp())
+            .append(", ttl:").append(cell.ttl())
+            .append(", value:").append(Hex.encodeHex(cell.value().array()));
+        return sb.toString();
     }
 }

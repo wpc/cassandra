@@ -38,7 +38,7 @@ public class ColumnEncoder
         ColumnBaseEncoder.encode(index, (byte) 0, dest);
         dest.putLong(cell.timestamp());
         dest.putInt(cell.value().remaining());
-        dest.put(cell.value());
+        dest.put(cell.value().duplicate());
     }
 
     public static Cell decode(ColumnDefinition cd, ByteBuffer src)

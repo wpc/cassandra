@@ -136,4 +136,11 @@ public class BasicSelectTest extends RocksDBTestBase
                    row(1, 1, 1, 1, 5, "6", "1"),
                    row(1, 1, 1, 2, 1, "1", "0"));
     }
+
+    @Test
+    public void testEmptyResult() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c=?", "p1", "k1"));
+    }
 }

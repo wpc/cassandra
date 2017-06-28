@@ -39,7 +39,7 @@ public class ExpiringColumnEncoder
         ColumnBaseEncoder.encode(index, (byte) LegacyLayout.EXPIRATION_MASK, dest);
         dest.putLong(cell.timestamp());
         dest.putInt(cell.value().remaining());
-        dest.put(cell.value());
+        dest.put(cell.value().duplicate());
         dest.putInt(cell.ttl());
     }
 

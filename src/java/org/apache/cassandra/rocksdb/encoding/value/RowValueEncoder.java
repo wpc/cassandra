@@ -26,6 +26,7 @@ import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -33,8 +34,13 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class RowValueEncoder
 {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RowValueEncoder.class);
     public static int ROW_HEADER_SIZE = 12;
 
     public static byte[] encode(CFMetaData metaData, Row row)
@@ -103,6 +109,10 @@ public class RowValueEncoder
 
     private static void encodeColumn(byte index, Cell cell, ByteBuffer dest)
     {
+        if (LOGGER.isDebugEnabled())
+        {
+            LOGGER.debug("Writing cell: " + RocksDBStreamUtils.toString(cell));
+        }
         if (cell.isTombstone())
         {
             TombstoneEncoder.encode(index, cell, dest);
