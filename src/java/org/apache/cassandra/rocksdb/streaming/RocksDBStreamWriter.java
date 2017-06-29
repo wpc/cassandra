@@ -41,6 +41,7 @@ public class RocksDBStreamWriter
     private final Collection<Range<Token>> ranges;
     private final StreamSession session;
     private final StreamManager.StreamRateLimiter limiter;
+    private long outgoingBytes;
 
     public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges, StreamSession session)
     {
@@ -48,6 +49,7 @@ public class RocksDBStreamWriter
         this.ranges = RocksDBStreamUtils.normalizeRanges(ranges);
         this.session = session;
         this.limiter = StreamManager.getRateLimiter(session.peer);
+        this.outgoingBytes = 0;
     }
 
     public void write(DataOutputStreamPlus out) throws IOException
@@ -73,6 +75,7 @@ public class RocksDBStreamWriter
                     out.write(key);
                     out.writeInt(value.length);
                     out.write(value);
+                    outgoingBytes += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
                     streamedPairs++;
                     iterator.next();
                 }
@@ -85,4 +88,10 @@ public class RocksDBStreamWriter
         LOGGER.info("Number of rocksdb entries written: " + streamedPairs);
         out.write(RocksDBStreamUtils.EOF);
     }
+
+    public long getOutgoingBytes()
+    {
+        return outgoingBytes;
+    }
+
 }

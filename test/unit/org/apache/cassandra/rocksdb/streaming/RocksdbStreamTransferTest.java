@@ -298,7 +298,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
                 RocksDBMessageHeader.SERIALIZER.seriliaze(message.header, out);
                 RocksDBStreamWriter writer = new RocksDBStreamWriter(alternativeDBToStreamFrom, message.ranges, session);
                 writer.write(out);
-                session.rocksdbSent(message.cfId, message.sequenceNumber);
+                session.rocksdbSent(message.cfId, message.sequenceNumber, 0);
             }
             finally
             {

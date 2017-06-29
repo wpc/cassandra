@@ -44,12 +44,14 @@ public class RocksDBSStableWriter
     private File sstable = null;
     private SstFileWriter sstableWriter = null;
     private long currentSstableSize;
+    private volatile long incomingBytes;
     private volatile int sstableIngested;
 
     public RocksDBSStableWriter(UUID cfId) throws IOException, RocksDBException
     {
         this.cfId = cfId;
         this.currentSstableSize = 0;
+        this.incomingBytes = 0;
         this.sstableIngested = 0;
         this.envOptions = new EnvOptions();
         this.options = new Options();
@@ -103,6 +105,7 @@ public class RocksDBSStableWriter
         valueSlice.close();
 
         currentSstableSize += key.length + value.length;
+        incomingBytes += key.length + value.length + RocksDBStreamUtils.MORE.length + Integer.BYTES * 2;
         if (currentSstableSize >= SSTABLE_INGEST_THRESHOLD)
             IngestSstable();
     }
@@ -132,6 +135,11 @@ public class RocksDBSStableWriter
         }
         catch (IOException re) {}
         return e;
+    }
+
+    public long getIncomingBytes()
+    {
+        return incomingBytes;
     }
 
     public int getSstableIngested()

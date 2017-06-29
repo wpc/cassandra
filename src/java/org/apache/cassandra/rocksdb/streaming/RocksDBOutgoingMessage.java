@@ -46,8 +46,8 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
             message.startTransfer();
             try 
             {
-                message.serialize(out, session);
-                session.rocksdbSent(message.cfId, message.sequenceNumber);
+                long outgoingBytes = message.serialize(out, session);
+                session.rocksdbSent(message.cfId, message.sequenceNumber, outgoingBytes);
             }
             finally
             {
@@ -56,11 +56,12 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
         }
     };
 
-    protected void serialize(DataOutputStreamPlus out,  StreamSession session) throws IOException
+    protected long serialize(DataOutputStreamPlus out,  StreamSession session) throws IOException
     {
         RocksDBMessageHeader.SERIALIZER.seriliaze(header, out);
         RocksDBStreamWriter writer = new RocksDBStreamWriter(db, ranges, session);
         writer.write(out);
+        return writer.getOutgoingBytes();
     }
 
     public final RocksDBMessageHeader header;

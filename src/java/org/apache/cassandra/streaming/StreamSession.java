@@ -652,8 +652,10 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         }
     }
 
-    public void rocksdbSent(UUID cfId, int sequenceNumber)
+    public void rocksdbSent(UUID cfId, int sequenceNumber, long outgoingBytes)
     {
+        StreamingMetrics.totalOutgoingBytes.inc(outgoingBytes);
+        metrics.outgoingBytes.inc(outgoingBytes);
         StreamTransferTask task = transfers.get(cfId);
         if (task != null)
         {
@@ -685,6 +687,8 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         // send back file received message
         handler.sendMessage(new ReceivedMessage(message.header.cfId, message.header.sequenceNumber));
         receivers.get(message.header.cfId).received(message.sstable);
+        StreamingMetrics.totalIncomingBytes.inc(message.sstable.getIncomingBytes());
+        metrics.incomingBytes.inc(message.sstable.getIncomingBytes());
     }
 
     public void progress(Descriptor desc, ProgressInfo.Direction direction, long bytes, long total)
