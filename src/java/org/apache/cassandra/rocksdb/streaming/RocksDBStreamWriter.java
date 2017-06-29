@@ -50,6 +50,7 @@ public class RocksDBStreamWriter
         this.session = session;
         this.limiter = StreamManager.getRateLimiter(session.peer);
         this.outgoingBytes = 0;
+        RocksdbThroughputManager.getInstance().registerOutgoingStreamWriter(this);
     }
 
     public void write(DataOutputStreamPlus out) throws IOException

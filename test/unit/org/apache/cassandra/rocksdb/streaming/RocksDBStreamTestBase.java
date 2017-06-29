@@ -33,6 +33,8 @@ import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.rocksdb.RocksDBTestBase;
+import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.utils.FBUtilities;
 
 public class RocksDBStreamTestBase extends RocksDBTestBase
 {
@@ -62,5 +64,10 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
         RocksDBTestBase.classTeardown();
         System.clearProperty("cassandra.rocksdb.stream.dir");
         System.clearProperty("cassandra.rocksdb.stream.sst_size");
+    }
+
+    public static StreamSession createDummySession()
+    {
+        return new StreamSession(FBUtilities.getLocalAddress(), FBUtilities.getLocalAddress(), null, 0, false, false);
     }
 }

@@ -88,10 +88,4 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         // Verifies merge respect timestamp while streaming.
         assertRows(execute("SELECT v FROM %s WHERE p=?", "merge"), row("new"));
     }
-
-
-    private StreamSession createDummySession()
-    {
-        return new StreamSession(FBUtilities.getLocalAddress(), FBUtilities.getLocalAddress(), null, 0, false, false);
-    }
 }

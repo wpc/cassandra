@@ -18,9 +18,11 @@
 
 package org.apache.cassandra.metrics;
 
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.rocksdb.encoding.metrics.HistogramUtils;
+import org.apache.cassandra.rocksdb.streaming.RocksdbThroughputManager;
 import org.rocksdb.HistogramType;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
@@ -49,8 +51,30 @@ public class RocksdbTableMetrics
     public final Histogram rocksdbWriteStallHistogram;
     public final Histogram rocksdbIngestTimeHistogram;
 
+    public static final Gauge<Long> rocksdbOutgoingThroughput;
+    public static final Gauge<Long> rocksdbIncomingThroughput;
+
+    static
+    {
+        rocksdbOutgoingThroughput = Metrics.register(RocksMetricNameFactory.DEFAULT_FACTORY.createMetricName("RocksdbOutgoingThroughput"),
+                                                    new Gauge<Long>(){
+                                                        public Long getValue()
+                                                        {
+                                                            return RocksdbThroughputManager.getInstance().getOutgoingThroughput();
+                                                        }
+                                                    });
+
+        rocksdbIncomingThroughput = Metrics.register(RocksMetricNameFactory.DEFAULT_FACTORY.createMetricName("RocksdbIncomingThroughput"),
+                                                    new Gauge<Long>(){
+                                                        public Long getValue()
+                                                        {
+                                                            return RocksdbThroughputManager.getInstance().getIncomingThroughput();
+                                                        }
+                                                    });
+    }
+
     public RocksdbTableMetrics(ColumnFamilyStore cfs) {
-        factory = new RocksTableMetricNameFactory(cfs);
+        factory = new RocksMetricNameFactory(cfs);
 
         rocksdbGetHistogram = Metrics.register(factory.createMetricName("Get"),
                                                HistogramUtils.createHistogram(cfs, HistogramType.DB_GET));
@@ -93,15 +117,25 @@ public class RocksdbTableMetrics
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
     }
 
-    static class RocksTableMetricNameFactory implements MetricNameFactory
+    static class RocksMetricNameFactory implements MetricNameFactory
     {
+        private static final RocksMetricNameFactory DEFAULT_FACTORY = new RocksMetricNameFactory(null);
         private static final String TYPE = "Rocksdb";
         private final String keyspaceName;
         private final String tableName;
-        RocksTableMetricNameFactory(ColumnFamilyStore cfs)
+        
+        RocksMetricNameFactory(ColumnFamilyStore cfs)
         {
-            this.keyspaceName = cfs.keyspace.getName();
-            this.tableName = cfs.name;
+            if (cfs != null)
+            {
+                this.keyspaceName = cfs.keyspace.getName();
+                this.tableName = cfs.name;
+            }
+                else
+            {
+                this.keyspaceName = "all";
+                this.tableName = "all";
+            }
         }
 
         public CassandraMetricsRegistry.MetricName createMetricName(String metricName)
