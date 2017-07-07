@@ -49,6 +49,7 @@ import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.UpdateFunction;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -56,6 +57,10 @@ import org.rocksdb.RocksIterator;
 
 public class RocksDBPartition implements Partition
 {
+    // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
+    // until compaction happens. However in our case, range deletion is only used to remove ranges
+    // no longer owned by this node. In such case, stale keys would never be quried.
+    private static final ReadOptions READ_OPTIONS = new ReadOptions().setIgnoreRangeDeletions(true);
     private final RocksDB db;
     private final DecoratedKey partitionKey;
     private final CFMetaData metadata;
@@ -133,7 +138,7 @@ public class RocksDBPartition implements Partition
         try
         {
             byte[] key = RowKeyEncoder.encode(partitionKey, clustering, metadata);
-            byte[] values = db.get(key);
+            byte[] values = db.get(READ_OPTIONS, key);
 
             return makeRow(values, columnFilter, clustering);
         }
@@ -160,7 +165,7 @@ public class RocksDBPartition implements Partition
         //TODO: support column_start and column_end using bound info from slice
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
-        RocksIterator rocksIterator = db.newIterator();
+        RocksIterator rocksIterator = db.newIterator(READ_OPTIONS);
         rocksIterator.seek(partitionKeyBytes);
         return new AbstractUnfilteredRowIterator(metadata, partitionKey, DeletionTime.LIVE, metadata.partitionColumns(), null, reversed, EncodingStats.NO_STATS)
         {

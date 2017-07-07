@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,7 @@ import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.partitions.Partition;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
@@ -47,6 +49,8 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
+import org.apache.cassandra.service.StorageService;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CompactionPriority;
@@ -197,5 +201,37 @@ public class RocksEngine implements StorageEngine
             return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfId);
         }
         return null;
+    }
+
+    @Override
+    public boolean cleanUpRanges(ColumnFamilyStore cfs)
+    {
+        Keyspace keyspace = cfs.keyspace;
+        if (!StorageService.instance.isJoined())
+        {
+            logger.info("Cleanup cannot run before a node has joined the ring");
+            return false;
+        }
+        final Collection<Range<Token>> ranges = StorageService.instance.getLocalRanges(keyspace.getName());
+        final Collection<Range<Token>> completeRanges = RocksDBStreamUtils.calcluateComplementRanges(cfs.getPartitioner(), ranges);
+        RocksDB db = rocksDBFamily.get(cfs.metadata.cfId);
+        for (Range range : completeRanges)
+        {
+            try
+            {
+                deleteRange(db, range);
+            } catch (RocksDBException e)
+            {
+                logger.error("Cleanup failed hitting a rocksdb exception", e);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @VisibleForTesting
+    public void deleteRange(RocksDB db, Range<Token> range) throws RocksDBException
+    {
+        db.deleteRange(RowKeyEncoder.encodeToken(range.left), RowKeyEncoder.encodeToken(range.right));
     }
 }

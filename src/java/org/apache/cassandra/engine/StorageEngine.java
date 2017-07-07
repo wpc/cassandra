@@ -47,7 +47,10 @@ public interface StorageEngine
     UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs,
                                        SinglePartitionReadCommand readCommand);
 
-    /* Streaming API
+    boolean cleanUpRanges(final ColumnFamilyStore cfs);
+
+    /**
+     *  Streaming APIs
      */
     AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
                                                      UUID cfId,
@@ -55,4 +58,5 @@ public interface StorageEngine
 
     AbstractStreamReceiveTask getStreamReceiveTask(StreamSession session,
                                                    StreamSummary summary);
+
 }

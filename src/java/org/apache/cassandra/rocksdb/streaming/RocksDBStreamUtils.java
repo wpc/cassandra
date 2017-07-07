@@ -116,6 +116,34 @@ public class RocksDBStreamUtils
         return normalized;
     }
 
+    /**
+     * Calcuate the complement of a given ranges (all the tokens not in the given range) in the token ring.
+     */
+    public static Collection<Range<Token>> calcluateComplementRanges(IPartitioner partitioner, Collection<Range<Token>> ranges)
+    {
+        Collection<Range<Token>> normalized = normalizeRanges(Range.normalize(ranges));
+
+        ArrayList<Range<Token>> result = new ArrayList<>(ranges.size() + 1);
+
+        Token start = getMinToken(partitioner);
+        for (Range<Token> range : normalized)
+        {
+            Token end = range.left;
+            if (!start.equals(end))
+            {
+                result.add(new Range<>(start, end));
+            }
+            start = range.right;
+        }
+
+        Token maxToken = getMaxToken(partitioner);
+        if (!start.equals(maxToken))
+        {
+            result.add(new Range<>(start, maxToken));
+        }
+        return result;
+    }
+
     public static Token getMaxToken(IPartitioner partitioner)
     {
         if (partitioner instanceof Murmur3Partitioner)

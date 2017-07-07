@@ -305,16 +305,4 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
             }
         }
     }
-
-    private boolean inRanges(Token token, List<Range<Token>> ranges)
-    {
-        for (Range<Token> range : ranges)
-        {
-            if ( token.compareTo(range.left) >= 0 && token.compareTo(range.right) < 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
 }

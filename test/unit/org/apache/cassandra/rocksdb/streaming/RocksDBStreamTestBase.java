@@ -21,6 +21,7 @@ package org.apache.cassandra.rocksdb.streaming;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang.NotImplementedException;
@@ -30,6 +31,7 @@ import org.junit.BeforeClass;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
+import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.rocksdb.RocksDBTestBase;
@@ -69,5 +71,17 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
     public static StreamSession createDummySession()
     {
         return new StreamSession(FBUtilities.getLocalAddress(), FBUtilities.getLocalAddress(), null, 0, false, false);
+    }
+
+    public boolean inRanges(Token token, List<Range<Token>> ranges)
+    {
+        for (Range<Token> range : ranges)
+        {
+            if ( token.compareTo(range.left) >= 0 && token.compareTo(range.right) < 0)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -1388,7 +1388,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public CompactionManager.AllSSTableOpStatus forceCleanup(int jobs) throws ExecutionException, InterruptedException
     {
-        return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        if (engine == null)
+            return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        else
+            return engine.cleanUpRanges(ColumnFamilyStore.this) ?
+                   CompactionManager.AllSSTableOpStatus.SUCCESSFUL : CompactionManager.AllSSTableOpStatus.ABORTED;
     }
 
     public CompactionManager.AllSSTableOpStatus scrub(boolean disableSnapshot, boolean skipCorrupted, boolean checkData, int jobs) throws ExecutionException, InterruptedException
