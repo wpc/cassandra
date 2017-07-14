@@ -119,8 +119,10 @@ public class RocksdbThroughputManager
             return;
         }
 
-        outgoingThroughput = (currentTotalOutgoingBytes - previousTotalOutgoingBytes) * 1000L / (currentTimeMs - lastCheckTimeMs);
-        incomingThroughput = (currentTotalIncomingBytes - previousTotalIncomingBytes) * 1000L / (currentTimeMs - lastCheckTimeMs);
+        long timeElapsed = Math.max(currentTimeMs - lastCheckTimeMs, 1);
+
+        outgoingThroughput = (currentTotalOutgoingBytes - previousTotalOutgoingBytes) * 1000L / timeElapsed;
+        incomingThroughput = (currentTotalIncomingBytes - previousTotalIncomingBytes) * 1000L / timeElapsed;
 
         lastCheckTimeMs = currentTimeMs;
     }
