@@ -18,7 +18,9 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -53,9 +55,13 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
+import org.rocksdb.CassandraCompactionFilter;
+import org.rocksdb.CassandraValueMergeOperator;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
-import org.rocksdb.Options;
+import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.Statistics;
@@ -72,49 +78,56 @@ public class RocksEngine implements StorageEngine
 
     public final ConcurrentMap<UUID, RocksDB> rocksDBFamily = new ConcurrentHashMap<>();
     public final ConcurrentMap<UUID, Statistics> rocksDBStats = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, CassandraCompactionFilter> rocksCompactionFilters = new ConcurrentHashMap<>();
+
 
     public void openColumnFamilyStore(String keyspaceName,
                                       String columnFamilyName,
                                       CFMetaData metadata)
     {
-        RocksDB db = null;
-        Options options = null;
-        Statistics stats = null;
-
-        options = new Options().setCreateIfMissing(true);
+        RocksDB db;
         try
         {
             final long writeBufferSize = 8 * 512 * 1024 * 1024L;
             final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
+            DBOptions dbOptions = new DBOptions();
+            Statistics stats = new Statistics();
+            CassandraCompactionFilter compactionFilter = new CassandraCompactionFilter(metadata.params.purgeTtlOnExpiration);
 
-            options.setAllowConcurrentMemtableWrite(true);
-            options.setEnableWriteThreadAdaptiveYield(true);
-            options.setBytesPerSync(1024 * 1024);
-            options.setWalBytesPerSync(1024 * 1024);
-            options.setMaxBackgroundCompactions(20);
-            options.setBaseBackgroundCompactions(20);
-            options.setMaxSubcompactions(8);
-            options.setCompressionType(CompressionType.LZ4_COMPRESSION);
-            options.setWriteBufferSize(writeBufferSize);
-            options.setMaxBytesForLevelBase(4 * writeBufferSize);
-            options.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
-            options.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
-            options.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-            options.setMergeOperatorName("cassandra");
+            dbOptions.setCreateIfMissing(true);
+            dbOptions.setAllowConcurrentMemtableWrite(true);
+            dbOptions.setEnableWriteThreadAdaptiveYield(true);
+            dbOptions.setBytesPerSync(1024 * 1024);
+            dbOptions.setWalBytesPerSync(1024 * 1024);
+            dbOptions.setMaxBackgroundCompactions(20);
+            dbOptions.setBaseBackgroundCompactions(20);
+            dbOptions.setMaxSubcompactions(8);
+            dbOptions.setStatistics(stats);
+
+            ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
+            columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
+            columnFamilyOptions.setWriteBufferSize(writeBufferSize);
+            columnFamilyOptions.setMaxBytesForLevelBase(4 * writeBufferSize);
+            columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
+            columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
+            columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+            columnFamilyOptions.setMergeOperatorName("cassandra");
+            columnFamilyOptions.setCompactionFilter(compactionFilter);
 
             final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
             final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
             tableOptions.setFilter(bloomFilter);
-            options.setTableFormatConfig(tableOptions);
+            columnFamilyOptions.setTableFormatConfig(tableOptions);
 
-            stats = options.statisticsPtr();
+            ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
+
             String rocksDBTableDir = ROCKSDB_DIR + "/" + keyspaceName + "/" + columnFamilyName;
             FileUtils.createDirectory(ROCKSDB_DIR);
             FileUtils.createDirectory(rocksDBTableDir);
-            db = RocksDB.open(options, rocksDBTableDir);
-
+            db = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
             rocksDBFamily.putIfAbsent(metadata.cfId, db);
             rocksDBStats.putIfAbsent(metadata.cfId, stats);
+            rocksCompactionFilters.putIfAbsent(metadata.cfId, compactionFilter); // holding the reference of compaction filter, avoid it be disposed
         }
         catch (RocksDBException e)
         {
@@ -126,7 +139,7 @@ public class RocksEngine implements StorageEngine
     {
         DecoratedKey partitionKey = update.partitionKey();
 
-        for (Row row: update)
+        for (Row row : update)
         {
             applyRowToRocksDB(cfs, partitionKey, row);
         }
@@ -144,7 +157,6 @@ public class RocksEngine implements StorageEngine
                                                    readCommand.partitionKey(),
                                                    readCommand.metadata());
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
-
     }
 
     public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,

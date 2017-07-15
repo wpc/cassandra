@@ -41,7 +41,6 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
-import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.UUIDGen;
 import org.rocksdb.RocksDB;
@@ -106,8 +105,7 @@ public class PartitionOrderTest extends RocksDBTestBase
 
     private List<Object> scannRocksDBValues(AbstractType valueType) throws IOException
     {
-        Iterable<ColumnFamilyStore> cfss = StorageService.instance.getValidColumnFamilies(false, false, KEYSPACE, currentTable());
-        ColumnFamilyStore cfs = cfss.iterator().next();
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         RocksDB rocksDB = RocksEngine.getRocksDBInstance(cfs);
         List<Object> result = new ArrayList<>();
         try (RocksIterator rocksIterator = rocksDB.newIterator())

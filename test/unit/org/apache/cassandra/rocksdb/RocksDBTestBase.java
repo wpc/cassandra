@@ -19,14 +19,34 @@
 package org.apache.cassandra.rocksdb;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
+import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.CQLTester;
+import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.PartitionColumns;
+import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.db.Slices;
+import org.apache.cassandra.db.filter.ClusteringIndexSliceFilter;
+import org.apache.cassandra.db.filter.ColumnFilter;
+import org.apache.cassandra.db.filter.DataLimits;
+import org.apache.cassandra.db.filter.RowFilter;
+import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
+import org.rocksdb.FlushOptions;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 public class RocksDBTestBase extends CQLTester
 {
@@ -48,5 +68,50 @@ public class RocksDBTestBase extends CQLTester
     {
         System.clearProperty("cassandra.rocksdb.keyspace");
         System.clearProperty("cassandra.rocksdb.dir");
+    }
+
+    protected List<Row> engineQuery(SinglePartitionReadCommand readCommand)
+    {
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        UnfilteredRowIterator result = cfs.engine.queryStorage(cfs, readCommand);
+        ArrayList<Row> rows = new ArrayList<>();
+        while (result.hasNext())
+        {
+            rows.add((Row) result.next());
+        }
+        return rows;
+    }
+
+    protected void triggerCompaction() throws RocksDBException
+    {
+        RocksDB rocksDBInstance = rocksdbFlush();
+        rocksDBInstance.compactRange();
+    }
+
+    protected RocksDB rocksdbFlush() throws RocksDBException
+    {
+        RocksDB rocksDBInstance = RocksEngine.getRocksDBInstance(getCurrentColumnFamilyStore());
+        rocksDBInstance.flush(new FlushOptions().setWaitForFlush(true));
+        return rocksDBInstance;
+    }
+
+    protected SinglePartitionReadCommand readCommand(String keystr, String column)
+    {
+
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        DecoratedKey key = cfs.metadata.decorateKey(ByteBufferUtil.bytes(keystr));
+        ColumnDefinition columnDef = cfs.metadata.getColumnDefinition(new ColumnIdentifier(column, true));
+        ColumnFilter columnFilter = ColumnFilter.selection(PartitionColumns.of(columnDef));
+        ClusteringIndexSliceFilter sliceFilter = new ClusteringIndexSliceFilter(Slices.ALL, false);
+        return new SinglePartitionReadCommand(false,
+                                              MessagingService.VERSION_30,
+                                              true,
+                                              cfs.metadata,
+                                              FBUtilities.nowInSeconds(),
+                                              columnFilter,
+                                              RowFilter.NONE,
+                                              DataLimits.NONE,
+                                              key,
+                                              sliceFilter);
     }
 }
