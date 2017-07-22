@@ -317,6 +317,7 @@ public class ColumnFamilyStoreCQLHelper
         builder.append("\n\tAND min_index_interval = ").append(tableParams.minIndexInterval);
         builder.append("\n\tAND max_index_interval = ").append(tableParams.maxIndexInterval);
         builder.append("\n\tAND memtable_flush_period_in_ms = ").append(tableParams.memtableFlushPeriodInMs);
+        builder.append("\n\tAND purge_ttl_on_expiration = ").append(tableParams.purgeTtlOnExpiration);
         builder.append("\n\tAND read_repair_chance = ").append(tableParams.readRepairChance);
         builder.append("\n\tAND speculative_retry = '").append(tableParams.speculativeRetry).append("'");
         builder.append("\n\tAND comment = ").append(singleQuote(tableParams.comment));

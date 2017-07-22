@@ -212,6 +212,12 @@ public final class CFMetaData
         return this;
     }
 
+    public CFMetaData purgeTtlOnExpiration(boolean prop)
+    {
+        params = TableParams.builder(params).purgeTtlOnExpiration(prop).build();
+        return this;
+    }
+
     public CFMetaData droppedColumns(Map<ByteBuffer, DroppedColumn> cols)
     {
         droppedColumns = cols;

@@ -132,6 +132,16 @@ public class BufferCell extends AbstractCell
         return path;
     }
 
+    public boolean shouldPurgeTtlOnExpiration()
+    {
+        CFMetaData cfm = Schema.instance.getCFMetaData(column.ksName, column.cfName);
+        if (cfm != null)
+        {
+            return cfm.params.purgeTtlOnExpiration;
+        }
+        return false;
+    }
+
     public Cell withUpdatedColumn(ColumnDefinition newColumn)
     {
         return new BufferCell(newColumn, timestamp, ttl, localDeletionTime, value, path);
@@ -173,6 +183,8 @@ public class BufferCell extends AbstractCell
             // to do both here.
             if (isExpiring())
             {
+                if (shouldPurgeTtlOnExpiration())
+                    return null;
                 // Note that as long as the expiring column and the tombstone put together live longer than GC grace seconds,
                 // we'll fulfil our responsibility to repair. See discussion at
                 // http://cassandra-user-incubator-apache-org.3065146.n2.nabble.com/repair-compaction-and-tombstone-rows-td7583481.html

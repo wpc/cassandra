@@ -26,7 +26,6 @@ package org.apache.cassandra.thrift;
  * 
  */
 
-
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
@@ -56,6 +55,6 @@ import org.slf4j.LoggerFactory;
 
 public class cassandraConstants {
 
-  public static final String VERSION = "20.1.0";
+  public static final String VERSION = "20.2.0";
 
 }

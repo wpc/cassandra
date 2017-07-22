@@ -330,6 +330,7 @@ public final class SystemKeyspace
                 + "memtable_flush_period_in_ms int,"
                 + "min_compaction_threshold int,"
                 + "min_index_interval int,"
+                + "purge_ttl_on_expiration boolean,"
                 + "read_repair_chance double,"
                 + "speculative_retry text,"
                 + "subcomparator text,"

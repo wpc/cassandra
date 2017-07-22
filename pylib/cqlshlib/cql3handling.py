@@ -51,6 +51,7 @@ class Cql3ParsingRuleSet(CqlParsingRuleSet):
         ('default_time_to_live', None),
         ('speculative_retry', None),
         ('memtable_flush_period_in_ms', None),
+        ('purge_ttl_on_expiration', None),
     )
 
     columnfamily_layout_map_options = (
