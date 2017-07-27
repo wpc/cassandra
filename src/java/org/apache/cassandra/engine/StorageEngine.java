@@ -36,9 +36,7 @@ import org.apache.cassandra.streaming.StreamSummary;
 public interface StorageEngine
 {
 
-    void openColumnFamilyStore(String keyspaceName,
-                               String columnFamilyName,
-                               CFMetaData metadata);
+    void openColumnFamilyStore(ColumnFamilyStore cfs);
 
     void apply(final ColumnFamilyStore cfs,
                final PartitionUpdate partitionUpdate,

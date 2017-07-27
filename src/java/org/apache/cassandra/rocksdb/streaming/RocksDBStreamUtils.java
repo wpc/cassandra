@@ -40,6 +40,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
@@ -77,16 +78,18 @@ public class RocksDBStreamUtils
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
-        RocksDB db = getRocksdb(cfId);
-        if (cfs == null || db == null)
+        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(cfId);
+        if (cfs == null || rocksDBCF == null)
             return;
+
+        RocksDB db = rocksDBCF.getRocksDB();
         long startTime = System.currentTimeMillis();
         final IngestExternalFileOptions ingestExternalFileOptions =
         new IngestExternalFileOptions();
         db.ingestExternalFile(Arrays.asList(sstFile),
                               ingestExternalFileOptions);
         ingestExternalFileOptions.close();
-        cfs.rocksMetric.rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
+        rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
     }
 
     /**

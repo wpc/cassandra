@@ -220,7 +220,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private volatile Directories directories;
 
     public final TableMetrics metric;
-    public final RocksdbTableMetrics rocksMetric;
     public volatile long sampleLatencyNanos;
     private final ScheduledFuture<?> latencyCalculator;
 
@@ -264,9 +263,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         if (engine != null)
         {
-            engine.openColumnFamilyStore(keyspace.getName(),
-                                         name,
-                                         metadata);
+            engine.openColumnFamilyStore(this);
         }
     }
 
@@ -399,7 +396,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         indexManager = new SecondaryIndexManager(this);
         viewManager = keyspace.viewManager.forTable(metadata);
         metric = new TableMetrics(this);
-        rocksMetric = new RocksdbTableMetrics(this);
         fileIndexGenerator.set(generation);
         sampleLatencyNanos = TimeUnit.MILLISECONDS.toNanos(DatabaseDescriptor.getReadRpcTimeout() / 2);
 
@@ -486,9 +482,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         if (engine != null)
         {
-            engine.openColumnFamilyStore(keyspace.getName(),
-                                         name,
-                                         metadata);
+            engine.openColumnFamilyStore(this);
         }
     }
 

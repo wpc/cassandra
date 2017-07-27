@@ -18,9 +18,7 @@
 
 package org.apache.cassandra.rocksdb;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,7 +27,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
@@ -44,27 +41,16 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
-import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
-import org.apache.cassandra.streaming.StreamSession;
-import org.apache.cassandra.streaming.StreamSummary;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
-import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
-import org.rocksdb.CassandraCompactionFilter;
-import org.rocksdb.CassandraValueMergeOperator;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.CompactionPriority;
-import org.rocksdb.CompressionType;
-import org.rocksdb.DBOptions;
+import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.streaming.StreamSummary;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.Statistics;
 
 public class RocksEngine implements StorageEngine
 {
@@ -75,59 +61,14 @@ public class RocksEngine implements StorageEngine
 
     public static final String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
     public static final String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
+    
+    public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
 
-    public final ConcurrentMap<UUID, RocksDB> rocksDBFamily = new ConcurrentHashMap<>();
-    public final ConcurrentMap<UUID, Statistics> rocksDBStats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, CassandraCompactionFilter> rocksCompactionFilters = new ConcurrentHashMap<>();
-
-
-    public void openColumnFamilyStore(String keyspaceName,
-                                      String columnFamilyName,
-                                      CFMetaData metadata)
+    public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {
-        RocksDB db;
         try
         {
-            final long writeBufferSize = 8 * 512 * 1024 * 1024L;
-            final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
-            DBOptions dbOptions = new DBOptions();
-            Statistics stats = new Statistics();
-            CassandraCompactionFilter compactionFilter = new CassandraCompactionFilter(metadata.params.purgeTtlOnExpiration);
-
-            dbOptions.setCreateIfMissing(true);
-            dbOptions.setAllowConcurrentMemtableWrite(true);
-            dbOptions.setEnableWriteThreadAdaptiveYield(true);
-            dbOptions.setBytesPerSync(1024 * 1024);
-            dbOptions.setWalBytesPerSync(1024 * 1024);
-            dbOptions.setMaxBackgroundCompactions(20);
-            dbOptions.setBaseBackgroundCompactions(20);
-            dbOptions.setMaxSubcompactions(8);
-            dbOptions.setStatistics(stats);
-
-            ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
-            columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
-            columnFamilyOptions.setWriteBufferSize(writeBufferSize);
-            columnFamilyOptions.setMaxBytesForLevelBase(4 * writeBufferSize);
-            columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
-            columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
-            columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-            columnFamilyOptions.setMergeOperatorName("cassandra");
-            columnFamilyOptions.setCompactionFilter(compactionFilter);
-
-            final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
-            final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-            tableOptions.setFilter(bloomFilter);
-            columnFamilyOptions.setTableFormatConfig(tableOptions);
-
-            ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
-
-            String rocksDBTableDir = ROCKSDB_DIR + "/" + keyspaceName + "/" + columnFamilyName;
-            FileUtils.createDirectory(ROCKSDB_DIR);
-            FileUtils.createDirectory(rocksDBTableDir);
-            db = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
-            rocksDBFamily.putIfAbsent(metadata.cfId, db);
-            rocksDBStats.putIfAbsent(metadata.cfId, stats);
-            rocksCompactionFilters.putIfAbsent(metadata.cfId, compactionFilter); // holding the reference of compaction filter, avoid it be disposed
+            rocksDBFamily.putIfAbsent(cfs.metadata.cfId, new RocksDBCF(cfs));
         }
         catch (RocksDBException e)
         {
@@ -153,7 +94,7 @@ public class RocksEngine implements StorageEngine
 
     public UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs, SinglePartitionReadCommand readCommand)
     {
-        Partition partition = new RocksDBPartition(rocksDBFamily.get(cfs.metadata.cfId),
+        Partition partition = new RocksDBPartition(rocksDBFamily.get(cfs.metadata.cfId).getRocksDB(),
                                                    readCommand.partitionKey(),
                                                    readCommand.metadata());
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
@@ -188,7 +129,7 @@ public class RocksEngine implements StorageEngine
         // value colummns
         try
         {
-            rocksDBFamily.get(cfs.metadata.cfId).merge(rocksDBKey, rocksDBValue);
+            rocksDBFamily.get(cfs.metadata.cfId).getRocksDB().merge(rocksDBKey, rocksDBValue);
         }
         catch (RocksDBException e)
         {
@@ -200,12 +141,22 @@ public class RocksEngine implements StorageEngine
     {
         if (cfs.engine instanceof RocksEngine)
         {
-            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId);
+            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
         }
         return null;
     }
 
     public static RocksDB getRocksDBInstance(UUID cfId)
+    {
+        ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
+        if (cfs != null && cfs.engine instanceof RocksEngine)
+        {
+            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfId).getRocksDB();
+        }
+        return null;
+    }
+
+    public static RocksDBCF getRocksDBCF(UUID cfId)
     {
         ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
         if (cfs != null && cfs.engine instanceof RocksEngine)
@@ -226,7 +177,7 @@ public class RocksEngine implements StorageEngine
         }
         final Collection<Range<Token>> ranges = StorageService.instance.getLocalRanges(keyspace.getName());
         final Collection<Range<Token>> completeRanges = RocksDBStreamUtils.calcluateComplementRanges(cfs.getPartitioner(), ranges);
-        RocksDB db = rocksDBFamily.get(cfs.metadata.cfId);
+        RocksDB db = rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
         for (Range range : completeRanges)
         {
             try

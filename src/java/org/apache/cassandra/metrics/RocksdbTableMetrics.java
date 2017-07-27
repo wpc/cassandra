@@ -24,6 +24,7 @@ import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.rocksdb.encoding.metrics.HistogramUtils;
 import org.apache.cassandra.rocksdb.streaming.RocksdbThroughputManager;
 import org.rocksdb.HistogramType;
+import org.rocksdb.Statistics;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
@@ -84,69 +85,69 @@ public class RocksdbTableMetrics
                                                     });
     }
 
-    public RocksdbTableMetrics(ColumnFamilyStore cfs) {
+    public RocksdbTableMetrics(ColumnFamilyStore cfs, Statistics stats) {
         factory = new RocksMetricNameFactory(cfs);
 
         rocksdbGetHistogram = Metrics.register(factory.createMetricName("Get"),
-                                               HistogramUtils.createHistogram(cfs, HistogramType.DB_GET));
+                                               HistogramUtils.createHistogram(cfs, stats, HistogramType.DB_GET));
         rocksdbWritedHistogram = Metrics.register(factory.createMetricName("Write"),
-                                                  HistogramUtils.createHistogram(cfs, HistogramType.DB_WRITE));
+                                                  HistogramUtils.createHistogram(cfs, stats, HistogramType.DB_WRITE));
         rocksdbTableSyncHistogram = Metrics.register(factory.createMetricName("TableSyncMicros"),
-                                                     HistogramUtils.createHistogram(cfs, HistogramType.TABLE_SYNC_MICROS));
+                                                     HistogramUtils.createHistogram(cfs, stats, HistogramType.TABLE_SYNC_MICROS));
         rocksdbCompactionOutFileSyncHistogram = Metrics.register(factory.createMetricName("CompactionOutFileSyncMicros"),
-                                                                 HistogramUtils.createHistogram(cfs, HistogramType.COMPACTION_OUTFILE_SYNC_MICROS));
+                                                                 HistogramUtils.createHistogram(cfs, stats, HistogramType.COMPACTION_OUTFILE_SYNC_MICROS));
         rocksdbWalFileSyncHistogram = Metrics.register(factory.createMetricName("WalFileSyncMicros"),
-                                                       HistogramUtils.createHistogram(cfs, HistogramType.WAL_FILE_SYNC_MICROS));
+                                                       HistogramUtils.createHistogram(cfs, stats, HistogramType.WAL_FILE_SYNC_MICROS));
         rocksdbManifiestSyncHistogram = Metrics.register(factory.createMetricName("ManifiestSyncMicros"),
-                                                         HistogramUtils.createHistogram(cfs, HistogramType.MANIFEST_FILE_SYNC_MICROS));
+                                                         HistogramUtils.createHistogram(cfs, stats, HistogramType.MANIFEST_FILE_SYNC_MICROS));
         rocksdbTableOpenIoHistogram = Metrics.register(factory.createMetricName("TableOpenIOMicros"),
-                                                       HistogramUtils.createHistogram(cfs, HistogramType.TABLE_OPEN_IO_MICROS));
+                                                       HistogramUtils.createHistogram(cfs, stats, HistogramType.TABLE_OPEN_IO_MICROS));
         rocksdbMultiGetHistogram = Metrics.register(factory.createMetricName("MultiGet"),
-                                                    HistogramUtils.createHistogram(cfs, HistogramType.DB_MULTIGET));
+                                                    HistogramUtils.createHistogram(cfs, stats, HistogramType.DB_MULTIGET));
         rocksdbReadBlockCompactionHistogram = Metrics.register(factory.createMetricName("ReadBlockCompactionMicros"),
-                                                               HistogramUtils.createHistogram(cfs, HistogramType.READ_BLOCK_COMPACTION_MICROS));
+                                                               HistogramUtils.createHistogram(cfs, stats, HistogramType.READ_BLOCK_COMPACTION_MICROS));
         rocksdbReadBlockGetHistogram = Metrics.register(factory.createMetricName("ReadBlockGetMicros"),
-                                                        HistogramUtils.createHistogram(cfs, HistogramType.READ_BLOCK_GET_MICROS));
+                                                        HistogramUtils.createHistogram(cfs, stats, HistogramType.READ_BLOCK_GET_MICROS));
         rocksdbWriteRawBlockHistogram = Metrics.register(factory.createMetricName("WriteRawBlockMicros"),
-                                                         HistogramUtils.createHistogram(cfs, HistogramType.WRITE_RAW_BLOCK_MICROS));
+                                                         HistogramUtils.createHistogram(cfs, stats, HistogramType.WRITE_RAW_BLOCK_MICROS));
         rocksdbStallL0SlowdownHistogram = Metrics.register(factory.createMetricName("StallL0SlowdownCount"),
-                                                           HistogramUtils.createHistogram(cfs, HistogramType.STALL_L0_SLOWDOWN_COUNT));
+                                                           HistogramUtils.createHistogram(cfs, stats, HistogramType.STALL_L0_SLOWDOWN_COUNT));
         rocksdbMemtableCompactionHistogram = Metrics.register(factory.createMetricName("MemtableCompactionCount"),
-                                                              HistogramUtils.createHistogram(cfs, HistogramType.STALL_MEMTABLE_COMPACTION_COUNT));
+                                                              HistogramUtils.createHistogram(cfs, stats, HistogramType.STALL_MEMTABLE_COMPACTION_COUNT));
         rocksdbStallL0NumFilesHistogram = Metrics.register(factory.createMetricName("StallL0NumFilesCount"),
-                                                           HistogramUtils.createHistogram(cfs, HistogramType.STALL_L0_NUM_FILES_COUNT));
+                                                           HistogramUtils.createHistogram(cfs, stats, HistogramType.STALL_L0_NUM_FILES_COUNT));
         rocksdbHardRateLimitDelayHistogram = Metrics.register(factory.createMetricName("HardRateLimitDelayCount"),
-                                                              HistogramUtils.createHistogram(cfs, HistogramType.HARD_RATE_LIMIT_DELAY_COUNT));
+                                                              HistogramUtils.createHistogram(cfs, stats, HistogramType.HARD_RATE_LIMIT_DELAY_COUNT));
         rocksdbSoftRateLimitDelayHistogram = Metrics.register(factory.createMetricName("SoftRateLimitDelayCount"),
-                                                              HistogramUtils.createHistogram(cfs, HistogramType.SOFT_RATE_LIMIT_DELAY_COUNT));
+                                                              HistogramUtils.createHistogram(cfs, stats, HistogramType.SOFT_RATE_LIMIT_DELAY_COUNT));
         rocksdbNumFilesInSingleCompactionHistogram = Metrics.register(factory.createMetricName("NumFilesInSingleCompaction"),
-                                                                      HistogramUtils.createHistogram(cfs, HistogramType.NUM_FILES_IN_SINGLE_COMPACTION));
+                                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.NUM_FILES_IN_SINGLE_COMPACTION));
         rocksdbDbSeekHistogram = Metrics.register(factory.createMetricName("DbSeek"),
-                                                  HistogramUtils.createHistogram(cfs, HistogramType.DB_SEEK));
+                                                  HistogramUtils.createHistogram(cfs, stats, HistogramType.DB_SEEK));
         rocksdbWriteStallHistogram = Metrics.register(factory.createMetricName("WriteStall"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.WRITE_STALL));
+                                         HistogramUtils.createHistogram(cfs, stats, HistogramType.WRITE_STALL));
         rocksdbSstReadMsHistogram = Metrics.register(factory.createMetricName("SstReadMs"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.SST_READ_MICROS));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.SST_READ_MICROS));
         rocksdbNumSubcompactionsScheduledHistogram = Metrics.register(factory.createMetricName("NumSubCompactionsScheduled"),
-                                                     HistogramUtils.createHistogram(cfs, HistogramType.NUM_SUBCOMPACTIONS_SCHEDULED));
+                                                     HistogramUtils.createHistogram(cfs, stats, HistogramType.NUM_SUBCOMPACTIONS_SCHEDULED));
         rocksdbBytesPerReadHistogram = Metrics.register(factory.createMetricName("BytesPerRead"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_READ));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.BYTES_PER_READ));
         rocksdbBytesPerWriteHistogram = Metrics.register(factory.createMetricName("BytesPerWrite"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_WRITE));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.BYTES_PER_WRITE));
         rocksdbBytesPerMultiGetHistogram = Metrics.register(factory.createMetricName("BytesPerMultiget"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_MULTIGET));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.BYTES_PER_MULTIGET));
         rocksdbBytesCompressedHistogram = Metrics.register(factory.createMetricName("BytesCompressed"),
-                                                           HistogramUtils.createHistogram(cfs, HistogramType.BYTES_COMPRESSED));
+                                                           HistogramUtils.createHistogram(cfs, stats, HistogramType.BYTES_COMPRESSED));
         rocksdbBytesDecompressedHistogram = Metrics.register(factory.createMetricName("BytesDecompressed"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_DECOMPRESSED));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.BYTES_DECOMPRESSED));
         rocksdbCompressionTimeUsHistogram = Metrics.register(factory.createMetricName("CompressionTimeUs"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.COMPRESSION_TIMES_NANOS));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.COMPRESSION_TIMES_NANOS));
         rocksdbDecompressionTimeUsHistogram = Metrics.register(factory.createMetricName("DecompressionTimeUs"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.DECOMPRESSION_TIMES_NANOS));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.DECOMPRESSION_TIMES_NANOS));
         rocksdbReadNumMergeOperandsHistogram = Metrics.register(factory.createMetricName("ReadNumMergeOperands"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.READ_NUM_MERGE_OPERANDS));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.READ_NUM_MERGE_OPERANDS));
         rocksdbHistogramEnumMaxHistogram = Metrics.register(factory.createMetricName("HistogramEnumMaxHistogram"),
-                                                      HistogramUtils.createHistogram(cfs, HistogramType.HISTOGRAM_ENUM_MAX));
+                                                      HistogramUtils.createHistogram(cfs, stats, HistogramType.HISTOGRAM_ENUM_MAX));
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
     }
 

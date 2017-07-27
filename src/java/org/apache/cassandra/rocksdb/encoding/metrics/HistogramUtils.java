@@ -33,8 +33,10 @@ public class HistogramUtils
 {
     private static final Snapshot EMPTY_SNAPSHOT = new UniformSnapshot(new long[0]);
 
-    public static Histogram createHistogram(final ColumnFamilyStore cfs, final HistogramType type) {
-        return new RocksHistogram(cfs, type);
+    public static Histogram createHistogram(final ColumnFamilyStore cfs,
+                                            final Statistics stats,
+                                            final HistogramType type) {
+        return new RocksHistogram(cfs, type, stats);
     }
 
     static class RocksHistogram extends Histogram {
@@ -42,15 +44,11 @@ public class HistogramUtils
         public final HistogramType type;
         public final Statistics stats;
 
-        public RocksHistogram(ColumnFamilyStore cfs, HistogramType type) {
+        public RocksHistogram(ColumnFamilyStore cfs, HistogramType type, Statistics stats) {
             super(null);
             this.cfs = cfs;
             this.type = type;
-
-            if (cfs.engine instanceof RocksEngine)
-                stats = ((RocksEngine)cfs.engine).rocksDBStats.get(cfs.metadata.cfId);
-            else
-                stats = null;
+            this.stats = stats;
         }
 
         public Snapshot getSnapshot()
