@@ -49,6 +49,17 @@ public class RocksdbTableMetrics
     public final Histogram rocksdbNumFilesInSingleCompactionHistogram;
     public final Histogram rocksdbDbSeekHistogram;
     public final Histogram rocksdbWriteStallHistogram;
+    public final Histogram rocksdbSstReadMsHistogram;
+    public final Histogram rocksdbNumSubcompactionsScheduledHistogram;
+    public final Histogram rocksdbBytesPerReadHistogram;
+    public final Histogram rocksdbBytesPerWriteHistogram;
+    public final Histogram rocksdbBytesPerMultiGetHistogram;
+    public final Histogram rocksdbBytesCompressedHistogram;
+    public final Histogram rocksdbBytesDecompressedHistogram;
+    public final Histogram rocksdbCompressionTimeUsHistogram;
+    public final Histogram rocksdbDecompressionTimeUsHistogram;
+    public final Histogram rocksdbReadNumMergeOperandsHistogram;
+    public final Histogram rocksdbHistogramEnumMaxHistogram;
     public final Histogram rocksdbIngestTimeHistogram;
 
     public static final Gauge<Long> rocksdbOutgoingThroughput;
@@ -114,6 +125,28 @@ public class RocksdbTableMetrics
                                                   HistogramUtils.createHistogram(cfs, HistogramType.DB_SEEK));
         rocksdbWriteStallHistogram = Metrics.register(factory.createMetricName("WriteStall"),
                                                       HistogramUtils.createHistogram(cfs, HistogramType.WRITE_STALL));
+        rocksdbSstReadMsHistogram = Metrics.register(factory.createMetricName("SstReadMs"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.SST_READ_MICROS));
+        rocksdbNumSubcompactionsScheduledHistogram = Metrics.register(factory.createMetricName("NumSubCompactionsScheduled"),
+                                                     HistogramUtils.createHistogram(cfs, HistogramType.NUM_SUBCOMPACTIONS_SCHEDULED));
+        rocksdbBytesPerReadHistogram = Metrics.register(factory.createMetricName("BytesPerRead"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_READ));
+        rocksdbBytesPerWriteHistogram = Metrics.register(factory.createMetricName("BytesPerWrite"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_WRITE));
+        rocksdbBytesPerMultiGetHistogram = Metrics.register(factory.createMetricName("BytesPerMultiget"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_PER_MULTIGET));
+        rocksdbBytesCompressedHistogram = Metrics.register(factory.createMetricName("BytesCompressed"),
+                                                           HistogramUtils.createHistogram(cfs, HistogramType.BYTES_COMPRESSED));
+        rocksdbBytesDecompressedHistogram = Metrics.register(factory.createMetricName("BytesDecompressed"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.BYTES_DECOMPRESSED));
+        rocksdbCompressionTimeUsHistogram = Metrics.register(factory.createMetricName("CompressionTimeUs"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.COMPRESSION_TIMES_NANOS));
+        rocksdbDecompressionTimeUsHistogram = Metrics.register(factory.createMetricName("DecompressionTimeUs"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.DECOMPRESSION_TIMES_NANOS));
+        rocksdbReadNumMergeOperandsHistogram = Metrics.register(factory.createMetricName("ReadNumMergeOperands"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.READ_NUM_MERGE_OPERANDS));
+        rocksdbHistogramEnumMaxHistogram = Metrics.register(factory.createMetricName("HistogramEnumMaxHistogram"),
+                                                      HistogramUtils.createHistogram(cfs, HistogramType.HISTOGRAM_ENUM_MAX));
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
     }
 

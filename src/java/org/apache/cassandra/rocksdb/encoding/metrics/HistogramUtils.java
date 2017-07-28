@@ -47,7 +47,7 @@ public class HistogramUtils
             this.cfs = cfs;
             this.type = type;
 
-            if (cfs.keyspace.getName().equals(RocksEngine.ROCKSDB_KEYSPACE))
+            if (cfs.engine instanceof RocksEngine)
                 stats = ((RocksEngine)cfs.engine).rocksDBStats.get(cfs.metadata.cfId);
             else
                 stats = null;
