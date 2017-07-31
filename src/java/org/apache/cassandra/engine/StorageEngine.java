@@ -57,4 +57,6 @@ public interface StorageEngine
     AbstractStreamReceiveTask getStreamReceiveTask(StreamSession session,
                                                    StreamSummary summary);
 
+    boolean doubleWrite();
+
 }

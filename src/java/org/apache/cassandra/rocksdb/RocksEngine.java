@@ -61,6 +61,7 @@ public class RocksEngine implements StorageEngine
 
     public static final String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
     public static final String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
+    public static final Boolean ROCKSDB_DOUBLE_WRITE = Boolean.parseBoolean(System.getProperty("cassandra.rocksdb.double_write", "false"));
     
     public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
 
@@ -196,5 +197,11 @@ public class RocksEngine implements StorageEngine
     public void deleteRange(RocksDB db, Range<Token> range) throws RocksDBException
     {
         db.deleteRange(RowKeyEncoder.encodeToken(range.left), RowKeyEncoder.encodeToken(range.right));
+    }
+
+    @Override
+    public boolean doubleWrite()
+    {
+        return ROCKSDB_DOUBLE_WRITE;
     }
 }

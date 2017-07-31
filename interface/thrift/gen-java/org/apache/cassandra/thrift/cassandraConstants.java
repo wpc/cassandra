@@ -26,6 +26,7 @@ package org.apache.cassandra.thrift;
  * 
  */
 
+
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;

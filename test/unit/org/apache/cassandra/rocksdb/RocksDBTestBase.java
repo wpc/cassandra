@@ -40,6 +40,7 @@ import org.apache.cassandra.db.filter.DataLimits;
 import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.utils.ByteBufferUtil;
@@ -70,7 +71,7 @@ public class RocksDBTestBase extends CQLTester
         System.clearProperty("cassandra.rocksdb.dir");
     }
 
-    protected List<Row> engineQuery(SinglePartitionReadCommand readCommand)
+    protected List<Row> queryEngine(SinglePartitionReadCommand readCommand)
     {
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         UnfilteredRowIterator result = cfs.engine.queryStorage(cfs, readCommand);
@@ -80,6 +81,29 @@ public class RocksDBTestBase extends CQLTester
             rows.add((Row) result.next());
         }
         return rows;
+    }
+
+    /**
+     * Force the readCommand to query Cassandra storage engine instead of plugged one by
+     * temporarily set cfs.engine to be null during read request. This function is not thread safe.
+     */
+    protected List<Row> queryCassandraStorage(SinglePartitionReadCommand readCommand)
+    {
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        StorageEngine engine = cfs.engine;
+        try {
+            cfs.engine = null;
+            UnfilteredRowIterator result = readCommand.queryMemtableAndDisk(cfs, null);
+            ArrayList<Row> rows = new ArrayList<>();
+            while (result.hasNext())
+            {
+                rows.add((Row) result.next());
+            }
+            return rows;
+        } finally
+        {
+            cfs.engine = engine;
+        }
     }
 
     protected void triggerCompaction() throws RocksDBException

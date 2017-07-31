@@ -562,11 +562,13 @@ public class Keyspace
                     continue;
                 }
 
+                // Update the storage engine first in the double writing senario:
+                // In case that Cassandra storage engine treats the bytebuffers in PartitionUpdate as mutable (such as read several bytes from the bytebuffer
+                // without duplicating it) and corrupts the data accordingly.
                 if (engine != null)
-                {
                     engine.apply(cfs, upd, writeCommitLog);
-                }
-                else
+
+                if (engine == null || engine.doubleWrite())
                 {
 
                     AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
@@ -597,6 +599,7 @@ public class Keyspace
                     if (requiresViewUpdate)
                         baseComplete.set(System.currentTimeMillis());
                 }
+
             }
 
             if (future != null) {

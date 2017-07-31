@@ -18,13 +18,9 @@
 
 package org.apache.cassandra.rocksdb;
 
-import java.util.List;
-
-import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.cassandra.db.SinglePartitionReadCommand;
-import org.apache.cassandra.db.rows.Row;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -52,13 +48,13 @@ public class CompactionTest extends RocksDBTestBase
         rocksdbFlush();
 
         SinglePartitionReadCommand readCommand = readCommand("p1", "v");
-        assertEquals(1, engineQuery(readCommand).size());
-        assertTrue(engineQuery(readCommand).get(0).cells().iterator().next().isExpiring());
+        assertEquals(1, queryEngine(readCommand).size());
+        assertTrue(queryEngine(readCommand).get(0).cells().iterator().next().isExpiring());
 
         triggerCompaction();
 
-        assertEquals(1, engineQuery(readCommand).size());
-        assertTrue(engineQuery(readCommand).get(0).cells().iterator().next().isTombstone());
+        assertEquals(1, queryEngine(readCommand).size());
+        assertTrue(queryEngine(readCommand).get(0).cells().iterator().next().isTombstone());
         assertRows(execute("SELECT p, v FROM %s WHERE p=?", "p1"));
     }
 
@@ -82,12 +78,12 @@ public class CompactionTest extends RocksDBTestBase
         rocksdbFlush();
 
         SinglePartitionReadCommand readCommand = readCommand("p1", "v");
-        assertEquals(1, engineQuery(readCommand).size());
-        assertTrue(engineQuery(readCommand).get(0).cells().iterator().next().isExpiring());
+        assertEquals(1, queryEngine(readCommand).size());
+        assertTrue(queryEngine(readCommand).get(0).cells().iterator().next().isExpiring());
 
         triggerCompaction();
 
-        assertEquals(0, engineQuery(readCommand).size());
+        assertEquals(0, queryEngine(readCommand).size());
         assertRows(execute("SELECT p, v FROM %s WHERE p=?", "p1"));
     }
 }
