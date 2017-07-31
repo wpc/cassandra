@@ -19,6 +19,7 @@ package org.apache.cassandra.net;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,7 @@ public class MessageDeliveryTask implements Runnable
             return;
         }
 
+        long processingStart = System.nanoTime();
         try
         {
             verbHandler.doVerb(message, id);
@@ -80,6 +82,11 @@ public class MessageDeliveryTask implements Runnable
         {
             handleFailure(t);
             throw t;
+        }
+        finally
+        {
+            long timeTaken = System.nanoTime() - processingStart;
+            MessagingService.instance().metrics.addProcessingLatency(verb, timeTaken, TimeUnit.NANOSECONDS);
         }
 
         if (GOSSIP_VERBS.contains(message.verb))
