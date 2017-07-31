@@ -17,14 +17,16 @@
  */
 package org.apache.cassandra.metrics;
 
+import java.net.InetAddress;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.Timer;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Pair;
-
-import java.net.InetAddress;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
@@ -35,9 +37,11 @@ public class MessagingMetrics
 {
     private static final MetricNameFactory factory = new DefaultNameFactory("Messaging");
 
-    private static final ConcurrentHashMap<Pair<MessagingService.Verb, String>, Counter> crossRegionCounter = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Pair<MessagingService.Verb, String>, Counter> crossRegionCounter = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<MessagingService.Verb, Timer> processingLatency = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<MessagingService.Verb, Timer> waitLatency = new ConcurrentHashMap<>();
 
-    public static void addCrossRegionCounter(MessagingService.Verb verb, InetAddress remote)
+    public void addCrossRegionCounter(MessagingService.Verb verb, InetAddress remote)
     {
         String remoteDC = DatabaseDescriptor.getEndpointSnitch().getDatacenter(remote);
 
@@ -50,5 +54,39 @@ public class MessagingMetrics
             counter = crossRegionCounter.computeIfAbsent(mapKey, k -> Metrics.counter(factory.createMetricName(metricKey)));
         }
         counter.inc();
+    }
+
+    public void addProcessingLatency(MessagingService.Verb verb, long timeTaken, TimeUnit timeUnit)
+    {
+        if (timeTaken < 0)
+        {
+            // the measurement is not accurate, ignore the negative timeTaken
+            return;
+        }
+
+        Timer timer = processingLatency.get(verb);
+        if (timer == null)
+        {
+
+            timer = processingLatency.computeIfAbsent(verb, k -> Metrics.timer(factory.createMetricName(verb.toString() + "-ProcessingLatency")));
+        }
+        timer.update(timeTaken, timeUnit);
+    }
+
+    public void addQueueWaitTime(MessagingService.Verb verb, long timeTaken, TimeUnit timeUnit)
+    {
+        if (timeTaken < 0)
+        {
+            // the measurement is not accurate, ignore the negative timeTaken
+            return;
+        }
+
+        Timer timer = waitLatency.get(verb);
+        if (timer == null)
+        {
+
+            timer = waitLatency.computeIfAbsent(verb, k -> Metrics.timer(factory.createMetricName(verb.toString() + "-WaitLatency")));
+        }
+        timer.update(timeTaken, timeUnit);
     }
 }

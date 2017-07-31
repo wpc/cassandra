@@ -313,7 +313,7 @@ public class OutboundTcpConnection extends FastThreadLocalThread
     {
         try
         {
-            MessagingMetrics.addCrossRegionCounter(qm.message.verb, poolReference.endPoint());
+            MessagingService.instance().metrics.addCrossRegionCounter(qm.message.verb, poolReference.endPoint());
             byte[] sessionBytes = qm.message.parameters.get(Tracing.TRACE_HEADER);
             if (sessionBytes != null)
             {

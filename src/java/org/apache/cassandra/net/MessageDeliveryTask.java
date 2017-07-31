@@ -19,6 +19,7 @@ package org.apache.cassandra.net;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ public class MessageDeliveryTask implements Runnable
     private final int id;
     private final long constructionTime;
     private final boolean isCrossNodeTimestamp;
+    private final long enqueueTime;
 
     public MessageDeliveryTask(MessageIn message, int id, long timestamp, boolean isCrossNodeTimestamp)
     {
@@ -43,11 +45,15 @@ public class MessageDeliveryTask implements Runnable
         this.id = id;
         this.constructionTime = timestamp;
         this.isCrossNodeTimestamp = isCrossNodeTimestamp;
+        this.enqueueTime = System.nanoTime();
+
     }
 
     public void run()
     {
         MessagingService.Verb verb = message.verb;
+        MessagingService.instance().metrics.addQueueWaitTime(verb, System.nanoTime() - enqueueTime, TimeUnit.NANOSECONDS);
+
         if (MessagingService.DROPPABLE_VERBS.contains(verb)
             && System.currentTimeMillis() > constructionTime + message.getTimeout())
         {
@@ -62,6 +68,7 @@ public class MessageDeliveryTask implements Runnable
             return;
         }
 
+        long processingStart = System.nanoTime();
         try
         {
             verbHandler.doVerb(message, id);
@@ -80,6 +87,11 @@ public class MessageDeliveryTask implements Runnable
         {
             handleFailure(t);
             throw t;
+        }
+        finally
+        {
+            long timeTaken = System.nanoTime() - processingStart;
+            MessagingService.instance().metrics.addProcessingLatency(verb, timeTaken, TimeUnit.NANOSECONDS);
         }
 
         if (GOSSIP_VERBS.contains(message.verb))
