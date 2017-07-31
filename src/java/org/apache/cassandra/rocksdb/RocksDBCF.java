@@ -36,6 +36,7 @@ import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.Statistics;
+import org.rocksdb.StatsLevel;
 
 import static org.apache.cassandra.rocksdb.RocksEngine.ROCKSDB_DIR;
 
@@ -58,6 +59,7 @@ public class RocksDBCF
         final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
         DBOptions dbOptions = new DBOptions();
         stats = new Statistics();
+        stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
         compactionFilter = new CassandraCompactionFilter(cfs.metadata.params.purgeTtlOnExpiration);
 
         dbOptions.setCreateIfMissing(true);
