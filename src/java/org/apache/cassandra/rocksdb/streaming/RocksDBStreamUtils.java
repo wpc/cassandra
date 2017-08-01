@@ -50,6 +50,9 @@ import org.rocksdb.RocksDBException;
 public class RocksDBStreamUtils
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
+    // To prevent write stall, only ingest streamed sstable when number of level0 sstables small or equal than this threshold.
+    private static final int INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD = Integer.getInteger("cassandra.rocksdb.num_files_at_level0_threshold", 10);
+    private static final long INGESTION_WAIT_MS = Long.getLong("cassandra.rocksdb.ingestion_wait_ms", 5000);
     public static final byte[] EOF = new byte[]{'\0'};
     public static final byte[] MORE = new byte[]{'1'};
 
@@ -75,6 +78,11 @@ public class RocksDBStreamUtils
         return RocksEngine.getRocksDBInstance(cfs);
     }
 
+    public static int getNumberOfLevel0Sstables(RocksDB db) throws RocksDBException
+    {
+        return Integer.parseInt(db.getProperty("rocksdb.num-files-at-level0"));
+    }
+
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
@@ -83,13 +91,36 @@ public class RocksDBStreamUtils
             return;
 
         RocksDB db = rocksDBCF.getRocksDB();
-        long startTime = System.currentTimeMillis();
-        final IngestExternalFileOptions ingestExternalFileOptions =
-        new IngestExternalFileOptions();
-        db.ingestExternalFile(Arrays.asList(sstFile),
-                              ingestExternalFileOptions);
-        ingestExternalFileOptions.close();
-        rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
+
+        // There might be multiple streaming sessions (threads) for the same sstable/db at the same time.
+        // Adding lock to the db to prevent multiple sstables are ingested at same time and trigger
+        // write stalls.
+        synchronized (db)
+        {
+            // Wait until compaction catch up by examing the number of l0 sstables.
+            while (true)
+            {
+                int numOfLevel0Sstables = getNumberOfLevel0Sstables(db);
+                if (numOfLevel0Sstables <= INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD)
+                    break;
+                try
+                {
+                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD
+                                + ", sleep for " + INGESTION_WAIT_MS + "ms.");
+                    Thread.sleep(INGESTION_WAIT_MS);
+                }
+                catch (InterruptedException e)
+                {
+                    LOGGER.warn("Ingestion wait interrupted, procceding.");
+                }
+            }
+
+            long startTime = System.currentTimeMillis();
+            try(final IngestExternalFileOptions ingestExternalFileOptions = new IngestExternalFileOptions()) {
+                db.ingestExternalFile(Arrays.asList(sstFile), ingestExternalFileOptions);
+            }
+            rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
+        }
     }
 
     /**
