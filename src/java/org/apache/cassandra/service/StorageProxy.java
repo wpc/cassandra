@@ -927,7 +927,7 @@ public class StorageProxy implements StorageProxyMBean
     {
         WriteResponseHandler<?> handler = new WriteResponseHandler<>(endpoints.all,
                                                                      Collections.<InetAddress>emptyList(),
-                                                                     endpoints.all.size() == 1 ? ConsistencyLevel.ONE : ConsistencyLevel.TWO,
+                                                                     ConsistencyLevel.ONE,
                                                                      Keyspace.open(SystemKeyspace.NAME),
                                                                      null,
                                                                      WriteType.BATCH_LOG);
