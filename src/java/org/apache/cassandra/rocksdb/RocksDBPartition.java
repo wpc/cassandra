@@ -45,7 +45,7 @@ import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
-import org.apache.cassandra.utils.Pair;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.UpdateFunction;
@@ -57,6 +57,7 @@ import org.rocksdb.RocksIterator;
 
 public class RocksDBPartition implements Partition
 {
+
     // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
     // until compaction happens. However in our case, range deletion is only used to remove ranges
     // no longer owned by this node. In such case, stale keys would never be quried.
@@ -153,21 +154,32 @@ public class RocksDBPartition implements Partition
         throw new NotImplementedException();
     }
 
+
     public UnfilteredRowIterator unfilteredIterator(ColumnFilter columns, Slices slices, boolean reversed)
     {
-        //TODO: support reverse order
         //TODO: support multiple slices
-        return sliceIterator(slices.get(0), columns, reversed);
+        return sliceIterator(slices.get(0), columns, (reversed ? PartitionIterOrder.REVERSED : PartitionIterOrder.NORMAL));
     }
 
-    private UnfilteredRowIterator sliceIterator(Slice slice, ColumnFilter columnFilter, boolean reversed)
+
+    private UnfilteredRowIterator sliceIterator(Slice slice, ColumnFilter columnFilter, PartitionIterOrder iterOrder)
     {
-        //TODO: support column_start and column_end using bound info from slice
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
         RocksIterator rocksIterator = db.newIterator(READ_OPTIONS);
-        rocksIterator.seek(partitionKeyBytes);
-        return new AbstractUnfilteredRowIterator(metadata, partitionKey, DeletionTime.LIVE, metadata.partitionColumns(), null, reversed, EncodingStats.NO_STATS)
+
+        byte[] minKey = slice.start() == Slice.Bound.BOTTOM ? null :
+                             RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metadata);
+
+        byte[] maxKey = slice.end() == Slice.Bound.TOP ? null :
+                             RowKeyEncoder.encode(partitionKey, slice.end().clustering(), metadata);
+
+        iterOrder.seekToStart(rocksIterator, partitionKeyBytes, minKey, maxKey,
+                              slice.start().isExclusive(), slice.end().isExclusive());
+
+
+        return new AbstractUnfilteredRowIterator(metadata, partitionKey, DeletionTime.LIVE, metadata.partitionColumns(),
+                                                 null, iterOrder == PartitionIterOrder.REVERSED, EncodingStats.NO_STATS)
         {
             public void close()
             {
@@ -180,7 +192,7 @@ public class RocksDBPartition implements Partition
                 Unfiltered row = null;
                 // keep moving rocksdb iterator forward until we get a row not been deleted
                 // or we reach the end of the slice boundary
-                while(row == null)
+                while (row == null)
                 {
                     if (!rocksIterator.isValid())
                     {
@@ -188,19 +200,58 @@ public class RocksDBPartition implements Partition
                     }
 
                     byte[] key = rocksIterator.key();
-                    if (!Bytes.startsWith(key, partitionKeyBytes))
+
+                    if (!Bytes.startsWith(key, partitionKeyBytes) ||
+                        exceedLowerBound(key, minKey, slice.start().isInclusive()) ||
+                        exceedUpperBound(key, maxKey, slice.end().isInclusive()))
                     {
                         return endOfData();
                     }
 
+
                     byte[] value = rocksIterator.value();
                     row = makeRow(key, value, columnFilter);
-                    rocksIterator.next();
+                    iterOrder.moveForward(rocksIterator);
                 }
                 return row;
             }
         };
     }
+
+    private boolean exceedLowerBound(byte[] key, byte[] lowerKey, boolean inclusive)
+    {
+        if (lowerKey == null)
+        {
+            return false;
+        }
+
+        if (inclusive)
+        {
+            return FBUtilities.compareUnsigned(key, lowerKey) < 0;
+        }
+        else
+        {
+            return FBUtilities.compareUnsigned(key, lowerKey) <= 0;
+        }
+    }
+
+    private boolean exceedUpperBound(byte[] key, byte[] upperKey, boolean inclusive)
+    {
+        if (upperKey == null)
+        {
+            return false;
+        }
+
+        if (inclusive)
+        {
+            return FBUtilities.compareUnsigned(key, upperKey) > 0;
+        }
+        else
+        {
+            return FBUtilities.compareUnsigned(key, upperKey) >= 0;
+        }
+    }
+
 
     private Row makeRow(byte[] key, byte[] value, ColumnFilter columnFilter)
     {
@@ -220,7 +271,8 @@ public class RocksDBPartition implements Partition
 
         RowValueEncoder.decode(metadata(), columnFilter, ByteBuffer.wrap(value), dataBuffer);
 
-        if(dataBuffer.isEmpty()) {
+        if (dataBuffer.isEmpty())
+        {
             //TODO: we need return tombstone instead of skipping the row for the case like quorum read
             return null;
         }

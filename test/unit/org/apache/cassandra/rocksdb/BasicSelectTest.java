@@ -170,7 +170,6 @@ public class BasicSelectTest extends RocksDBTestBase
                    row(p1, uuid3, "v3"),
                    row(p1, uuid2, "v1"),
                    row(p1, uuid1, "v2"));
-
     }
 
     @Test
@@ -209,5 +208,333 @@ public class BasicSelectTest extends RocksDBTestBase
                    row(p1, big0, uuid2, "v1"),
                    row(p1, big0, uuid1, "v2"),
                    row(p1, big1, uuid4, "v4"));
+    }
+
+    @Test
+    public void testSingleClustering() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, s text, PRIMARY KEY (p, c))");
+
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p1", "k1", "v1", "sv1");
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p1", "k2", "v2", "sv1");
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p2", "k3", "v3", "sv2");
+
+        assertRows(execute("SELECT * FROM %s WHERE p=?", "p1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+
+        // Ascending order
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c ASC", "p1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c ASC", "p2"),
+                   row("p2", "k3", "sv2", "v3")
+        );
+
+        // Descending order
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c DESC", "p1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c DESC", "p2"),
+                   row("p2", "k3", "sv2", "v3")
+        );
+
+        // No order with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c =?", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=?", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=?", "p1", "k0"));
+
+        // Ascending with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c =? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c ASC", "p1", "k0"));
+
+        // Descending with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c =? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c DESC", "p1", "k0"));
+
+        // IN
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?)", "p1", "k1", "k2"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?) ORDER BY c ASC", "p1", "k1", "k2"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?) ORDER BY c DESC", "p1", "k1", "k2"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+    }
+
+    @Test
+    public void testSingleClusteringReversed() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, s text, PRIMARY KEY (p, c)) WITH CLUSTERING ORDER BY (c DESC)");
+
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p1", "k1", "v1", "sv1");
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p1", "k2", "v2", "sv1");
+        execute("INSERT INTO %s(p, c, v, s) values (?, ?, ?, ?)", "p2", "k3", "v3", "sv2");
+
+        assertRows(execute("SELECT * FROM %s WHERE p=?", "p1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=?", "p2"),
+                   row("p2", "k3", "sv2", "v3")
+        );
+
+        // Ascending order
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c ASC", "p1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c ASC", "p2"),
+                   row("p2", "k3", "sv2", "v3")
+        );
+
+        // Descending order
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c DESC", "p1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? ORDER BY c DESC", "p2"),
+                   row("p2", "k3", "sv2", "v3")
+        );
+
+        // No order with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=?", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c=?", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=?", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=?", "p1", "k0"));
+
+        // Ascending with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c ASC", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c=? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c ASC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c ASC", "p1", "k0"));
+
+        // Descending with one relation
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k2"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c>=? ORDER BY c DESC", "p1", "k3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c=? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c DESC", "p1", "k1"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertEmpty(execute("SELECT * FROM %s WHERE p=? AND c<=? ORDER BY c DESC", "p1", "k0"));
+
+        // IN
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?)", "p1", "k1", "k2"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?) ORDER BY c ASC", "p1", "k1", "k2"),
+                   row("p1", "k1", "sv1", "v1"),
+                   row("p1", "k2", "sv1", "v2")
+        );
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND c IN (?, ?) ORDER BY c DESC", "p1", "k1", "k2"),
+                   row("p1", "k2", "sv1", "v2"),
+                   row("p1", "k1", "sv1", "v1")
+        );
+    }
+
+    @Test
+    public void testSelectBounds() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k int, c int, v int, PRIMARY KEY (k, c))");
+
+        for (int i = 0; i < 10; i++)
+            execute("INSERT INTO %s (k, c, v) VALUES (0, ?, ?)", i, i);
+
+        assertRowCount(execute("SELECT v FROM %s WHERE k = 0"), 10);
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 2 AND c <= 6"),
+                   row(2), row(3), row(4), row(5), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 2 AND c <= 6"),
+                   row(3), row(4), row(5), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 2 AND c < 6"),
+                   row(2), row(3), row(4), row(5));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 2 AND c < 6"),
+                   row(3), row(4), row(5));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 2 AND c <= 6 LIMIT 2"),
+                   row(3), row(4));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 2 AND c < 6 ORDER BY c DESC LIMIT 2"),
+                   row(5), row(4));
+
+        assertEmpty(execute("SELECT v FROM %s WHERE k = 0 AND c > 10"));
+    }
+
+    @Test
+    public void testSelectBoundsNotExistsInDB() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k int, c int, v int, PRIMARY KEY (k, c))");
+
+        for (int i = 0; i < 10; i += 3) // 0, 3, 6, 9
+                execute("INSERT INTO %s (k, c, v) VALUES (0, ?, ?)", i, i);
+
+        assertRowCount(execute("SELECT v FROM %s WHERE k = 0"), 4);
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 1 AND c <= 7"),
+                   row(3), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 1 AND c <= 7"),
+                   row(3), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 1 AND c < 7"),
+                   row(3), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 1 AND c < 7"),
+                   row(3), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > 1 AND c <= 7 LIMIT 2"),
+                   row(3), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 1 AND c < 7 ORDER BY c DESC LIMIT 2"),
+                   row(6), row(3));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c >= 1 AND c <= 7 ORDER BY c DESC LIMIT 2"),
+                   row(6), row(3));
+
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > -1 LIMIT 2"),
+                   row(0), row(3));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c < 10 LIMIT 2"),
+                   row(0), row(3));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c > -1 ORDER BY C DESC LIMIT 2"),
+                   row(9), row(6));
+
+        assertRows(execute("SELECT v FROM %s WHERE k = 0 AND c < 10 ORDER BY C DESC LIMIT 2"),
+                   row(9), row(6));
+
     }
 }

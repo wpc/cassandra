@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.Clustering;
+import org.apache.cassandra.db.ClusteringPrefix;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.AsciiType;
@@ -115,7 +116,7 @@ public class RowKeyEncoder
                                    new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defalutAdapter));
     }
 
-    public static byte[] encode(DecoratedKey partitionKey, Clustering clustering, CFMetaData metaData)
+    public static byte[] encode(DecoratedKey partitionKey, ClusteringPrefix clustering, CFMetaData metaData)
     {
         ColumnDefinition partitionKeyColumn = metaData.partitionKeyColumns().get(0);
         List<ColumnDefinition> clusteringColumns = metaData.clusteringColumns();
