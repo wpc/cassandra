@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.TimestampType;
+import org.apache.cassandra.utils.ByteBufferUtil;
 
 public interface RowKeyInputAdapter
 {
@@ -44,7 +45,7 @@ public interface RowKeyInputAdapter
     {
         public Object compose(AbstractType type, ByteBuffer input)
         {
-            return input.array();
+            return ByteBufferUtil.getArray(input);
         }
 
         public ByteBuffer decompose(AbstractType type, Object orderlyValue)
