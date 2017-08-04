@@ -171,4 +171,9 @@ public interface ColumnFamilyStoreMBean
        Enable/Disable compaction space check
      */
     public void compactionDiskSpaceCheck(boolean enable);
+
+    /*
+     * Check the consistency between rocksdb and Cassandra storage engine.
+     */
+    public String rocksdbSanityCheck();
 }

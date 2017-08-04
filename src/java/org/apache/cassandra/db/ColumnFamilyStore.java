@@ -73,6 +73,7 @@ import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
+import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
@@ -2479,4 +2480,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         return keyspace.getColumnFamilyStore(id);
     }
+
+    @Override
+    public String rocksdbSanityCheck()
+    {
+        return SanityCheckUtils.checkSanity(this).toString();
+    }
+
 }
