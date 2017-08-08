@@ -33,6 +33,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ning.compress.lzf.LZFOutputStream;
+import com.ning.compress.lzf.util.LZFFileOutputStream;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.marshal.AsciiType;
@@ -295,8 +297,10 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
             try
             {
                 RocksDBMessageHeader.SERIALIZER.seriliaze(message.header, out);
-                RocksDBStreamWriter writer = new RocksDBStreamWriter(alternativeDBToStreamFrom, message.ranges, session);
-                writer.write(out);
+                RocksDBStreamWriter writer = new RocksDBStreamWriter(alternativeDBToStreamFrom, message.ranges, session, 0);
+                LZFOutputStream stream = new LZFOutputStream(out);
+                writer.write(stream);
+                stream.flush();
                 session.fileSent(message.cfId, message.sequenceNumber, 0);
             }
             finally

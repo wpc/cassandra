@@ -28,6 +28,8 @@ import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.io.util.DataInputPlus;
+import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.Pair;
 
@@ -35,16 +37,26 @@ public class RocksDBStreamReader
 {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamReader.class);
+    private static final long INCOMING_BYTES_DELTA_UPDATE_THRESHOLD = 1 * 1024 * 1024;
     private final RocksDBMessageHeader header;
     private final StreamSession session;
+    private final long estimatedIncomingBytes;
+    private long totalIncomingBytes;
 
     public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session)
     {
-        this.header = header;
-        this.session = session;
+        this(header, session, 0);
     }
 
-    RocksDBSStableWriter read(DataInputPlus input) throws IOException
+    public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session, long estimatedIncomingBytes)
+    {
+        this.header = header;
+        this.session = session;
+        this.totalIncomingBytes = 0;
+        this.estimatedIncomingBytes = estimatedIncomingBytes;
+    }
+
+    public RocksDBSStableWriter read(DataInputPlus input) throws IOException
     {
         Pair<String, String> kscf = Schema.instance.getCF(header.cfId);
         ColumnFamilyStore cfs = null;
@@ -64,15 +76,24 @@ public class RocksDBStreamReader
 
         try
         {
+            long incomingBytesDelta = 0;
             writer = new RocksDBSStableWriter(header.cfId);
             while(input.readByte() != RocksDBStreamUtils.EOF[0]) {
-                int length = input.readInt();
-                byte[] key = new byte[length];
+                int keyLength = input.readInt();
+                byte[] key = new byte[keyLength];
                 input.readFully(key);
-                length = input.readInt();
-                byte[] value = new byte[length];
+                int valueLength = input.readInt();
+                byte[] value = new byte[valueLength];
                 input.readFully(value);
                 writer.write(key, value);
+                incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+                totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+                if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
+                {
+                    StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
+                    incomingBytesDelta = 0;
+                    session.progress("RocksdbSstable", ProgressInfo.Direction.IN, totalIncomingBytes, estimatedIncomingBytes);
+                }
             }
         }
         catch (Throwable e)
@@ -90,4 +111,10 @@ public class RocksDBStreamReader
         writer.close();
         return writer;
     }
+
+    public long getTotalIncomingBytes()
+    {
+        return totalIncomingBytes;
+    }
+
 }

@@ -643,6 +643,12 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         streamResult.handleProgress(progress);
     }
 
+    public void progress(String fileName, ProgressInfo.Direction direction, long bytes, long total)
+    {
+        ProgressInfo progress = new ProgressInfo(peer, index, fileName, direction, bytes, total);
+        streamResult.handleProgress(progress);
+    }
+
     public void received(UUID cfId, int sequenceNumber)
     {
         transfers.get(cfId).complete(sequenceNumber);

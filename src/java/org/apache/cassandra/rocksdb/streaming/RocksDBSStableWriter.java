@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.rocksdb.DirectSlice;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
@@ -99,11 +100,7 @@ public class RocksDBSStableWriter
         if (sstableWriter == null)
             createSstable();
 
-        Slice keySlice = new Slice(key);
-        Slice valueSlice = new Slice(value);
-        sstableWriter.merge(keySlice, valueSlice);
-        keySlice.close();
-        valueSlice.close();
+        sstableWriter.merge(key, value);
 
         currentSstableSize += key.length + value.length;
         incomingBytes += key.length + value.length + RocksDBStreamUtils.MORE.length + Integer.BYTES * 2;

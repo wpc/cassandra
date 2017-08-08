@@ -62,6 +62,7 @@ public class RocksdbTableMetrics
     public final Histogram rocksdbReadNumMergeOperandsHistogram;
     public final Histogram rocksdbHistogramEnumMaxHistogram;
     public final Histogram rocksdbIngestTimeHistogram;
+    public final Histogram rocksdbIngestWaitTimeHistogram;
 
     public static final Gauge<Long> rocksdbOutgoingThroughput;
     public static final Gauge<Long> rocksdbIncomingThroughput;
@@ -149,6 +150,7 @@ public class RocksdbTableMetrics
         rocksdbHistogramEnumMaxHistogram = Metrics.register(factory.createMetricName("HistogramEnumMaxHistogram"),
                                                       HistogramUtils.createHistogram(cfs, stats, HistogramType.HISTOGRAM_ENUM_MAX));
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
+        rocksdbIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
     }
 
     static class RocksMetricNameFactory implements MetricNameFactory

@@ -82,7 +82,6 @@ public class RocksDBStreamReceiveTask extends AbstractStreamReceiveTask
         // metrics.incomingBytes.inc(headerSize);
         // send back file received message
         handler.sendMessage(new ReceivedMessage(message.header.cfId, message.header.sequenceNumber));
-        StreamingMetrics.totalIncomingBytes.inc(message.sstable.getIncomingBytes());
         metrics.incomingBytes.inc(message.sstable.getIncomingBytes());
 
         received(message.sstable);

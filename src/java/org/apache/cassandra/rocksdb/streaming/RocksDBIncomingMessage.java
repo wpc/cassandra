@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
+import com.ning.compress.lzf.LZFInputStream;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.streaming.StreamSession;
@@ -45,7 +46,7 @@ public class RocksDBIncomingMessage extends StreamMessage
 
             try
             {
-                return new RocksDBIncomingMessage(reader.read(new DataInputPlus.DataInputStreamPlus(Channels.newInputStream(in))),
+                return new RocksDBIncomingMessage(reader.read(new DataInputPlus.DataInputStreamPlus(new LZFInputStream(Channels.newInputStream(in)))),
                                                   header);
             }
             catch (Throwable t)

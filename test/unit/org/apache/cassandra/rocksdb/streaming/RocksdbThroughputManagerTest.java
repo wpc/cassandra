@@ -39,7 +39,7 @@ public class RocksdbThroughputManagerTest extends RocksDBStreamTestBase
 
         public DummyStreamWriter()
         {
-            super(null, new ArrayList<>(), createDummySession());
+            super(null, new ArrayList<>(), createDummySession(), 0);
         }
 
         public void increaseOutgoingBytes(long value)

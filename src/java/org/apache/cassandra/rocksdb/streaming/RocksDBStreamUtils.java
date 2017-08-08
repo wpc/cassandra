@@ -19,6 +19,7 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,9 +51,7 @@ import org.rocksdb.RocksDBException;
 public class RocksDBStreamUtils
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
-    // To prevent write stall, only ingest streamed sstable when number of level0 sstables small or equal than this threshold.
-    private static final int INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD = Integer.getInteger("cassandra.rocksdb.num_files_at_level0_threshold", 10);
-    private static final long INGESTION_WAIT_MS = Long.getLong("cassandra.rocksdb.ingestion_wait_ms", 5000);
+    private static final long INGESTION_WAIT_MS = Long.getLong("cassandra.rocksdb.ingestion_wait_ms", 100);
     public static final byte[] EOF = new byte[]{'\0'};
     public static final byte[] MORE = new byte[]{'1'};
 
@@ -89,15 +88,16 @@ public class RocksDBStreamUtils
         // write stalls.
         synchronized (db)
         {
+            long startTime = System.currentTimeMillis();
             // Wait until compaction catch up by examing the number of l0 sstables.
             while (true)
             {
                 int numOfLevel0Sstables = getNumberOfLevel0Sstables(db);
-                if (numOfLevel0Sstables <= INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD)
+                if (numOfLevel0Sstables <= RocksDBCF.LEVEL0_STOP_WRITES_TRIGGER)
                     break;
                 try
                 {
-                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + INGESTION_NUM_FILES_AT_LEVEL0_THRESHOLD
+                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + RocksDBCF.LEVEL0_STOP_WRITES_TRIGGER
                                 + ", sleep for " + INGESTION_WAIT_MS + "ms.");
                     Thread.sleep(INGESTION_WAIT_MS);
                 }
@@ -106,12 +106,16 @@ public class RocksDBStreamUtils
                     LOGGER.warn("Ingestion wait interrupted, procceding.");
                 }
             }
+            rocksDBCF.getRocksMetrics().rocksdbIngestWaitTimeHistogram.update(System.currentTimeMillis() - startTime);
+            LOGGER.info("Time spend waiting for compaction:" + (System.currentTimeMillis() - startTime));
 
-            long startTime = System.currentTimeMillis();
+            long ingestStartTime = System.currentTimeMillis();
             try(final IngestExternalFileOptions ingestExternalFileOptions = new IngestExternalFileOptions()) {
                 db.ingestExternalFile(Arrays.asList(sstFile), ingestExternalFileOptions);
             }
-            rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - startTime);
+
+            LOGGER.info("Time spend on ingestion:" + (System.currentTimeMillis() - ingestStartTime));
+            rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
         }
     }
 
@@ -204,4 +208,65 @@ public class RocksDBStreamUtils
             .append(", value:").append(Hex.encodeHex(cell.value().array()));
         return sb.toString();
     }
+
+    public static double getRangeSpaceSize(Collection<Range<Token>> normalizedRanges)
+    {
+        if (normalizedRanges.isEmpty())
+            return 0;
+
+        IPartitioner partitioner = normalizedRanges.iterator().next().left.getPartitioner();
+
+        if (partitioner instanceof Murmur3Partitioner)
+        {
+            double rangesSize = 0;
+            for (Range<Token> r : normalizedRanges)
+            {
+                rangesSize += r.left.size(r.right);
+            }
+            return rangesSize;
+        }
+
+        if (partitioner instanceof RandomPartitioner)
+        {
+            BigInteger fullTokenSpaceSize = RandomPartitioner.MAXIMUM;
+            BigInteger rangesSize = BigInteger.ZERO;
+            for (Range<Token> r : normalizedRanges)
+            {
+                RandomPartitioner.BigIntegerToken left = (RandomPartitioner.BigIntegerToken) r.left;
+                RandomPartitioner.BigIntegerToken right = (RandomPartitioner.BigIntegerToken) r.right;
+                rangesSize = rangesSize.add(right.getTokenValue()).add(left.getTokenValue().negate());
+            }
+            return rangesSize.doubleValue() / fullTokenSpaceSize.doubleValue();
+        }
+
+        throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
+    }
+
+    public static long estimateDataSize(RocksDB db, Collection<Range<Token>> normalizedRange)
+    {
+        try
+        {
+            long estimatedDataSize = Long.parseLong(db.getProperty("rocksdb.estimate-live-data-size"));
+            return (long)(estimatedDataSize * getRangeSpaceSize(normalizedRange));
+        } catch (RocksDBException e)
+        {
+            LOGGER.warn("Failed to estimate data size", e);
+            return 0;
+        }
+    }
+
+    public static long estimateNumKeys(RocksDB db, Collection<Range<Token>> normalizedRange)
+    {
+        try
+        {
+            long estimateNumKeys = Long.parseLong(db.getProperty("rocksdb.estimate-num-keys"));
+            return (long)(estimateNumKeys * getRangeSpaceSize(normalizedRange));
+        } catch (RocksDBException e)
+        {
+            LOGGER.warn("Failed to estimate num of keys", e);
+            return 0;
+        }
+    }
+
+
 }

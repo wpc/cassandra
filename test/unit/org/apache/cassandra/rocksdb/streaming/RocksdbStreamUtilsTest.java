@@ -20,6 +20,7 @@ package org.apache.cassandra.rocksdb.streaming;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -104,6 +105,27 @@ public class RocksdbStreamUtilsTest
             assertUnionIsFullRing(ranges, complementRanges);
             assertSorted(complementRanges);
         }
+    }
+
+    @Test
+    public void testGetRangeSpaceSize()
+    {
+        assertEquals(0.0, RocksDBStreamUtils.getRangeSpaceSize(new ArrayList<>()), 1e-10);
+        assertEquals(1.0,
+                     RocksDBStreamUtils.getRangeSpaceSize(
+                                                         Arrays.asList(
+                                                                        new Range<Token>(Murmur3Partitioner.MINIMUM,
+                                                                                         new Murmur3Partitioner.LongToken(Murmur3Partitioner.MAXIMUM
+                                                                                         )))),
+                     1e-10);
+
+        assertEquals(0.5,
+                     RocksDBStreamUtils.getRangeSpaceSize(
+                                                         Arrays.asList(
+                                                                      new Range<Token>(RandomPartitioner.MINIMUM,
+                                                                                       new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM.divide(BigInteger.valueOf(2)))
+                                                                                       ))),
+                     1e-10);
     }
 
     private void assertNoOverlap(Collection<Range<Token>> ranges, Collection<Range<Token>> complementRanges)

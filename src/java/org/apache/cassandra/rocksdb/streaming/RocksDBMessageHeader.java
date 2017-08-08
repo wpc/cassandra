@@ -34,10 +34,18 @@ public class RocksDBMessageHeader
     public static RocksdbMessageHeaderSerializer SERIALIZER = new RocksdbMessageHeaderSerializer();
     public final UUID cfId;
     public final int sequenceNumber;
+    public final long estimatedBytes;
+    public final long estimatedKeys;
 
     public RocksDBMessageHeader(UUID cfId, int sequenceNumber) {
+        this(cfId, sequenceNumber, 0, 0);
+    }
+
+    public RocksDBMessageHeader(UUID cfId, int sequenceNumber, long estimatedBytes, long estimatedKeys) {
         this.cfId = cfId;
         this.sequenceNumber = sequenceNumber;
+        this.estimatedBytes = estimatedBytes;
+        this.estimatedKeys = estimatedKeys;
     }
 
     @Override
@@ -46,6 +54,8 @@ public class RocksDBMessageHeader
         final StringBuilder sb = new StringBuilder("RocksHeader (");
         sb.append("cfId: ").append(cfId);
         sb.append(", #").append(sequenceNumber);
+        sb.append(", estimated number of bytes").append(sequenceNumber);
+        sb.append(", estimated number of keys").append(sequenceNumber);
         sb.append(')');
         return sb.toString();
     }
@@ -73,13 +83,17 @@ public class RocksDBMessageHeader
         {
             org.apache.cassandra.utils.UUIDSerializer.serializer.serialize(header.cfId, out, MessagingService.current_version);
             out.writeInt(header.sequenceNumber);
+            out.writeLong(header.estimatedBytes);
+            out.writeLong(header.estimatedKeys);
         }
 
         public RocksDBMessageHeader deserialize(DataInputPlus in) throws IOException
         {
             UUID cfId = org.apache.cassandra.utils.UUIDSerializer.serializer.deserialize(in, MessagingService.current_version);
             int sequenceNumber = in.readInt();
-            return new RocksDBMessageHeader(cfId, sequenceNumber);
+            long estimatedBytes = in.readLong();
+            long estimatedKeys = in.readLong();
+            return new RocksDBMessageHeader(cfId, sequenceNumber, estimatedBytes, estimatedKeys);
         }
 
     }

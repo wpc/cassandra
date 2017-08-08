@@ -56,7 +56,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
                                                              Arrays.asList(
                                                                           new Range(RocksDBStreamUtils.getMinToken(tokenPartioner),
                                                                                     RocksDBStreamUtils.getMaxToken(tokenPartioner))),
-                                                             createDummySession());
+                                                             createDummySession(), 0);
         DataOutputBuffer out = new DataOutputBuffer(BUFFER_SIZE);
         writer.write(out);
 

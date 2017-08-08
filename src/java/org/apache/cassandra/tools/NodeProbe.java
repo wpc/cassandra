@@ -84,6 +84,7 @@ import org.apache.cassandra.service.StorageServiceMBean;
 import org.apache.cassandra.streaming.StreamManagerMBean;
 import org.apache.cassandra.streaming.StreamState;
 import org.apache.cassandra.streaming.management.StreamStateCompositeData;
+import org.rocksdb.RocksDBException;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -728,7 +729,7 @@ public class NodeProbe implements AutoCloseable
     public String sanityCheck(String keyspace, String cf)
     {
         ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
-        return cfsProxy.rocksdbSanityCheck();
+        return cfsProxy.rocksDBSanityCheck();
     }
 
     public String getOperationMode()
@@ -1375,6 +1376,18 @@ public class NodeProbe implements AutoCloseable
         {
             throw new RuntimeException(e);
         }
+    }
+
+    public String exportRocksDBStream(String keyspace, String cf, String output, int limit) throws IOException, RocksDBException
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
+        return cfsProxy.exportRocksDBStream(output, limit);
+    }
+
+    public String ingestRocksDBStream(String keyspace, String cf, String input) throws IOException, RocksDBException
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
+        return cfsProxy.ingestRocksDBStream(input);
     }
 }
 

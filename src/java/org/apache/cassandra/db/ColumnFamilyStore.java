@@ -17,11 +17,16 @@
  */
 package org.apache.cassandra.db;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
@@ -38,6 +43,8 @@ import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
+import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
+import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.metrics.RocksdbTableMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,10 +80,15 @@ import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
+import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
 import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.TopKSampler.SamplerResult;
 import org.apache.cassandra.utils.concurrent.OpOrder;
@@ -84,6 +96,7 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.rocksdb.RocksDBException;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -2482,9 +2495,38 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     }
 
     @Override
-    public String rocksdbSanityCheck()
+    public String rocksDBSanityCheck()
     {
         return SanityCheckUtils.checkSanity(this).toString();
     }
 
+    @Override
+    public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException
+    {
+        Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBStreamUtils.getMinToken(getPartitioner()),
+                                                                         RocksDBStreamUtils.getMaxToken(getPartitioner())));
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(this), ranges);
+        BufferedDataOutputStreamPlus out = new BufferedDataOutputStreamPlus(new FileOutputStream(outputFile));
+        long startTimeMs = System.currentTimeMillis();
+        writer.write(out, limit);
+        out.close();
+        long timeElapsedMs = Math.max(1, System.currentTimeMillis() - startTimeMs); // Avoid divde by 0 Exception.
+        double streamedMB = writer.getOutgoingBytes() / (1024.0 * 1024 /* MB in bytes */);
+        double throughputMBps = streamedMB / (timeElapsedMs / 1000.0f /* Ms in seconds */);
+        return "Data Streamed: " + streamedMB + "MB, time elapsed: " + timeElapsedMs + " MS, throughput: " + throughputMBps + " MB/S.";
+    }
+
+    @Override
+    public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException
+    {
+        RocksDBStreamReader reader = new RocksDBStreamReader(new RocksDBMessageHeader(metadata.cfId, 0),
+                                                             new StreamSession(FBUtilities.getBroadcastAddress(), FBUtilities.getBroadcastAddress(), null, 0, false, false));
+        BufferedInputStream stream = new BufferedInputStream(new FileInputStream(inputFile));
+        long startTimeMs = System.currentTimeMillis();
+        reader.read(new DataInputPlus.DataInputStreamPlus(stream));
+        long timeElapsedMs = Math.max(1, System.currentTimeMillis() - startTimeMs); // Avoid divde by 0 Exception.
+        double streamedMB = reader.getTotalIncomingBytes() / (1024.0 * 1024 /* MB in bytes */);
+        double throughputMBps = streamedMB / (timeElapsedMs / 1000.0f /* Ms in seconds */);
+        return "Data Streamed: " + streamedMB + "MB, time elapsed: " + timeElapsedMs + " MS, throughput: " + throughputMBps + " MB/S.";
+    }
 }
