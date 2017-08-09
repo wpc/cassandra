@@ -99,6 +99,7 @@ public class NodeTool
                 Assassinate.class,
                 Repair.class,
                 ReplayBatchlog.class,
+                SanityCheck.class,
                 SetCacheCapacity.class,
                 SetHintedHandoffThrottleInKB.class,
                 SetCompactionThreshold.class,
