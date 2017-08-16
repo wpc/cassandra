@@ -70,14 +70,6 @@ public class RocksDBStreamUtils
         return cfs;
     }
 
-    public static RocksDB getRocksdb(UUID cfId)
-    {
-        ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
-        if (cfs == null)
-            return null;
-        return RocksEngine.getRocksDBInstance(cfs);
-    }
-
     public static int getNumberOfLevel0Sstables(RocksDB db) throws RocksDBException
     {
         return Integer.parseInt(db.getProperty("rocksdb.num-files-at-level0"));

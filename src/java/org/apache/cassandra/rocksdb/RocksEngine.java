@@ -83,19 +83,19 @@ public class RocksEngine implements StorageEngine
 
         for (Row row : update)
         {
-            applyRowToRocksDB(cfs, partitionKey, row);
+            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, row);
         }
 
         Row staticRow = update.staticRow();
         if (!staticRow.isEmpty())
         {
-            applyRowToRocksDB(cfs, partitionKey, staticRow);
+            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, staticRow);
         }
     }
 
     public UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs, SinglePartitionReadCommand readCommand)
     {
-        Partition partition = new RocksDBPartition(rocksDBFamily.get(cfs.metadata.cfId).getRocksDB(),
+        Partition partition = new RocksDBPartition(rocksDBFamily.get(cfs.metadata.cfId),
                                                    readCommand.partitionKey(),
                                                    readCommand.metadata());
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
@@ -118,6 +118,7 @@ public class RocksEngine implements StorageEngine
     }
 
     private void applyRowToRocksDB(ColumnFamilyStore cfs,
+                                   boolean writeCommitLog,
                                    DecoratedKey partitionKey,
                                    Row row)
     {
@@ -130,7 +131,7 @@ public class RocksEngine implements StorageEngine
         // value colummns
         try
         {
-            rocksDBFamily.get(cfs.metadata.cfId).getRocksDB().merge(rocksDBKey, rocksDBValue);
+            rocksDBFamily.get(cfs.metadata.cfId).merge(rocksDBKey, rocksDBValue, writeCommitLog);
         }
         catch (RocksDBException e)
         {

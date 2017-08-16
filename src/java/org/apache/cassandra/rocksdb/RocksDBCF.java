@@ -33,10 +33,13 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.WriteOptions;
 
 import static org.apache.cassandra.rocksdb.RocksEngine.ROCKSDB_DIR;
 
@@ -50,6 +53,9 @@ public class RocksDBCF
     private final Statistics stats;
     private final RocksdbTableMetrics rocksMetrics;
     private final CassandraCompactionFilter compactionFilter;
+    
+    private final ReadOptions readOptions;
+    private final WriteOptions disableWAL;
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -93,8 +99,14 @@ public class RocksDBCF
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
         rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
-
+        
         rocksMetrics = new RocksdbTableMetrics(cfs, stats);
+
+        // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
+        // until compaction happens. However in our case, range deletion is only used to remove ranges
+        // no longer owned by this node. In such case, stale keys would never be quried.
+        readOptions = new ReadOptions().setIgnoreRangeDeletions(true);
+        disableWAL = new WriteOptions().setDisableWAL(true);
     }
 
     public RocksDB getRocksDB()
@@ -115,5 +127,32 @@ public class RocksDBCF
     public RocksdbTableMetrics getRocksMetrics()
     {
         return rocksMetrics;
+    }
+
+    public byte[] get(byte[] key) throws RocksDBException
+    {
+        return rocksDB.get(readOptions, key);
+    }
+
+    public RocksIterator newIterator()
+    {
+        return rocksDB.newIterator(readOptions);
+    }
+    
+    public void merge(byte[] key, byte[] value) throws RocksDBException
+    {
+        merge(key, value, true);
+    }
+
+    public void merge(byte[] key, byte[] value, boolean writeCommitLog) throws RocksDBException
+    {
+        if (writeCommitLog)
+        {
+            rocksDB.merge(key, value);
+        }
+        else
+        {
+            rocksDB.merge(disableWAL, key, value);
+        }
     }
 }
