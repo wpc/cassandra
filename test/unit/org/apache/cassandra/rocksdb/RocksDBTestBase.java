@@ -45,7 +45,6 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
-import org.rocksdb.FlushOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
@@ -114,9 +113,9 @@ public class RocksDBTestBase extends CQLTester
 
     protected RocksDB rocksdbFlush() throws RocksDBException
     {
-        RocksDB rocksDBInstance = RocksEngine.getRocksDBInstance(getCurrentColumnFamilyStore());
-        rocksDBInstance.flush(new FlushOptions().setWaitForFlush(true));
-        return rocksDBInstance;
+        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(getCurrentColumnFamilyStore().metadata.cfId);
+        rocksDBCF.forceFlush();
+        return rocksDBCF.getRocksDB();
     }
 
     protected SinglePartitionReadCommand readCommand(String keystr, String column)

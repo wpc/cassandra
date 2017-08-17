@@ -45,7 +45,7 @@ public interface StorageEngine
     UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs,
                                        SinglePartitionReadCommand readCommand);
 
-    boolean cleanUpRanges(final ColumnFamilyStore cfs);
+    void forceFlush(final ColumnFamilyStore cfs);
 
     /**
      *  Streaming APIs
@@ -56,6 +56,8 @@ public interface StorageEngine
 
     AbstractStreamReceiveTask getStreamReceiveTask(StreamSession session,
                                                    StreamSummary summary);
+
+    boolean cleanUpRanges(final ColumnFamilyStore cfs);
 
     boolean doubleWrite();
 

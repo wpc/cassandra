@@ -101,6 +101,18 @@ public class RocksEngine implements StorageEngine
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
     }
 
+    public void forceFlush(ColumnFamilyStore cfs)
+    {
+        try
+        {
+            RocksEngine.getRocksDBCF(cfs.metadata.cfId).forceFlush();
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
+        }
+    }
+
     public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
                                                             UUID cfId,
                                                             Collection<Range<Token>> ranges)

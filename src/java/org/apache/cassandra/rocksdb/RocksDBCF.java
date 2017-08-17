@@ -33,6 +33,7 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
+import org.rocksdb.FlushOptions;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -56,6 +57,7 @@ public class RocksDBCF
     
     private final ReadOptions readOptions;
     private final WriteOptions disableWAL;
+    private final FlushOptions flushOptions;
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -107,6 +109,7 @@ public class RocksDBCF
         // no longer owned by this node. In such case, stale keys would never be quried.
         readOptions = new ReadOptions().setIgnoreRangeDeletions(true);
         disableWAL = new WriteOptions().setDisableWAL(true);
+        flushOptions = new FlushOptions().setWaitForFlush(true);
     }
 
     public RocksDB getRocksDB()
@@ -154,5 +157,10 @@ public class RocksDBCF
         {
             rocksDB.merge(disableWAL, key, value);
         }
+    }
+
+    public void forceFlush() throws RocksDBException
+    {
+        rocksDB.flush(flushOptions);
     }
 }
