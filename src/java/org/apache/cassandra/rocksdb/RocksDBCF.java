@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.RocksdbTableMetrics;
@@ -49,6 +52,8 @@ import static org.apache.cassandra.rocksdb.RocksEngine.ROCKSDB_DIR;
  */
 public class RocksDBCF
 {
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
+
     private final UUID cfID;
     private final RocksDB rocksDB;
     private final Statistics stats;
@@ -101,6 +106,8 @@ public class RocksDBCF
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
         rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
+        logger.info("Open rocksdb instance for cf {}.{} with path:{}, purgeTTL:{}",
+                    cfs.keyspace.getName(), cfs.name, rocksDBTableDir, cfs.metadata.params.purgeTtlOnExpiration);
         
         rocksMetrics = new RocksdbTableMetrics(cfs, stats);
 
