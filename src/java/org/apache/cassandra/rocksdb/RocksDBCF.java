@@ -40,7 +40,6 @@ import org.rocksdb.FlushOptions;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.rocksdb.WriteOptions;
@@ -147,9 +146,10 @@ public class RocksDBCF
         return rocksDB.get(readOptions, key);
     }
 
-    public RocksIterator newIterator()
+    public RocksIteratorAdapter newIterator()
     {
-        return rocksDB.newIterator(readOptions);
+        rocksMetrics.rocksdbIterNew.inc();
+        return new RocksIteratorAdapter(rocksDB.newIterator(readOptions), rocksMetrics);
     }
     
     public void merge(byte[] key, byte[] value) throws RocksDBException

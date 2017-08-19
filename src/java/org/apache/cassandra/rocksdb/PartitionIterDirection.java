@@ -20,18 +20,17 @@ package org.apache.cassandra.rocksdb;
 
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.utils.FBUtilities;
-import org.rocksdb.RocksIterator;
 
 enum PartitionIterOrder
 {
     NORMAL
     {
-        public void moveForward(RocksIterator rocksIterator)
+        public void moveForward(RocksIteratorAdapter rocksIterator)
         {
             rocksIterator.next();
         }
 
-        public void seekToStart(RocksIterator rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+        public void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                 boolean lowerExclusive, boolean upperExclusive)
         {
             if (minKey == null)
@@ -51,12 +50,12 @@ enum PartitionIterOrder
 
     REVERSED
     {
-        public void moveForward(RocksIterator rocksIterator)
+        public void moveForward(RocksIteratorAdapter rocksIterator)
         {
             rocksIterator.prev();
         }
 
-        public void seekToStart(RocksIterator rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+        public void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                 boolean lowerExclusive, boolean upperExclusive)
         {
             if (maxKey == null)
@@ -68,7 +67,7 @@ enum PartitionIterOrder
 
             rocksIterator.seek(maxKey);
 
-            if(rocksIterator.isValid())
+            if (rocksIterator.isValid())
             {
                 // we seeked to a valid key that closest to upper bound
                 // next we make sure we are on the lower side of upper bound
@@ -77,7 +76,8 @@ enum PartitionIterOrder
                 {
                     rocksIterator.prev();
                 }
-            } else
+            }
+            else
             {
                 // we are likely reach the end of the database
                 // in this case we just reset to partition end
@@ -86,7 +86,7 @@ enum PartitionIterOrder
             }
         }
 
-        private void moveToPartitionEnd(RocksIterator rocksIterator, byte[] partitionKey)
+        private void moveToPartitionEnd(RocksIteratorAdapter rocksIterator, byte[] partitionKey)
         {
             byte[] maxKey = null;
             while (rocksIterator.isValid())
@@ -106,9 +106,9 @@ enum PartitionIterOrder
         }
     };
 
-    public abstract void moveForward(RocksIterator rocksIterator);
+    public abstract void moveForward(RocksIteratorAdapter rocksIterator);
 
-    public abstract void seekToStart(RocksIterator rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+    public abstract void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                      boolean lowerExclusive, boolean upperExclusive);
 
 }

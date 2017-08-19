@@ -50,7 +50,6 @@ import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.UpdateFunction;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 
 public class RocksDBPartition implements Partition
@@ -159,7 +158,7 @@ public class RocksDBPartition implements Partition
     {
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
-        RocksIterator rocksIterator = db.newIterator();
+        RocksIteratorAdapter rocksIterator = db.newIterator();
 
         byte[] minKey = slice.start() == Slice.Bound.BOTTOM ? null :
                              RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metadata);

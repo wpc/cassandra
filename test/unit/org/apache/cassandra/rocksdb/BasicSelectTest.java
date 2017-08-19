@@ -144,6 +144,7 @@ public class BasicSelectTest extends RocksDBTestBase
         assertRows(execute("SELECT * FROM %s WHERE p=? AND c=?", "p1", "k1"));
     }
 
+    @Test
     public void testRangeQueryWithDescClusteringKey() throws Throwable
     {
         long now = System.currentTimeMillis();

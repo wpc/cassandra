@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.metrics;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -66,6 +67,10 @@ public class RocksdbTableMetrics
 
     public static final Gauge<Long> rocksdbOutgoingThroughput;
     public static final Gauge<Long> rocksdbIncomingThroughput;
+
+    public final Counter rocksdbIterMove;
+    public final Counter rocksdbIterSeek;
+    public final Counter rocksdbIterNew;
 
     static
     {
@@ -151,6 +156,9 @@ public class RocksdbTableMetrics
                                                       HistogramUtils.createHistogram(cfs, stats, HistogramType.HISTOGRAM_ENUM_MAX));
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
         rocksdbIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
+        rocksdbIterMove = Metrics.counter(factory.createMetricName("RocksIterMove"));
+        rocksdbIterSeek = Metrics.counter(factory.createMetricName("RocksIterSeek"));;
+        rocksdbIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
     }
 
     static class RocksMetricNameFactory implements MetricNameFactory
