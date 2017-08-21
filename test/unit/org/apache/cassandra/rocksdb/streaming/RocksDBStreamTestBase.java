@@ -24,48 +24,31 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.commons.lang.NotImplementedException;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-import org.apache.cassandra.dht.IPartitioner;
-import org.apache.cassandra.dht.Murmur3Partitioner;
-import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBTestBase;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 
 public class RocksDBStreamTestBase extends RocksDBTestBase
 {
-    public static Path STREAM_DIR;
-    public static Path DB_DIR;
 
     @BeforeClass
     public static void classSetUp() throws Exception
     {
         RocksDBTestBase.classSetUp();
 
-        STREAM_DIR = Paths.get("/tmp/rocksdbstream/", UUID.randomUUID().toString());
-        DB_DIR = Paths.get(STREAM_DIR.toAbsolutePath().toString(), "db");
-        System.setProperty("cassandra.rocksdb.stream.dir", STREAM_DIR.toString());
-        System.setProperty("cassandra.rocksdb.stream.sst_size", "100");
-        File streamDir = STREAM_DIR.toFile();
-        if (streamDir.exists())
+        Path streamDir = Paths.get("/tmp/rocksdbstream/", UUID.randomUUID().toString());
+        RocksDBConfigs.STREAMING_TMPFILE_PATH = new File(streamDir.toString());
+        if (RocksDBConfigs.STREAMING_TMPFILE_PATH.exists())
         {
-            FileUtils.deleteRecursive(streamDir);
+            FileUtils.deleteRecursive(RocksDBConfigs.STREAMING_TMPFILE_PATH);
         }
-        FileUtils.createDirectory(STREAM_DIR.toString());
-    }
-
-    @AfterClass
-    public static void classTeardown() throws Exception
-    {
-        RocksDBTestBase.classTeardown();
-        System.clearProperty("cassandra.rocksdb.stream.dir");
-        System.clearProperty("cassandra.rocksdb.stream.sst_size");
+        FileUtils.createDirectory(streamDir.toString());
     }
 
     public static StreamSession createDummySession()

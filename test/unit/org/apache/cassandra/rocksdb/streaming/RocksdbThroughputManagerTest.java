@@ -87,7 +87,6 @@ public class RocksdbThroughputManagerTest extends RocksDBStreamTestBase
     @AfterClass
     public static void classTeardown() throws Exception
     {
-        RocksDBStreamTestBase.classTeardown();
         System.clearProperty("cassandra.rocksdb.stream.dir");
     }
 

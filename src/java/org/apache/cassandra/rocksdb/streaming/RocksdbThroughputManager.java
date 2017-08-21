@@ -31,10 +31,9 @@ import org.slf4j.LoggerFactory;
 
 public class RocksdbThroughputManager
 {
-    private static long PEEK_INTERVAL_MS = Long.parseLong(System.getProperty("cassandra.rocksdb.throughput.peek_interval_ms", "200"));
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksdbThroughputManager.class);
     private static final RocksdbThroughputManager INSTANCE = new RocksdbThroughputManager();
-
+    public static long STREAM_THROUGHPUT_PEEK_INTERVAL_MS = 200;
     private final Map<RocksDBStreamWriter, Long> outgoingStreamWriters;
     private final Map<RocksDBSStableWriter, Long> incomingStreamWriters;
     private final ScheduledExecutorService scheduler;
@@ -53,7 +52,7 @@ public class RocksdbThroughputManager
         incomingStreamWriters = new WeakHashMap<RocksDBSStableWriter, Long>();
 
         scheduler = Executors.newScheduledThreadPool(1);
-        if (PEEK_INTERVAL_MS > 0)
+        if (STREAM_THROUGHPUT_PEEK_INTERVAL_MS > 0)
         {
             scheduler.scheduleAtFixedRate(new Runnable()
             {
@@ -68,7 +67,7 @@ public class RocksdbThroughputManager
                         LOGGER.warn("Exception collecting throughput metrics.", e);
                     }
                 }
-            }, PEEK_INTERVAL_MS, PEEK_INTERVAL_MS, TimeUnit.MILLISECONDS);
+            }, STREAM_THROUGHPUT_PEEK_INTERVAL_MS, STREAM_THROUGHPUT_PEEK_INTERVAL_MS, TimeUnit.MILLISECONDS);
         }
     }
 

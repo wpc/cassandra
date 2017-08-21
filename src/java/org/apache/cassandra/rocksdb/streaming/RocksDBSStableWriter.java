@@ -25,20 +25,16 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.rocksdb.DirectSlice;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.Slice;
 import org.rocksdb.SstFileWriter;
 
 public class RocksDBSStableWriter
 {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBSStableWriter.class);
-    private static final File TMP_STREAM_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
-    // While streaming, split the stream into 64 MB sst files.
-    private static long SSTABLE_INGEST_THRESHOLD = Long.parseLong(System.getProperty("cassandra.rocksdb.stream.sst_size", "67108864"));
     private final UUID cfId;
     private final EnvOptions envOptions;
     private final Options options;
@@ -61,7 +57,7 @@ public class RocksDBSStableWriter
 
     private synchronized void createSstable() throws IOException, RocksDBException
     {
-        sstable = File.createTempFile(cfId.toString(), ".sst", TMP_STREAM_PATH);
+        sstable = File.createTempFile(cfId.toString(), ".sst", RocksDBConfigs.STREAMING_TMPFILE_PATH);
         sstable.deleteOnExit();
         sstableWriter = new SstFileWriter(envOptions, options);
         sstableWriter.open(sstable.getAbsolutePath());
@@ -71,7 +67,7 @@ public class RocksDBSStableWriter
     private synchronized void IngestSstable() throws RocksDBException
     {
 
-        LOGGER.info("Flushing " + sstable + ", estimated size: " + currentSstableSize + ", flushing threshold: " + SSTABLE_INGEST_THRESHOLD);
+        LOGGER.info("Flushing " + sstable + ", estimated size: " + currentSstableSize + ", flushing threshold: " + RocksDBConfigs.SSTABLE_INGEST_THRESHOLD);
         try
         {
             if (sstableWriter != null)
@@ -104,7 +100,7 @@ public class RocksDBSStableWriter
 
         currentSstableSize += key.length + value.length;
         incomingBytes += key.length + value.length + RocksDBStreamUtils.MORE.length + Integer.BYTES * 2;
-        if (currentSstableSize >= SSTABLE_INGEST_THRESHOLD)
+        if (currentSstableSize >= RocksDBConfigs.SSTABLE_INGEST_THRESHOLD)
             IngestSstable();
     }
 

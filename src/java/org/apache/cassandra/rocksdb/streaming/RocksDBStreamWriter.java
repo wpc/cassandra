@@ -28,8 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamManager;
@@ -42,7 +42,6 @@ import org.rocksdb.RocksIterator;
 public class RocksDBStreamWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
-    private static final long READ_AHEAD_SIZE = Long.getLong("cassandra.rocksdb.stream.readahead_size", 10L * 1024 * 1024);
     private static final long OUTGOING_BYTES_DELTA_UPDATE_THRESHOLD = 1 * 1024 * 1024;
     private final RocksDB db;
     private final Collection<Range<Token>> ranges;
@@ -84,7 +83,7 @@ public class RocksDBStreamWriter
         // Iterate through all possible key-value pairs and send to stream.
         outerloop:
         for (Range<Token> range : ranges) {
-            RocksIterator iterator = db.newIterator(new ReadOptions().setReadaheadSize(READ_AHEAD_SIZE));
+            RocksIterator iterator = db.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
             try
             {
                 iterator.seekToFirst();

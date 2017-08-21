@@ -56,13 +56,6 @@ public class RocksEngine implements StorageEngine
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksEngine.class);
 
-    public static final String DEFAULT_ROCKSDB_KEYSPACE = "rocksdb";
-    public static final String DEFAULT_ROCKSDB_DIR = "/data/rocksdb";
-
-    public static final String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", DEFAULT_ROCKSDB_KEYSPACE);
-    public static final String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", DEFAULT_ROCKSDB_DIR);
-    public static final Boolean ROCKSDB_DOUBLE_WRITE = Boolean.parseBoolean(System.getProperty("cassandra.rocksdb.double_write", "false"));
-    
     public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
 
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
@@ -215,6 +208,6 @@ public class RocksEngine implements StorageEngine
     @Override
     public boolean doubleWrite()
     {
-        return ROCKSDB_DOUBLE_WRITE;
+        return RocksDBConfigs.ROCKSDB_DOUBLE_WRITE;
     }
 }

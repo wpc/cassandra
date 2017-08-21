@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 import org.apache.cassandra.config.ColumnDefinition;
@@ -53,21 +52,13 @@ public class RocksDBTestBase extends CQLTester
     @BeforeClass
     public static void classSetUp() throws Exception
     {
-        String dbdir = "/tmp/rocksdbtest/" + UUID.randomUUID();
-        System.setProperty("cassandra.rocksdb.keyspace", CQLTester.KEYSPACE);
-        System.setProperty("cassandra.rocksdb.dir", dbdir);
-        File rocksdbdir = new File(dbdir);
+        RocksDBConfigs.ROCKSDB_DIR  = "/tmp/rocksdbtest/" + UUID.randomUUID();
+        RocksDBConfigs.ROCKSDB_KEYSPACE = CQLTester.KEYSPACE;
+        File rocksdbdir = new File(RocksDBConfigs.ROCKSDB_DIR);
         if (rocksdbdir.exists())
         {
             FileUtils.deleteRecursive(rocksdbdir);
         }
-    }
-
-    @AfterClass
-    public static void classTeardown() throws Exception
-    {
-        System.clearProperty("cassandra.rocksdb.keyspace");
-        System.clearProperty("cassandra.rocksdb.dir");
     }
 
     protected List<Row> queryEngine(SinglePartitionReadCommand readCommand)

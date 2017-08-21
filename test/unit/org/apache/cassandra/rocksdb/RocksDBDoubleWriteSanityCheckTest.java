@@ -1,6 +1,5 @@
 package org.apache.cassandra.rocksdb;
 
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -17,14 +16,7 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
     public static void classSetUp() throws Exception
     {
         RocksDBTestBase.classSetUp();
-        System.setProperty("cassandra.rocksdb.double_write", "true");
-    }
-
-    @AfterClass
-    public static void classTeardown() throws Exception
-    {
-        System.clearProperty("cassandra.rocksdb.double_write");
-        RocksDBTestBase.classTeardown();
+        RocksDBConfigs.ROCKSDB_DOUBLE_WRITE = true;
     }
 
     @Test

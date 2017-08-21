@@ -42,6 +42,7 @@ import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.RocksDBCF;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
@@ -51,7 +52,7 @@ import org.rocksdb.RocksDBException;
 public class RocksDBStreamUtils
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
-    private static final long INGESTION_WAIT_MS = Long.getLong("cassandra.rocksdb.ingestion_wait_ms", 100);
+    private static final long INGESTION_WAIT_MS = 100;
     public static final byte[] EOF = new byte[]{'\0'};
     public static final byte[] MORE = new byte[]{'1'};
 
@@ -93,11 +94,11 @@ public class RocksDBStreamUtils
             while (true)
             {
                 int numOfLevel0Sstables = getNumberOfLevel0Sstables(db);
-                if (numOfLevel0Sstables <= RocksDBCF.LEVEL0_STOP_WRITES_TRIGGER)
+                if (numOfLevel0Sstables <= RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER)
                     break;
                 try
                 {
-                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + RocksDBCF.LEVEL0_STOP_WRITES_TRIGGER
+                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER
                                 + ", sleep for " + INGESTION_WAIT_MS + "ms.");
                     Thread.sleep(INGESTION_WAIT_MS);
                 }

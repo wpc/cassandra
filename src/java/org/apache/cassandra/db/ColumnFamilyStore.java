@@ -18,7 +18,6 @@
 package org.apache.cassandra.db;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -26,7 +25,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
@@ -45,7 +43,7 @@ import com.google.common.util.concurrent.*;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
 import org.apache.cassandra.io.util.DataInputPlus;
-import org.apache.cassandra.metrics.RocksdbTableMetrics;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +76,7 @@ import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
@@ -1240,7 +1239,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     }
 
     public boolean isRocksDBBacked() {
-        return keyspace.getName().equals(RocksEngine.ROCKSDB_KEYSPACE);
+        return keyspace.getName().equals(RocksDBConfigs.ROCKSDB_KEYSPACE);
     }
 
     /**

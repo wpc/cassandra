@@ -45,6 +45,7 @@ import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.metrics.KeyspaceMetrics;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.schema.KeyspaceMetadata;
@@ -301,7 +302,7 @@ public class Keyspace
         assert metadata != null : "Unknown keyspace " + keyspaceName;
         createReplicationStrategy(metadata);
 
-        if (keyspaceName.equals(RocksEngine.ROCKSDB_KEYSPACE))
+        if (keyspaceName.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
             engine = new RocksEngine();
         else
             engine = null;
@@ -322,7 +323,7 @@ public class Keyspace
         createReplicationStrategy(metadata);
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
-        if (metadata.name.equals(RocksEngine.ROCKSDB_KEYSPACE))
+        if (metadata.name.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
             engine = new RocksEngine();
         else
             engine = null;

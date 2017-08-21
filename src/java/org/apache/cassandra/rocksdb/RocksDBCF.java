@@ -44,15 +44,13 @@ import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.rocksdb.WriteOptions;
 
-import static org.apache.cassandra.rocksdb.RocksEngine.ROCKSDB_DIR;
+import static org.apache.cassandra.rocksdb.RocksDBConfigs.ROCKSDB_DIR;
 
 /**
  * A wrapper around RocksDB instance.
  */
 public class RocksDBCF
 {
-    // TODO(chenshen): Consolidate all parameters into one class.
-    public static final int LEVEL0_STOP_WRITES_TRIGGER = Integer.getInteger("cassandra.rocksdb.level0_stop_writes_trigger", 1000);
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private final UUID cfID;
     private final RocksDB rocksDB;
@@ -94,8 +92,8 @@ public class RocksDBCF
         columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
         columnFamilyOptions.setMergeOperatorName("cassandra");
         columnFamilyOptions.setCompactionFilter(compactionFilter);
-        columnFamilyOptions.setLevel0SlowdownWritesTrigger(LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevel0StopWritesTrigger(LEVEL0_STOP_WRITES_TRIGGER);
+        columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+        columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
 
         final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
         final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
