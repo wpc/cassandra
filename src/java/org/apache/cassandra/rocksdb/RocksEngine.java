@@ -72,6 +72,8 @@ public class RocksEngine implements StorageEngine
 
     public void apply(ColumnFamilyStore cfs, PartitionUpdate update, boolean writeCommitLog)
     {
+        long start = System.nanoTime();
+
         DecoratedKey partitionKey = update.partitionKey();
 
         for (Row row : update)
@@ -84,6 +86,8 @@ public class RocksEngine implements StorageEngine
         {
             applyRowToRocksDB(cfs, writeCommitLog, partitionKey, staticRow);
         }
+
+        cfs.metric.writeLatency.addNano(System.nanoTime() - start);
     }
 
     public UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs, SinglePartitionReadCommand readCommand)
