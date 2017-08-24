@@ -33,6 +33,7 @@ import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CassandraCompactionFilter;
+import org.rocksdb.CassandraValueMergeOperator;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
@@ -60,10 +61,11 @@ public class RocksDBCF
     private final Statistics stats;
     private final RocksdbTableMetrics rocksMetrics;
     private final CassandraCompactionFilter compactionFilter;
-    
+
     private final ReadOptions readOptions;
     private final WriteOptions disableWAL;
     private final FlushOptions flushOptions;
+    private final CassandraValueMergeOperator mergeOperator;
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -76,6 +78,7 @@ public class RocksDBCF
         stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
         compactionFilter = new CassandraCompactionFilter(cfs.metadata.params.purgeTtlOnExpiration);
+        mergeOperator = new CassandraValueMergeOperator(cfs.metadata.params.gcGraceSeconds);
 
         dbOptions.setCreateIfMissing(true);
         dbOptions.setAllowConcurrentMemtableWrite(true);
@@ -95,7 +98,7 @@ public class RocksDBCF
         columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
         columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
         columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-        columnFamilyOptions.setMergeOperatorName("cassandra");
+        columnFamilyOptions.setMergeOperator(mergeOperator);
         columnFamilyOptions.setCompactionFilter(compactionFilter);
         columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
         columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
@@ -113,7 +116,7 @@ public class RocksDBCF
         rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir, cfs.metadata.params.purgeTtlOnExpiration);
-        
+
         rocksMetrics = new RocksdbTableMetrics(cfs, stats);
 
         // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
@@ -154,7 +157,7 @@ public class RocksDBCF
         rocksMetrics.rocksdbIterNew.inc();
         return new RocksIteratorAdapter(rocksDB.newIterator(readOptions), rocksMetrics);
     }
-    
+
     public void merge(byte[] key, byte[] value) throws RocksDBException
     {
         merge(key, value, true);
