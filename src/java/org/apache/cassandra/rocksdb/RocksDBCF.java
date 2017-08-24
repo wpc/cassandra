@@ -84,6 +84,7 @@ public class RocksDBCF
         dbOptions.setStatistics(stats);
 
         ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
+        columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
         columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
         columnFamilyOptions.setWriteBufferSize(writeBufferSize);
         columnFamilyOptions.setMaxBytesForLevelBase(4 * writeBufferSize);

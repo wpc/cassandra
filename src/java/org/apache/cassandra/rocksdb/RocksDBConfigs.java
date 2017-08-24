@@ -8,6 +8,9 @@ public class RocksDBConfigs
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
     public static File STREAMING_TMPFILE_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
 
+    // Max levels for RocksDB. 7 is the default value.
+    public static int MAX_LEVELS = 7;
+
     // Tables created in this keyspace is backed by RocksDB.
     public static String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", "rocksdb");
 

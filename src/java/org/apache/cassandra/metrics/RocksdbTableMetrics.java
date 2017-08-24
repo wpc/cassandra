@@ -18,11 +18,21 @@
 
 package org.apache.cassandra.metrics;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
+import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.rocksdb.encoding.metrics.HistogramUtils;
+import org.apache.cassandra.rocksdb.streaming.RocksDBSStableWriter;
 import org.apache.cassandra.rocksdb.streaming.RocksdbThroughputManager;
 import org.rocksdb.HistogramType;
 import org.rocksdb.Statistics;
@@ -31,6 +41,7 @@ import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
 public class RocksdbTableMetrics
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksdbTableMetrics.class);
     private final MetricNameFactory factory;
     public final Histogram rocksdbGetHistogram;
     public final Histogram rocksdbWritedHistogram;
@@ -67,6 +78,9 @@ public class RocksdbTableMetrics
 
     public static final Gauge<Long> rocksdbOutgoingThroughput;
     public static final Gauge<Long> rocksdbIncomingThroughput;
+
+    public final List<Gauge<Integer>> rocksdbNumSstablePerLevel;
+    public final Gauge<Long> rocksdbPendingCompactionBytes;
 
     public final Counter rocksdbIterMove;
     public final Counter rocksdbIterSeek;
@@ -156,6 +170,40 @@ public class RocksdbTableMetrics
                                                       HistogramUtils.createHistogram(cfs, stats, HistogramType.HISTOGRAM_ENUM_MAX));
         rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
         rocksdbIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
+
+        rocksdbNumSstablePerLevel = new ArrayList<>(RocksDBConfigs.MAX_LEVELS);
+        for (int level = 0; level < RocksDBConfigs.MAX_LEVELS; level ++)
+        {
+            final int fLevel = level;
+            rocksdbNumSstablePerLevel.add(Metrics.register(factory.createMetricName("SSTableCountPerLevel." + fLevel),
+                                                           new Gauge<Integer>(){
+                                                               public Integer getValue()
+                                                               {
+                                                                   try
+                                                                   {
+                                                                       return RocksDBUtils.getNumberOfSstablesByLevel(RocksEngine.getRocksDBInstance(cfs), fLevel);
+                                                                   } catch (Throwable e) {
+                                                                       LOGGER.warn("Failed to get sstable count by level.", e);
+                                                                       return 0;
+                                                                   }
+                                                               }
+                                                           }));
+        }
+
+        rocksdbPendingCompactionBytes = Metrics.register(factory.createMetricName("PendingCompactionBytes"),
+                                                        new Gauge<Long>(){
+                                                            public Long getValue()
+                                                            {
+                                                                try
+                                                                {
+                                                                    return RocksDBUtils.getPendingCompactionBytes(RocksEngine.getRocksDBInstance(cfs));
+                                                                } catch (Throwable e) {
+                                                                    LOGGER.warn("Failed to get pending compaction bytes", e);
+                                                                    return 0L;
+                                                                }
+                                                            }
+                                                        });
+
         rocksdbIterMove = Metrics.counter(factory.createMetricName("RocksIterMove"));
         rocksdbIterSeek = Metrics.counter(factory.createMetricName("RocksIterSeek"));;
         rocksdbIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
@@ -175,7 +223,7 @@ public class RocksdbTableMetrics
                 this.keyspaceName = cfs.keyspace.getName();
                 this.tableName = cfs.name;
             }
-                else
+            else
             {
                 this.keyspaceName = "all";
                 this.tableName = "all";

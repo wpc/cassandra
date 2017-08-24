@@ -43,6 +43,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
@@ -70,11 +71,6 @@ public class RocksDBStreamUtils
         return cfs;
     }
 
-    public static int getNumberOfLevel0Sstables(RocksDB db) throws RocksDBException
-    {
-        return Integer.parseInt(db.getProperty("rocksdb.num-files-at-level0"));
-    }
-
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
@@ -93,7 +89,7 @@ public class RocksDBStreamUtils
             // Wait until compaction catch up by examing the number of l0 sstables.
             while (true)
             {
-                int numOfLevel0Sstables = getNumberOfLevel0Sstables(db);
+                int numOfLevel0Sstables = RocksDBUtils.getNumberOfSstablesByLevel(db, 0);
                 if (numOfLevel0Sstables <= RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER)
                     break;
                 try
