@@ -184,5 +184,7 @@ public interface ColumnFamilyStoreMBean
 
     public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException;
 
-    String getRocksDBProperty(String property);
+    public String getRocksDBProperty(String property);
+
+    public boolean isRocksDBBacked();
 }

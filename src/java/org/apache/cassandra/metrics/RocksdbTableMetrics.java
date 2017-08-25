@@ -200,10 +200,10 @@ public class RocksdbTableMetrics
         rocksdbIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
     }
 
-    static class RocksMetricNameFactory implements MetricNameFactory
+    public static class RocksMetricNameFactory implements MetricNameFactory
     {
+        public static final String TYPE = "Rocksdb";
         private static final RocksMetricNameFactory DEFAULT_FACTORY = new RocksMetricNameFactory(null);
-        private static final String TYPE = "Rocksdb";
         private final String keyspaceName;
         private final String tableName;
 

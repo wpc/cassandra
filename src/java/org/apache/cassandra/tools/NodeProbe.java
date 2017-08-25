@@ -68,6 +68,7 @@ import org.apache.cassandra.gms.GossiperMBean;
 import org.apache.cassandra.db.HintedHandOffManager;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import org.apache.cassandra.metrics.CassandraMetricsRegistry;
+import org.apache.cassandra.metrics.RocksdbTableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.metrics.TableMetrics;
@@ -1202,6 +1203,29 @@ public class NodeProbe implements AutoCloseable
     }
 
     /**
+     * Retrieves Rocksdb metrics
+     * @param ks Keyspace for which stats are to be displayed.
+     * @param cf ColumnFamily for which stats are to be displayed.
+     * @param metricName View {@link TableMetrics}.
+     */
+    public Object getRocksdbMetric(String ks, String cf, String metricName)
+    {
+        try
+        {
+            ObjectName oName = new ObjectName(String.format("org.apache.cassandra.metrics:type=%s,keyspace=%s,scope=%s,name=%s", RocksdbTableMetrics.RocksMetricNameFactory.TYPE, ks, cf, metricName));
+            if (metricName.startsWith("SSTableCountPerLevel") || metricName.equals("PendingCompactionBytes"))
+                return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxGaugeMBean.class);
+            else if (metricName.equals("RocksIterMove") || metricName.equals("RocksIterMove") || metricName.equals("RocksIterNew"))
+                return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxCounterMBean.class);
+            return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxHistogramMBean.class);
+        }
+        catch (MalformedObjectNameException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Retrieve Proxy metrics
      * @param scope RangeSlice, Read or Write
      */
@@ -1279,6 +1303,18 @@ public class NodeProbe implements AutoCloseable
                 metric.get99thPercentile(),
                 metric.getMin(),
                 metric.getMax()};
+    }
+
+    public double[] rocksDBMetricPercentilesAsArray(CassandraMetricsRegistry.JmxHistogramMBean metric)
+    {
+        // Rocksdb histogram doens't have 75/99/Min/Max.
+        return new double[]{ metric.get50thPercentile(),
+                             Double.NaN,
+                             metric.get95thPercentile(),
+                             Double.NaN,
+                             metric.get99thPercentile(),
+                             Double.NaN,
+                             Double.NaN};
     }
 
     public double[] metricPercentilesAsArray(CassandraMetricsRegistry.JmxTimerMBean metric)
@@ -1395,6 +1431,13 @@ public class NodeProbe implements AutoCloseable
         ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
         return cfsProxy.getRocksDBProperty(property);
     }
+
+    public boolean isRocksDBBacked(String keyspace, String table)
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
+        return cfsProxy.isRocksDBBacked();
+    }
+
 }
 
 class ColumnFamilyStoreMBeanIterator implements Iterator<Map.Entry<String, ColumnFamilyStoreMBean>>
