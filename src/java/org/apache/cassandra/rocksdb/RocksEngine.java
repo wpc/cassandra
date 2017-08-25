@@ -194,7 +194,8 @@ public class RocksEngine implements StorageEngine
             try
             {
                 deleteRange(db, range);
-            } catch (RocksDBException e)
+            }
+            catch (RocksDBException e)
             {
                 logger.error("Cleanup failed hitting a rocksdb exception", e);
                 return false;

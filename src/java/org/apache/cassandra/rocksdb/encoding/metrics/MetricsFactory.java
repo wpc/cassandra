@@ -20,33 +20,37 @@ package org.apache.cassandra.rocksdb.encoding.metrics;
 
 import java.io.OutputStream;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.UniformSnapshot;
-import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.rocksdb.RocksEngine;
 import org.rocksdb.HistogramData;
 import org.rocksdb.HistogramType;
 import org.rocksdb.Statistics;
+import org.rocksdb.TickerType;
 
-public class HistogramUtils
+public class MetricsFactory
 {
     private static final Snapshot EMPTY_SNAPSHOT = new UniformSnapshot(new long[0]);
 
-    public static Histogram createHistogram(final ColumnFamilyStore cfs,
-                                            final Statistics stats,
-                                            final HistogramType type) {
-        return new RocksHistogram(cfs, type, stats);
+    public static Histogram createHistogram(Statistics stats, HistogramType type)
+    {
+        return new RocksHistogram(type, stats);
     }
 
-    static class RocksHistogram extends Histogram {
-        public final ColumnFamilyStore cfs;
+    public static Counter createCounter(Statistics stats, TickerType tickerType)
+    {
+        return new RocksCounter(tickerType, stats);
+    }
+
+    private static class RocksHistogram extends Histogram
+    {
         public final HistogramType type;
         public final Statistics stats;
 
-        public RocksHistogram(ColumnFamilyStore cfs, HistogramType type, Statistics stats) {
+        public RocksHistogram(HistogramType type, Statistics stats)
+        {
             super(null);
-            this.cfs = cfs;
             this.type = type;
             this.stats = stats;
         }
@@ -106,12 +110,14 @@ public class HistogramUtils
                     return histogramData.getMedian();
                 }
 
-                public double get95thPercentile() {
+                public double get95thPercentile()
+                {
 
                     return histogramData.getPercentile95();
                 }
 
-                public double get99thPercentile() {
+                public double get99thPercentile()
+                {
 
                     return histogramData.getPercentile99();
                 }
@@ -121,6 +127,23 @@ public class HistogramUtils
                     // Do nothing.
                 }
             };
+        }
+    }
+
+    private static class RocksCounter extends Counter
+    {
+        private final Statistics stats;
+        private final TickerType tickerType;
+
+        public RocksCounter(TickerType tickerType, Statistics stats)
+        {
+            this.stats = stats;
+            this.tickerType = tickerType;
+        }
+
+        public long getCount()
+        {
+            return stats.getTickerCount(tickerType);
         }
     }
 }
