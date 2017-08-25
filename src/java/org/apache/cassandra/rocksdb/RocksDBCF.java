@@ -26,8 +26,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.RocksdbTableMetrics;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CassandraCompactionFilter;
@@ -53,6 +55,7 @@ public class RocksDBCF
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private final UUID cfID;
+    private final IPartitioner partitioner;
     private final RocksDB rocksDB;
     private final Statistics stats;
     private final RocksdbTableMetrics rocksMetrics;
@@ -65,6 +68,7 @@ public class RocksDBCF
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
         cfID = cfs.metadata.cfId;
+        partitioner = cfs.getPartitioner();
 
         final long writeBufferSize = 8 * 512 * 1024 * 1024L;
         final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
@@ -176,5 +180,12 @@ public class RocksDBCF
     public String getProperty(String property) throws RocksDBException
     {
         return rocksDB.getProperty(property);
+    }
+
+    public void truncate() throws RocksDBException
+    {
+        // TODO: use delete range for now, could have a better solution
+        rocksDB.deleteRange(RowKeyEncoder.encodeToken(RocksDBUtils.getMinToken(partitioner)),
+                            RowKeyEncoder.encodeToken(RocksDBUtils.getMaxToken(partitioner)));
     }
 }

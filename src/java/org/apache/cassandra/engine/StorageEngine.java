@@ -47,6 +47,8 @@ public interface StorageEngine
 
     void forceFlush(final ColumnFamilyStore cfs);
 
+    void truncate(final ColumnFamilyStore cfs);
+
     /**
      *  Streaming APIs
      */

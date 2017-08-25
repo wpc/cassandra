@@ -43,6 +43,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamPlan;
@@ -121,8 +122,8 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
             RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBInstance(outCfs));
             List<Range<Token>> ranges = new ArrayList<>();
             ranges.add(
-                      new Range<Token>(RocksDBStreamUtils.getMinToken(inCfs.getPartitioner()),
-                                       RocksDBStreamUtils.getMaxToken(inCfs.getPartitioner())));
+                      new Range<Token>(RocksDBUtils.getMinToken(inCfs.getPartitioner()),
+                                       RocksDBUtils.getMaxToken(inCfs.getPartitioner())));
             transferRanges(inCfs, ranges);
         } finally
         {
@@ -161,8 +162,8 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
 
         IPartitioner partitioner = inCfs.getPartitioner();
         List<Range<Token>> ranges = new ArrayList<>();
-        Token minToken = RocksDBStreamUtils.getMinToken(partitioner);
-        Token maxToken = RocksDBStreamUtils.getMaxToken(partitioner);
+        Token minToken = RocksDBUtils.getMinToken(partitioner);
+        Token maxToken = RocksDBUtils.getMaxToken(partitioner);
         Token midToken = partitioner.midpoint(minToken, maxToken);
         ranges.add(new Range<Token>(minToken, midToken));
 
@@ -225,8 +226,8 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
             List<Range<Token>> ranges = new ArrayList<>();
 
             IPartitioner partitioner = inCfs.getPartitioner();
-            Token rangeEnd = partitioner.midpoint(RocksDBStreamUtils.getMinToken(partitioner), RocksDBStreamUtils.getMaxToken(partitioner));
-            Token rangeStart = partitioner.midpoint(RocksDBStreamUtils.getMinToken(partitioner), RocksDBStreamUtils.getMaxToken(partitioner)).increaseSlightly();
+            Token rangeEnd = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner));
+            Token rangeStart = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner)).increaseSlightly();
             ranges.add(new Range<Token>(rangeStart, rangeEnd));
             transferRanges(inCfs, ranges);
         } finally

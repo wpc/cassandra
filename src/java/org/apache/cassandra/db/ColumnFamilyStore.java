@@ -77,6 +77,7 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
@@ -2502,8 +2503,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     @Override
     public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException
     {
-        Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBStreamUtils.getMinToken(getPartitioner()),
-                                                                         RocksDBStreamUtils.getMaxToken(getPartitioner())));
+        Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBUtils.getMinToken(getPartitioner()),
+                                                                         RocksDBUtils.getMaxToken(getPartitioner())));
         RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(this), ranges);
         BufferedDataOutputStreamPlus out = new BufferedDataOutputStreamPlus(new FileOutputStream(outputFile));
         long startTimeMs = System.currentTimeMillis();

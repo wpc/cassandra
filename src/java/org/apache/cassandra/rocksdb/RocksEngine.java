@@ -110,6 +110,18 @@ public class RocksEngine implements StorageEngine
         }
     }
 
+    public void truncate(ColumnFamilyStore cfs)
+    {
+        try
+        {
+            getRocksDBCF(cfs.metadata.cfId).truncate();
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
+        }
+    }
+
     public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
                                                             UUID cfId,
                                                             Collection<Range<Token>> ranges)

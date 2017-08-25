@@ -27,6 +27,7 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksEngine;
 
 public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
@@ -54,8 +55,8 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         // Write Rocksdb entries into stream.
         RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(cfs),
                                                              Arrays.asList(
-                                                                          new Range(RocksDBStreamUtils.getMinToken(tokenPartioner),
-                                                                                    RocksDBStreamUtils.getMaxToken(tokenPartioner))),
+                                                                          new Range(RocksDBUtils.getMinToken(tokenPartioner),
+                                                                                    RocksDBUtils.getMaxToken(tokenPartioner))),
                                                              createDummySession(), 0);
         DataOutputBuffer out = new DataOutputBuffer(BUFFER_SIZE);
         writer.write(out);

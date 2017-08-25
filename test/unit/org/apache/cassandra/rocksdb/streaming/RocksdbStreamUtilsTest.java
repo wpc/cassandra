@@ -30,6 +30,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -150,8 +151,8 @@ public class RocksdbStreamUtilsTest
         Collection<Range<Token>> normalized = Range.normalize(combined);
         assertEquals(normalized.size(), 1);
         Range<Token> range = normalized.iterator().next();
-        assertEquals(range.left, RocksDBStreamUtils.getMinToken(range.left.getPartitioner()));
-        assertEquals(range.right, RocksDBStreamUtils.getMaxToken(range.left.getPartitioner()));
+        assertEquals(range.left, RocksDBUtils.getMinToken(range.left.getPartitioner()));
+        assertEquals(range.right, RocksDBUtils.getMaxToken(range.left.getPartitioner()));
     }
 
     private void assertSorted(Collection<Range<Token>> ranges)

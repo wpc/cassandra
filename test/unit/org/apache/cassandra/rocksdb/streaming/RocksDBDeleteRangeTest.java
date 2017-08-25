@@ -29,6 +29,7 @@ import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksEngine;
 import org.rocksdb.RocksDB;
 
@@ -54,8 +55,8 @@ public class RocksDBDeleteRangeTest extends RocksDBStreamTestBase
 
         // Delete token ranges from minimal token to mid token.
         IPartitioner partitioner = cfs.getPartitioner();
-        Token minToken = RocksDBStreamUtils.getMinToken(partitioner);
-        Token maxToken = RocksDBStreamUtils.getMaxToken(partitioner);
+        Token minToken = RocksDBUtils.getMinToken(partitioner);
+        Token maxToken = RocksDBUtils.getMaxToken(partitioner);
         Token midToken = partitioner.midpoint(maxToken, maxToken);
         Range<Token> toRemove = new Range<Token>(minToken, midToken);
 

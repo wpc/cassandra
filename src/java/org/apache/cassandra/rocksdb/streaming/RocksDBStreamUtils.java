@@ -50,6 +50,9 @@ import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
+import static org.apache.cassandra.rocksdb.RocksDBUtils.getMaxToken;
+import static org.apache.cassandra.rocksdb.RocksDBUtils.getMinToken;
+
 public class RocksDBStreamUtils
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
@@ -169,30 +172,6 @@ public class RocksDBStreamUtils
             result.add(new Range<>(start, maxToken));
         }
         return result;
-    }
-
-    public static Token getMaxToken(IPartitioner partitioner)
-    {
-        if (partitioner instanceof Murmur3Partitioner)
-        {
-            return new Murmur3Partitioner.LongToken(Murmur3Partitioner.MAXIMUM);
-        } else if (partitioner instanceof RandomPartitioner)
-        {
-            return new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM);
-        }
-        throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
-    }
-
-    public static Token getMinToken(IPartitioner partitioner)
-    {
-        if (partitioner instanceof Murmur3Partitioner)
-        {
-            return Murmur3Partitioner.MINIMUM;
-        } else if (partitioner instanceof RandomPartitioner)
-        {
-            return RandomPartitioner.MINIMUM;
-        }
-        throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
     }
 
     public static String toString(Cell cell)
