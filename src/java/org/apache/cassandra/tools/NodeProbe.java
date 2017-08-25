@@ -1389,6 +1389,12 @@ public class NodeProbe implements AutoCloseable
         ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
         return cfsProxy.ingestRocksDBStream(input);
     }
+
+    public String getRocksDBProperty(String keyspace, String table, String property)
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
+        return cfsProxy.getRocksDBProperty(property);
+    }
 }
 
 class ColumnFamilyStoreMBeanIterator implements Iterator<Map.Entry<String, ColumnFamilyStoreMBean>>

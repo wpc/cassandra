@@ -172,4 +172,9 @@ public class RocksDBCF
     {
         rocksDB.flush(flushOptions);
     }
+
+    public String getProperty(String property) throws RocksDBException
+    {
+        return rocksDB.getProperty(property);
+    }
 }

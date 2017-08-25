@@ -183,4 +183,6 @@ public interface ColumnFamilyStoreMBean
     public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException;
 
     public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException;
+
+    String getRocksDBProperty(String property);
 }

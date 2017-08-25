@@ -2528,4 +2528,16 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         double throughputMBps = streamedMB / (timeElapsedMs / 1000.0f /* Ms in seconds */);
         return "Data Streamed: " + streamedMB + "MB, time elapsed: " + timeElapsedMs + " MS, throughput: " + throughputMBps + " MB/S.";
     }
+
+    @Override
+    public String getRocksDBProperty(String property)
+    {
+        try
+        {
+            return RocksEngine.getRocksDBCF(metadata.cfId).getProperty(property);
+        } catch (Throwable e) {
+            logger.warn("Failed to get rocksBD property " + property, e);
+            return "Failed to get property:" + property + ", reason:" + e.toString();
+        }
+    }
 }

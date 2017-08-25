@@ -98,6 +98,7 @@ public class NodeTool
                 Rebuild.class,
                 Refresh.class,
                 RemoveNode.class,
+                RocksDBProperty.class,
                 Assassinate.class,
                 Repair.class,
                 ReplayBatchlog.class,
