@@ -82,8 +82,8 @@ public class RocksDBCF
         dbOptions.setEnableWriteThreadAdaptiveYield(true);
         dbOptions.setBytesPerSync(1024 * 1024);
         dbOptions.setWalBytesPerSync(1024 * 1024);
-        dbOptions.setMaxBackgroundCompactions(20);
-        dbOptions.setBaseBackgroundCompactions(20);
+        dbOptions.setMaxBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
+        dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
         dbOptions.setMaxSubcompactions(8);
         dbOptions.setStatistics(stats);
 
