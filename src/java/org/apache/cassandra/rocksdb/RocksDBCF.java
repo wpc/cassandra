@@ -40,6 +40,7 @@ import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
+import org.rocksdb.RateLimiter;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -89,6 +90,9 @@ public class RocksDBCF
         dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
         dbOptions.setMaxSubcompactions(8);
         dbOptions.setStatistics(stats);
+
+        RateLimiter rateLimiter = new RateLimiter(1024L * 1024L * RocksDBConfigs.RATE_MBYTES_PER_SECOND);
+        dbOptions.setRateLimiter(rateLimiter);
 
         ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
         columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
