@@ -21,7 +21,6 @@ package org.apache.cassandra.engine;
 import java.util.Collection;
 import java.util.UUID;
 
-import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.partitions.PartitionUpdate;

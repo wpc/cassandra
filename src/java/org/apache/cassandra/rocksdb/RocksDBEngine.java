@@ -49,6 +49,7 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
+import org.rocksdb.RateLimiter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
@@ -57,6 +58,14 @@ public class RocksDBEngine implements StorageEngine
     private static final Logger logger = LoggerFactory.getLogger(RocksDBEngine.class);
 
     public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
+
+    static
+    {
+        RocksDB.loadLibrary();
+    }
+
+    public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L *
+                                                           RocksDBConfigs.RATE_MBYTES_PER_SECOND);
 
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {

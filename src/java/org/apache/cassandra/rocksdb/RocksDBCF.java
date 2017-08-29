@@ -40,7 +40,6 @@ import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
-import org.rocksdb.RateLimiter;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -58,6 +57,7 @@ public class RocksDBCF
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private final UUID cfID;
     private final IPartitioner partitioner;
+    private final RocksDBEngine engine;
     private final RocksDB rocksDB;
     private final Statistics stats;
     private final RocksDBTableMetrics rocksMetrics;
@@ -67,11 +67,12 @@ public class RocksDBCF
     private final WriteOptions disableWAL;
     private final FlushOptions flushOptions;
     private final CassandraValueMergeOperator mergeOperator;
-
+    
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
         cfID = cfs.metadata.cfId;
         partitioner = cfs.getPartitioner();
+        engine = (RocksDBEngine) cfs.engine;
 
         final long writeBufferSize = 8 * 512 * 1024 * 1024L;
         final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
@@ -90,9 +91,7 @@ public class RocksDBCF
         dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
         dbOptions.setMaxSubcompactions(8);
         dbOptions.setStatistics(stats);
-
-        RateLimiter rateLimiter = new RateLimiter(1024L * 1024L * RocksDBConfigs.RATE_MBYTES_PER_SECOND);
-        dbOptions.setRateLimiter(rateLimiter);
+        dbOptions.setRateLimiter(engine.rateLimiter);
 
         ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
         columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
