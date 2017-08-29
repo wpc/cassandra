@@ -227,4 +227,20 @@ public class RocksDBEngine implements StorageEngine
     {
         return RocksDBConfigs.ROCKSDB_DOUBLE_WRITE;
     }
+
+    @Override
+    public long load() {
+        long result = 0;
+        for (RocksDBCF cf : rocksDBFamily.values())
+        {
+            try
+            {
+                result += RocksDBProperty.getEstimatedLiveDataSize(cf);
+            } catch (RocksDBException e)
+            {
+                logger.warn("Failed to query live data size.", e);
+            }
+        }
+        return result;
+    }
 }

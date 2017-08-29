@@ -43,8 +43,8 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
+import org.apache.cassandra.rocksdb.RocksDBProperty;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
@@ -92,7 +92,7 @@ public class RocksDBStreamUtils
             // Wait until compaction catch up by examing the number of l0 sstables.
             while (true)
             {
-                int numOfLevel0Sstables = RocksDBUtils.getNumberOfSstablesByLevel(db, 0);
+                int numOfLevel0Sstables = RocksDBProperty.getNumberOfSstablesByLevel(rocksDBCF, 0);
                 if (numOfLevel0Sstables <= RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER)
                     break;
                 try
@@ -222,7 +222,7 @@ public class RocksDBStreamUtils
     {
         try
         {
-            long estimatedDataSize = Long.parseLong(rocksDBCF.getProperty("rocksdb.estimate-live-data-size"));
+            long estimatedDataSize = RocksDBProperty.getEstimatedLiveDataSize(rocksDBCF);
             return (long)(estimatedDataSize * getRangeSpaceSize(normalizedRange));
         } catch (RocksDBException e)
         {
@@ -235,7 +235,7 @@ public class RocksDBStreamUtils
     {
         try
         {
-            long estimateNumKeys = Long.parseLong(rocksDBCF.getProperty("rocksdb.estimate-num-keys"));
+            long estimateNumKeys = RocksDBProperty.getEstimatedNumKeys(rocksDBCF);
             return (long)(estimateNumKeys * getRangeSpaceSize(normalizedRange));
         } catch (RocksDBException e)
         {

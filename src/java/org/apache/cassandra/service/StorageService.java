@@ -2483,7 +2483,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     public String getLoadString()
     {
-        return FileUtils.stringifyFileSize(StorageMetrics.load.getCount());
+        return FileUtils.stringifyFileSize(StorageMetrics.getLoad());
     }
 
     public Map<String, String> getLoadMap()

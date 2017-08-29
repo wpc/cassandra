@@ -29,8 +29,8 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
+import org.apache.cassandra.rocksdb.RocksDBProperty;
 import org.apache.cassandra.rocksdb.encoding.metrics.MetricsFactory;
 import org.apache.cassandra.rocksdb.streaming.RocksDBThroughputManager;
 import org.rocksdb.HistogramType;
@@ -47,6 +47,7 @@ public class RocksDBTableMetrics
 
     public final List<Gauge<Integer>> rocksDBNumSstablePerLevel;
     public final Gauge<Long> rocksDBPendingCompactionBytes;
+    public final Gauge<Long> rocksDBEstimateLiveDataSize;
 
     public final Counter rocksDBIterMove;
     public final Counter rocksDBIterSeek;
@@ -167,7 +168,7 @@ public class RocksDBTableMetrics
                                                                {
                                                                    try
                                                                    {
-                                                                       return RocksDBUtils.getNumberOfSstablesByLevel(RocksDBEngine.getRocksDBInstance(cfs), fLevel);
+                                                                       return RocksDBProperty.getNumberOfSstablesByLevel(RocksDBEngine.getRocksDBCF(cfs.metadata.cfId), fLevel);
                                                                    }
                                                                    catch (Throwable e)
                                                                    {
@@ -185,11 +186,28 @@ public class RocksDBTableMetrics
                                                              {
                                                                  try
                                                                  {
-                                                                     return RocksDBUtils.getPendingCompactionBytes(RocksDBEngine.getRocksDBInstance(cfs));
+                                                                     return RocksDBProperty.getPendingCompactionBytes(RocksDBEngine.getRocksDBCF(cfs.metadata.cfId));
                                                                  }
                                                                  catch (Throwable e)
                                                                  {
                                                                      LOGGER.warn("Failed to get pending compaction bytes", e);
+                                                                     return 0L;
+                                                                 }
+                                                             }
+                                                         });
+
+        rocksDBEstimateLiveDataSize = Metrics.register(factory.createMetricName("LiveDataSize"),
+                                                         new Gauge<Long>()
+                                                         {
+                                                             public Long getValue()
+                                                             {
+                                                                 try
+                                                                 {
+                                                                     return RocksDBProperty.getEstimatedLiveDataSize(RocksDBEngine.getRocksDBCF(cfs.metadata.cfId));
+                                                                 }
+                                                                 catch (Throwable e)
+                                                                 {
+                                                                     LOGGER.warn("Failed to get live data size", e);
                                                                      return 0L;
                                                                  }
                                                              }

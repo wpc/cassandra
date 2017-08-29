@@ -63,4 +63,6 @@ public interface StorageEngine
 
     boolean doubleWrite();
 
+    long load();
+
 }

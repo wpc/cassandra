@@ -29,15 +29,6 @@ import org.rocksdb.RocksDBException;
 
 public class RocksDBUtils
 {
-    public static int getNumberOfSstablesByLevel(RocksDB db, int level) throws RocksDBException
-    {
-        return Integer.parseInt(db.getProperty("rocksdb.num-files-at-level" + level));
-    }
-
-    public static long getPendingCompactionBytes(RocksDB db) throws RocksDBException
-    {
-        return Long.parseLong(db.getProperty("rocksdb.estimate-pending-compaction-bytes"));
-    }
 
     public static Token getMaxToken(IPartitioner partitioner)
     {
