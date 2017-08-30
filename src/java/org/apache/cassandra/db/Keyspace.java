@@ -45,6 +45,7 @@ import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.metrics.KeyspaceMetrics;
+import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.engine.StorageEngine;
@@ -567,7 +568,12 @@ public class Keyspace
                 // In case that Cassandra storage engine treats the bytebuffers in PartitionUpdate as mutable (such as read several bytes from the bytebuffer
                 // without duplicating it) and corrupts the data accordingly.
                 if (engine != null)
+                {
+                    long start = System.nanoTime();
                     engine.apply(cfs, upd, writeCommitLog);
+                    cfs.metric.samplers.get(TableMetrics.Sampler.WRITES).addSample(upd.partitionKey().getKey(), upd.partitionKey().hashCode(), 1);
+                    cfs.metric.writeLatency.addNano(System.nanoTime() - start);
+                }
 
                 if (engine == null || engine.doubleWrite())
                 {

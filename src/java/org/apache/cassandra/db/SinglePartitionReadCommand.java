@@ -492,7 +492,10 @@ public class SinglePartitionReadCommand extends ReadCommand
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
         if (cfs.engine != null)
+        {
+            cfs.metric.samplers.get(TableMetrics.Sampler.READS).addSample(partitionKey().getKey(), partitionKey().hashCode(), 1);
             return cfs.engine.queryStorage(cfs, this);
+        }
 
         boolean copyOnHeap = Memtable.MEMORY_POOL.needToCopyOnHeap();
         return queryMemtableAndDiskInternal(cfs, copyOnHeap);
