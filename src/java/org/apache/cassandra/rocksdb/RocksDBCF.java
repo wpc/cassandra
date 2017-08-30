@@ -158,8 +158,13 @@ public class RocksDBCF
 
     public RocksIteratorAdapter newIterator()
     {
+        return newIterator(readOptions);
+    }
+
+    public RocksIteratorAdapter newIterator(ReadOptions options)
+    {
         rocksMetrics.rocksdbIterNew.inc();
-        return new RocksIteratorAdapter(rocksDB.newIterator(readOptions), rocksMetrics);
+        return new RocksIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
     }
 
     public void merge(byte[] key, byte[] value) throws RocksDBException

@@ -218,11 +218,11 @@ public class RocksDBStreamUtils
         throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
     }
 
-    public static long estimateDataSize(RocksDB db, Collection<Range<Token>> normalizedRange)
+    public static long estimateDataSize(RocksDBCF rocksDBCF, Collection<Range<Token>> normalizedRange)
     {
         try
         {
-            long estimatedDataSize = Long.parseLong(db.getProperty("rocksdb.estimate-live-data-size"));
+            long estimatedDataSize = Long.parseLong(rocksDBCF.getProperty("rocksdb.estimate-live-data-size"));
             return (long)(estimatedDataSize * getRangeSpaceSize(normalizedRange));
         } catch (RocksDBException e)
         {
@@ -231,11 +231,11 @@ public class RocksDBStreamUtils
         }
     }
 
-    public static long estimateNumKeys(RocksDB db, Collection<Range<Token>> normalizedRange)
+    public static long estimateNumKeys(RocksDBCF rocksDBCF, Collection<Range<Token>> normalizedRange)
     {
         try
         {
-            long estimateNumKeys = Long.parseLong(db.getProperty("rocksdb.estimate-num-keys"));
+            long estimateNumKeys = Long.parseLong(rocksDBCF.getProperty("rocksdb.estimate-num-keys"));
             return (long)(estimateNumKeys * getRangeSpaceSize(normalizedRange));
         } catch (RocksDBException e)
         {

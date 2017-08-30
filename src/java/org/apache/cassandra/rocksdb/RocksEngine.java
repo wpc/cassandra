@@ -128,7 +128,7 @@ public class RocksEngine implements StorageEngine
     {
         RocksDBStreamTransferTask task = new RocksDBStreamTransferTask(session, cfId);
         task.addTransferRocksdbFile(cfId,
-                                    RocksEngine.getRocksDBInstance(cfId),
+                                    RocksEngine.getRocksDBCF(cfId),
                                     ranges);
         return task;
     }

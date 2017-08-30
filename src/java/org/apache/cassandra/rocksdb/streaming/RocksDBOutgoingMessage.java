@@ -27,13 +27,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ning.compress.lzf.LZFOutputStream;
-import com.ning.compress.lzf.util.LZFFileOutputStream;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
+import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.messages.OutgoingMessage;
-import org.rocksdb.RocksDB;
 
 public class RocksDBOutgoingMessage extends OutgoingMessage
 {
@@ -66,7 +65,7 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
     {
         RocksDBMessageHeader.SERIALIZER.seriliaze(header, out);
         LZFOutputStream lzfOutputStream = new LZFOutputStream(out);
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(db, ranges, session, header.estimatedBytes);
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(rocksDBCF, ranges, session, header.estimatedBytes);
         writer.write(lzfOutputStream);
         lzfOutputStream.flush();
         return writer.getOutgoingBytes();
@@ -75,20 +74,20 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
     public final RocksDBMessageHeader header;
     public final UUID cfId;
     public final int sequenceNumber;
-    private final RocksDB db;
+    private final RocksDBCF rocksDBCF;
     public final Collection<Range<Token>>  ranges;
     private boolean completed = false;
     public boolean transferring = false;
 
-    public RocksDBOutgoingMessage(UUID cfId, int sequenceNumber, RocksDB db, Collection<Range<Token>> ranges)
+    public RocksDBOutgoingMessage(UUID cfId, int sequenceNumber, RocksDBCF rocksDBCF, Collection<Range<Token>> ranges)
     {
         super(Type.ROCKSFILE);
         this.cfId = cfId;
         this.sequenceNumber = sequenceNumber;
-        this.db = db;
+        this.rocksDBCF = rocksDBCF;
         this.ranges = ranges;
-        this.header = new RocksDBMessageHeader(cfId, sequenceNumber, RocksDBStreamUtils.estimateDataSize(db, ranges),
-                                               RocksDBStreamUtils.estimateNumKeys(db, ranges));
+        this.header = new RocksDBMessageHeader(cfId, sequenceNumber, RocksDBStreamUtils.estimateDataSize(rocksDBCF, ranges),
+                                               RocksDBStreamUtils.estimateNumKeys(rocksDBCF, ranges));
     }
 
     public synchronized void startTransfer()

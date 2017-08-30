@@ -2506,7 +2506,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBUtils.getMinToken(getPartitioner()),
                                                                          RocksDBUtils.getMaxToken(getPartitioner())));
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(this), ranges);
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBCF(metadata.cfId), ranges);
         BufferedDataOutputStreamPlus out = new BufferedDataOutputStreamPlus(new FileOutputStream(outputFile));
         long startTimeMs = System.currentTimeMillis();
         writer.write(out, limit);

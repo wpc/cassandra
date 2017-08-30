@@ -29,30 +29,30 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksIteratorAdapter;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamManager;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 import org.rocksdb.ReadOptions;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
 
 public class RocksDBStreamWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamWriter.class);
     private static final long OUTGOING_BYTES_DELTA_UPDATE_THRESHOLD = 1 * 1024 * 1024;
-    private final RocksDB db;
+    private final RocksDBCF rocksDBCF;
     private final Collection<Range<Token>> ranges;
     private final StreamManager.StreamRateLimiter limiter;
     private final long estimatedTotalSize;
     private StreamSession session = null;
     private long outgoingBytes;
 
-    public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges, StreamManager.StreamRateLimiter limiter, long estimatedTotalSize)
+    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamManager.StreamRateLimiter limiter, long estimatedTotalSize)
     {
-        this.db = db;
+        this.rocksDBCF = rocksDBCF;
         this.ranges = RocksDBStreamUtils.normalizeRanges(ranges);
         this.limiter = limiter;
         this.outgoingBytes = 0;
@@ -60,15 +60,15 @@ public class RocksDBStreamWriter
         RocksdbThroughputManager.getInstance().registerOutgoingStreamWriter(this);
     }
 
-    public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges, StreamSession session, long estimatedTotalSize)
+    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamSession session, long estimatedTotalSize)
     {
-        this(db, ranges, StreamManager.getRateLimiter(session.peer), estimatedTotalSize);
+        this(rocksDBCF, ranges, StreamManager.getRateLimiter(session.peer), estimatedTotalSize);
         this.session = session;
     }
 
-    public RocksDBStreamWriter(RocksDB db, Collection<Range<Token>> ranges)
+    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges)
     {
-        this(db, ranges, new StreamManager.StreamRateLimiter(FBUtilities.getBroadcastAddress()), 0);
+        this(rocksDBCF, ranges, new StreamManager.StreamRateLimiter(FBUtilities.getBroadcastAddress()), 0);
     }
 
     public void write(OutputStream out) throws IOException
@@ -83,7 +83,7 @@ public class RocksDBStreamWriter
         // Iterate through all possible key-value pairs and send to stream.
         outerloop:
         for (Range<Token> range : ranges) {
-            RocksIterator iterator = db.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
+            RocksIteratorAdapter iterator = rocksDBCF.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
             try
             {
                 iterator.seekToFirst();

@@ -53,7 +53,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         assertRows(execute("SELECT v FROM %s WHERE p=?", "merge"), row("old"));
 
         // Write Rocksdb entries into stream.
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBInstance(cfs),
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBCF(cfs.metadata.cfId),
                                                              Arrays.asList(
                                                                           new Range(RocksDBUtils.getMinToken(tokenPartioner),
                                                                                     RocksDBUtils.getMaxToken(tokenPartioner))),

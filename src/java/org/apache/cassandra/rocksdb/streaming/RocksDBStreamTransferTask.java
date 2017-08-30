@@ -24,8 +24,8 @@ import java.util.UUID;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
+import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.streaming.StreamSession;
-import org.rocksdb.RocksDB;
 
 /**
  * StreamTransferTask sends sections of SSTable files in certain ColumnFamily.
@@ -37,9 +37,9 @@ public class RocksDBStreamTransferTask extends AbstractStreamTransferTask
         super(session, cfId);
     }
 
-    public synchronized void addTransferRocksdbFile(UUID cfId, RocksDB db, Collection<Range<Token>> ranges)
+    public synchronized void addTransferRocksdbFile(UUID cfId, RocksDBCF rocksDBCF, Collection<Range<Token>> ranges)
     {
-        RocksDBOutgoingMessage message = new RocksDBOutgoingMessage(cfId, sequenceNumber.getAndIncrement(), db, ranges);
+        RocksDBOutgoingMessage message = new RocksDBOutgoingMessage(cfId, sequenceNumber.getAndIncrement(), rocksDBCF, ranges);
         files.put(message.sequenceNumber, message);
     }
 }

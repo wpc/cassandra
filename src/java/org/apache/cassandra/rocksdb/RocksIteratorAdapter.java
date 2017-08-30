@@ -39,6 +39,11 @@ public class RocksIteratorAdapter
         iterator.next();
     }
 
+    public void seekToFirst()
+    {
+        iterator.seekToFirst();
+    }
+
     public void seek(byte[] key)
     {
         metrics.rocksdbIterSeek.inc();
