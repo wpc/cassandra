@@ -2495,9 +2495,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     }
 
     @Override
-    public String rocksDBSanityCheck()
+    public String rocksDBSanityCheck(boolean randomStartToken, long limit)
     {
-        return SanityCheckUtils.checkSanity(this).toString();
+        return SanityCheckUtils.checkSanity(this, randomStartToken, limit).toString();
     }
 
     @Override

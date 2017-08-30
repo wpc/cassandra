@@ -14,6 +14,7 @@ import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.dht.Token;
 
 /**
  * Compare the rowiterators from Rocksdb and Cassandra and record the consistency.
@@ -22,6 +23,7 @@ public class RowIteratorSanityCheck
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SanityCheckUtils.class);
 
+    private final Token startToken;
     private long partitions;
     private long cassandraMissingPartitions;
     private long rocksDBMissingPartitions;
@@ -34,8 +36,9 @@ public class RowIteratorSanityCheck
     private long rocksDBMissingRows;
     private long mismatchRows;
 
-    public RowIteratorSanityCheck()
+    public RowIteratorSanityCheck(Token startToken)
     {
+        this.startToken = startToken;
         partitions = 0;
         cassandraMissingPartitions = 0;
         rocksDBMissingPartitions = 0;
@@ -160,20 +163,22 @@ public class RowIteratorSanityCheck
 
     public static class Report
     {
-        public long partitions;
-        public long cassandraMissingPartitions;
-        public long rocksDBMissingPartitions;
-        public long mismatcPartitions;
-        public long partitionDeletionMismatch;
-        public long rangeTombstoneSkipped;
+        public final Token startToken;
+        public final long partitions;
+        public final long cassandraMissingPartitions;
+        public final long rocksDBMissingPartitions;
+        public final long mismatcPartitions;
+        public final long partitionDeletionMismatch;
+        public final long rangeTombstoneSkipped;
 
-        public long rows;
-        public long cassandraMissingRows;
-        public long rocksDBMissingRows;
-        public long mismatchRows;
+        public final long rows;
+        public final long cassandraMissingRows;
+        public final long rocksDBMissingRows;
+        public final long mismatchRows;
 
         public Report(RowIteratorSanityCheck comparator)
         {
+            this.startToken = comparator.startToken;
             this.partitions = comparator.partitions;
             this.cassandraMissingPartitions = comparator.cassandraMissingPartitions;
             this.rocksDBMissingPartitions = comparator.rocksDBMissingPartitions;
@@ -191,6 +196,7 @@ public class RowIteratorSanityCheck
         {
             StringBuilder sb = new StringBuilder();
             sb.append("Sanity check result:")
+              .append("\n  start token: ").append(startToken)
               .append("\n  total partitions: ").append(partitions)
               .append("\n    cassandra missing partitions: ").append(cassandraMissingPartitions)
               .append("\n    rocksdb missing partitions: ").append(rocksDBMissingPartitions)

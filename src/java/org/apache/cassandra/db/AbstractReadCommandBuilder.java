@@ -261,14 +261,30 @@ public abstract class AbstractReadCommandBuilder
 
     public static class PartitionRangeBuilder extends AbstractReadCommandBuilder
     {
-        private DecoratedKey startKey;
+        private PartitionPosition startKey;
         private boolean startInclusive;
-        private DecoratedKey endKey;
+        private PartitionPosition endKey;
         private boolean endInclusive;
 
         public PartitionRangeBuilder(ColumnFamilyStore cfs)
         {
             super(cfs);
+        }
+
+        public PartitionRangeBuilder fromToken(Token token, boolean inclusive)
+        {
+            assert startKey == null;
+            this.startInclusive = inclusive;
+            this.startKey = inclusive ? token.minKeyBound() : token.maxKeyBound();
+            return this;
+        }
+
+        public PartitionRangeBuilder toToken(Token token, boolean inclusive)
+        {
+            assert endKey == null;
+            this.endInclusive = inclusive;
+            this.endKey = inclusive ? token.maxKeyBound() : token.minKeyBound();
+            return this;
         }
 
         public PartitionRangeBuilder fromKeyIncl(Object... values)

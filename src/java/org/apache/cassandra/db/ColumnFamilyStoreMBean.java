@@ -178,7 +178,7 @@ public interface ColumnFamilyStoreMBean
     /*
      * Check the consistency between rocksdb and Cassandra storage engine.
      */
-    public String rocksDBSanityCheck();
+    public String rocksDBSanityCheck(boolean randomStartToken, long limit);
 
     public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException;
 
