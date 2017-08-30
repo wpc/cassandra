@@ -27,8 +27,8 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
 
 public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
 {
@@ -53,7 +53,7 @@ public class RocksDBStreamWriterAndReaderTest extends RocksDBStreamTestBase
         assertRows(execute("SELECT v FROM %s WHERE p=?", "merge"), row("old"));
 
         // Write Rocksdb entries into stream.
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBCF(cfs.metadata.cfId),
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksDBEngine.getRocksDBCF(cfs.metadata.cfId),
                                                              Arrays.asList(
                                                                           new Range(RocksDBUtils.getMinToken(tokenPartioner),
                                                                                     RocksDBUtils.getMaxToken(tokenPartioner))),

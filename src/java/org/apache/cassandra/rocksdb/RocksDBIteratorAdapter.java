@@ -19,15 +19,15 @@
 package org.apache.cassandra.rocksdb;
 
 
-import org.apache.cassandra.metrics.RocksdbTableMetrics;
+import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.rocksdb.RocksIterator;
 
-public class RocksIteratorAdapter
+public class RocksDBIteratorAdapter
 {
     private final RocksIterator iterator;
-    private final RocksdbTableMetrics metrics;
+    private final RocksDBTableMetrics metrics;
 
-    RocksIteratorAdapter(RocksIterator rocksIterator, RocksdbTableMetrics metrics)
+    RocksDBIteratorAdapter(RocksIterator rocksIterator, RocksDBTableMetrics metrics)
     {
         this.metrics = metrics;
         this.iterator = rocksIterator;
@@ -35,7 +35,7 @@ public class RocksIteratorAdapter
 
     public void next()
     {
-        metrics.rocksdbIterMove.inc();
+        metrics.rocksDBIterMove.inc();
         iterator.next();
     }
 
@@ -46,7 +46,7 @@ public class RocksIteratorAdapter
 
     public void seek(byte[] key)
     {
-        metrics.rocksdbIterSeek.inc();
+        metrics.rocksDBIterSeek.inc();
         iterator.seek(key);
     }
 
@@ -62,7 +62,7 @@ public class RocksIteratorAdapter
 
     public void prev()
     {
-        metrics.rocksdbIterMove.inc();
+        metrics.rocksDBIterMove.inc();
         iterator.prev();
     }
 

@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.metrics.RocksdbTableMetrics;
+import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
@@ -60,7 +60,7 @@ public class RocksDBCF
     private final IPartitioner partitioner;
     private final RocksDB rocksDB;
     private final Statistics stats;
-    private final RocksdbTableMetrics rocksMetrics;
+    private final RocksDBTableMetrics rocksMetrics;
     private final CassandraCompactionFilter compactionFilter;
 
     private final ReadOptions readOptions;
@@ -121,7 +121,7 @@ public class RocksDBCF
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir, cfs.metadata.params.purgeTtlOnExpiration);
 
-        rocksMetrics = new RocksdbTableMetrics(cfs, stats);
+        rocksMetrics = new RocksDBTableMetrics(cfs, stats);
 
         // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
         // until compaction happens. However in our case, range deletion is only used to remove ranges
@@ -146,7 +146,7 @@ public class RocksDBCF
         return cfID;
     }
 
-    public RocksdbTableMetrics getRocksMetrics()
+    public RocksDBTableMetrics getRocksMetrics()
     {
         return rocksMetrics;
     }
@@ -156,15 +156,15 @@ public class RocksDBCF
         return rocksDB.get(readOptions, key);
     }
 
-    public RocksIteratorAdapter newIterator()
+    public RocksDBIteratorAdapter newIterator()
     {
         return newIterator(readOptions);
     }
 
-    public RocksIteratorAdapter newIterator(ReadOptions options)
+    public RocksDBIteratorAdapter newIterator(ReadOptions options)
     {
-        rocksMetrics.rocksdbIterNew.inc();
-        return new RocksIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
+        rocksMetrics.rocksDBIterNew.inc();
+        return new RocksDBIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
     }
 
     public void merge(byte[] key, byte[] value) throws RocksDBException

@@ -25,12 +25,12 @@ enum PartitionIterOrder
 {
     NORMAL
     {
-        public void moveForward(RocksIteratorAdapter rocksIterator)
+        public void moveForward(RocksDBIteratorAdapter rocksIterator)
         {
             rocksIterator.next();
         }
 
-        public void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+        public void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                 boolean lowerExclusive, boolean upperExclusive)
         {
             if (minKey == null)
@@ -50,12 +50,12 @@ enum PartitionIterOrder
 
     REVERSED
     {
-        public void moveForward(RocksIteratorAdapter rocksIterator)
+        public void moveForward(RocksDBIteratorAdapter rocksIterator)
         {
             rocksIterator.prev();
         }
 
-        public void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+        public void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                 boolean lowerExclusive, boolean upperExclusive)
         {
             if (maxKey == null)
@@ -86,7 +86,7 @@ enum PartitionIterOrder
             }
         }
 
-        private void moveToPartitionEnd(RocksIteratorAdapter rocksIterator, byte[] partitionKey)
+        private void moveToPartitionEnd(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey)
         {
             byte[] maxKey = null;
             while (rocksIterator.isValid())
@@ -106,9 +106,9 @@ enum PartitionIterOrder
         }
     };
 
-    public abstract void moveForward(RocksIteratorAdapter rocksIterator);
+    public abstract void moveForward(RocksDBIteratorAdapter rocksIterator);
 
-    public abstract void seekToStart(RocksIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
+    public abstract void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
                                      boolean lowerExclusive, boolean upperExclusive);
 
 }

@@ -44,7 +44,7 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
@@ -77,7 +77,7 @@ public class RocksDBStreamUtils
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
-        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(cfId);
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfId);
         if (cfs == null || rocksDBCF == null)
             return;
 
@@ -106,7 +106,7 @@ public class RocksDBStreamUtils
                     LOGGER.warn("Ingestion wait interrupted, procceding.");
                 }
             }
-            rocksDBCF.getRocksMetrics().rocksdbIngestWaitTimeHistogram.update(System.currentTimeMillis() - startTime);
+            rocksDBCF.getRocksMetrics().rocksDBIngestWaitTimeHistogram.update(System.currentTimeMillis() - startTime);
             LOGGER.info("Time spend waiting for compaction:" + (System.currentTimeMillis() - startTime));
 
             long ingestStartTime = System.currentTimeMillis();
@@ -115,7 +115,7 @@ public class RocksDBStreamUtils
             }
 
             LOGGER.info("Time spend on ingestion:" + (System.currentTimeMillis() - ingestStartTime));
-            rocksDBCF.getRocksMetrics().rocksdbIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
+            rocksDBCF.getRocksMetrics().rocksDBIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
         }
     }
 

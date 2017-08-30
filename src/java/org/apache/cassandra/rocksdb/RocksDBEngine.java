@@ -52,9 +52,9 @@ import org.apache.cassandra.streaming.StreamSummary;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
-public class RocksEngine implements StorageEngine
+public class RocksDBEngine implements StorageEngine
 {
-    private static final Logger logger = LoggerFactory.getLogger(RocksEngine.class);
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBEngine.class);
 
     public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
 
@@ -102,7 +102,7 @@ public class RocksEngine implements StorageEngine
     {
         try
         {
-            RocksEngine.getRocksDBCF(cfs.metadata.cfId).forceFlush();
+            RocksDBEngine.getRocksDBCF(cfs.metadata.cfId).forceFlush();
         }
         catch (RocksDBException e)
         {
@@ -128,7 +128,7 @@ public class RocksEngine implements StorageEngine
     {
         RocksDBStreamTransferTask task = new RocksDBStreamTransferTask(session, cfId);
         task.addTransferRocksdbFile(cfId,
-                                    RocksEngine.getRocksDBCF(cfId),
+                                    RocksDBEngine.getRocksDBCF(cfId),
                                     ranges);
         return task;
     }
@@ -162,9 +162,9 @@ public class RocksEngine implements StorageEngine
 
     public static RocksDB getRocksDBInstance(ColumnFamilyStore cfs)
     {
-        if (cfs.engine instanceof RocksEngine)
+        if (cfs.engine instanceof RocksDBEngine)
         {
-            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
+            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
         }
         return null;
     }
@@ -172,9 +172,9 @@ public class RocksEngine implements StorageEngine
     public static RocksDB getRocksDBInstance(UUID cfId)
     {
         ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
-        if (cfs != null && cfs.engine instanceof RocksEngine)
+        if (cfs != null && cfs.engine instanceof RocksDBEngine)
         {
-            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfId).getRocksDB();
+            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfId).getRocksDB();
         }
         return null;
     }
@@ -182,9 +182,9 @@ public class RocksEngine implements StorageEngine
     public static RocksDBCF getRocksDBCF(UUID cfId)
     {
         ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
-        if (cfs != null && cfs.engine instanceof RocksEngine)
+        if (cfs != null && cfs.engine instanceof RocksDBEngine)
         {
-            return ((RocksEngine) cfs.engine).rocksDBFamily.get(cfId);
+            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfId);
         }
         return null;
     }

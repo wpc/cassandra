@@ -18,9 +18,7 @@
 
 package org.apache.cassandra.rocksdb.streaming;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import org.junit.Test;
 
@@ -29,8 +27,8 @@ import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
 import org.rocksdb.RocksDB;
 
 public class RocksDBDeleteRangeTest extends RocksDBStreamTestBase
@@ -60,8 +58,8 @@ public class RocksDBDeleteRangeTest extends RocksDBStreamTestBase
         Token midToken = partitioner.midpoint(maxToken, maxToken);
         Range<Token> toRemove = new Range<Token>(minToken, midToken);
 
-        RocksEngine rocksEngine = (RocksEngine)cfs.engine;
-        RocksDB db = RocksEngine.getRocksDBInstance(cfs);
+        RocksDBEngine rocksEngine = (RocksDBEngine)cfs.engine;
+        RocksDB db = RocksDBEngine.getRocksDBInstance(cfs);
         rocksEngine.deleteRange(db, toRemove);
         db.compactRange();
         

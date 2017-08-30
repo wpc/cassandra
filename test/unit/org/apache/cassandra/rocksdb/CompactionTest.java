@@ -34,18 +34,18 @@ public class CompactionTest extends RocksDBTestBase
         createTable("CREATE TABLE %s (p text, v text, PRIMARY KEY (p))");
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v0",
                 System.currentTimeMillis() * 1000 - 140 * 1000000, 80);
-        rocksdbFlush();
+        rocksDBFlush();
 
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v1",
                 System.currentTimeMillis() * 1000 - 120 * 1000000, 80);
 
-        rocksdbFlush();
+        rocksDBFlush();
 
         // An expired column.
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v2",
                 System.currentTimeMillis() * 1000 - 100 * 1000000, 80);
 
-        rocksdbFlush();
+        rocksDBFlush();
 
         SinglePartitionReadCommand readCommand = readCommand("p1", "v");
         assertEquals(1, queryEngine(readCommand).size());
@@ -64,18 +64,18 @@ public class CompactionTest extends RocksDBTestBase
         createTable("CREATE TABLE %s (p text, v text, PRIMARY KEY (p)) WITH purge_ttl_on_expiration = True");
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v0",
                 System.currentTimeMillis() * 1000 - 140 * 1000000, 80);
-        rocksdbFlush();
+        rocksDBFlush();
 
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v1",
                 System.currentTimeMillis() * 1000 - 120 * 1000000, 80);
 
-        rocksdbFlush();
+        rocksDBFlush();
 
         // An expired column.
         execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ? AND TTL ?", "p1", "v2",
                 System.currentTimeMillis() * 1000 - 100 * 1000000, 80);
 
-        rocksdbFlush();
+        rocksDBFlush();
 
         SinglePartitionReadCommand readCommand = readCommand("p1", "v");
         assertEquals(1, queryEngine(readCommand).size());

@@ -24,27 +24,27 @@ public class RowIteratorSanityCheck
 
     private long partitions;
     private long cassandraMissingPartitions;
-    private long rocksdbMissingPartitions;
+    private long rocksDBMissingPartitions;
     private long mismatcPartitions;
     private long partitionDeletionMismatch;
     private long rangeTombstoneSkipped;
 
     private long rows;
     private long cassandraMissingRows;
-    private long rocksdbMissingRows;
+    private long rocksDBMissingRows;
     private long mismatchRows;
 
     public RowIteratorSanityCheck()
     {
         partitions = 0;
         cassandraMissingPartitions = 0;
-        rocksdbMissingPartitions = 0;
+        rocksDBMissingPartitions = 0;
         mismatcPartitions = 0;
         partitionDeletionMismatch = 0;
         rangeTombstoneSkipped = 0;
         rows = 0;
         cassandraMissingRows = 0;
-        rocksdbMissingRows = 0;
+        rocksDBMissingRows = 0;
         mismatchRows = 0;
     }
 
@@ -62,7 +62,7 @@ public class RowIteratorSanityCheck
 
         if (rocksdbPartition == null)
         {
-            rocksdbMissingPartitions++;
+            rocksDBMissingPartitions++;
             return;
         }
         assert (cassandraPartition.partitionKey().equals(rocksdbPartition.partitionKey()));
@@ -88,7 +88,7 @@ public class RowIteratorSanityCheck
         Map<Clustering, Row> rocksdbRows = new HashMap<>();
         while (rocksdbPartition.hasNext())
         {
-            // We don't support range tombstone in RocksEngine yet.
+            // We don't support range tombstone in RocksDBEngine yet.
             Row row = (Row) rocksdbPartition.next();
             LOGGER.info(row.toString());
             rocksdbRows.put(row.clustering(), row);
@@ -116,7 +116,7 @@ public class RowIteratorSanityCheck
             }
             else if (!rocksdbRows.containsKey(c))
             {
-                rocksdbMissingRows++;
+                rocksDBMissingRows++;
                 match = false;
             }
             else
@@ -162,27 +162,27 @@ public class RowIteratorSanityCheck
     {
         public long partitions;
         public long cassandraMissingPartitions;
-        public long rocksdbMissingPartitions;
+        public long rocksDBMissingPartitions;
         public long mismatcPartitions;
         public long partitionDeletionMismatch;
         public long rangeTombstoneSkipped;
 
         public long rows;
         public long cassandraMissingRows;
-        public long rocksdbMissingRows;
+        public long rocksDBMissingRows;
         public long mismatchRows;
 
         public Report(RowIteratorSanityCheck comparator)
         {
             this.partitions = comparator.partitions;
             this.cassandraMissingPartitions = comparator.cassandraMissingPartitions;
-            this.rocksdbMissingPartitions = comparator.rocksdbMissingPartitions;
+            this.rocksDBMissingPartitions = comparator.rocksDBMissingPartitions;
             this.mismatcPartitions = comparator.mismatcPartitions;
             this.partitionDeletionMismatch = comparator.partitionDeletionMismatch;
             this.rangeTombstoneSkipped = comparator.rangeTombstoneSkipped;
             this.rows = comparator.rows;
             this.cassandraMissingRows = comparator.cassandraMissingRows;
-            this.rocksdbMissingRows = comparator.rocksdbMissingRows;
+            this.rocksDBMissingRows = comparator.rocksDBMissingRows;
             this.mismatchRows = comparator.mismatchRows;
         }
 
@@ -193,13 +193,13 @@ public class RowIteratorSanityCheck
             sb.append("Sanity check result:")
               .append("\n  total partitions: ").append(partitions)
               .append("\n    cassandra missing partitions: ").append(cassandraMissingPartitions)
-              .append("\n    rocksdb missing partitions: ").append(rocksdbMissingPartitions)
+              .append("\n    rocksdb missing partitions: ").append(rocksDBMissingPartitions)
               .append("\n    mismatch partitions: ").append(mismatcPartitions)
               .append("\n    mismatch partition deletions: ").append(partitionDeletionMismatch)
               .append("\n    skipped range tombstones: ").append(rangeTombstoneSkipped)
               .append("\n    total rows: ").append(rows)
               .append("\n    cassandra missing rows: ").append(cassandraMissingRows)
-              .append("\n    rocksdb missing rows: ").append(rocksdbMissingRows)
+              .append("\n    rocksdb missing rows: ").append(rocksDBMissingRows)
               .append("\n    mismatched rows: ").append(mismatchRows);
             return sb.toString();
         }

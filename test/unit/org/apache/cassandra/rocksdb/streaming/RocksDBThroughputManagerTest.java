@@ -31,7 +31,7 @@ import org.rocksdb.RocksDBException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class RocksdbThroughputManagerTest extends RocksDBStreamTestBase
+public class RocksDBThroughputManagerTest extends RocksDBStreamTestBase
 {
     private static class DummyStreamWriter extends RocksDBStreamWriter {
 
@@ -93,7 +93,7 @@ public class RocksdbThroughputManagerTest extends RocksDBStreamTestBase
     @Test
     public void testReportsThroughput() throws IOException, RocksDBException
     {
-        RocksdbThroughputManager manager = RocksdbThroughputManager.getInstance();
+        RocksDBThroughputManager manager = RocksDBThroughputManager.getInstance();
         manager.calcluateThroughput();
         assertEquals(manager.getIncomingThroughput(), 0);
         assertEquals(manager.getOutgoingThroughput(), 0);

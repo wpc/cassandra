@@ -21,7 +21,7 @@ package org.apache.cassandra.rocksdb;
 import org.junit.Test;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.metrics.RocksdbTableMetrics;
+import org.apache.cassandra.metrics.RocksDBTableMetrics;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.TestCase.assertTrue;
@@ -34,24 +34,24 @@ public class MetricsTest extends RocksDBTestBase
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
 
-        RocksdbTableMetrics rocksMetrics  = getMetricsForCurrentCF();
-        assertEquals(0, rocksMetrics.rocksdbIterSeek.getCount());
-        assertEquals(0, rocksMetrics.rocksdbIterMove.getCount());
-        assertEquals(0, rocksMetrics.rocksdbIterNew.getCount());
+        RocksDBTableMetrics rocksMetrics  = getMetricsForCurrentCF();
+        assertEquals(0, rocksMetrics.rocksDBIterSeek.getCount());
+        assertEquals(0, rocksMetrics.rocksDBIterMove.getCount());
+        assertEquals(0, rocksMetrics.rocksDBIterNew.getCount());
 
         execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k1", "v1");
         assertRows(execute("SELECT p, c, v FROM %s WHERE p=?", "p1"),
                    row("p1", "k1", "v1"));
 
-        assertTrue(rocksMetrics.rocksdbIterSeek.getCount() > 0);
-        assertTrue(rocksMetrics.rocksdbIterNew.getCount() > 0);
-        assertTrue(rocksMetrics.rocksdbIterMove.getCount() > 0);
+        assertTrue(rocksMetrics.rocksDBIterSeek.getCount() > 0);
+        assertTrue(rocksMetrics.rocksDBIterNew.getCount() > 0);
+        assertTrue(rocksMetrics.rocksDBIterMove.getCount() > 0);
     }
 
-    private RocksdbTableMetrics getMetricsForCurrentCF()
+    private RocksDBTableMetrics getMetricsForCurrentCF()
     {
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(cfs.metadata.cfId);
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
         return rocksDBCF.getRocksMetrics();
     }
 }

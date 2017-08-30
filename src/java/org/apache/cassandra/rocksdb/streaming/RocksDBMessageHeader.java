@@ -19,19 +19,15 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
-import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.utils.Pair;
 
 public class RocksDBMessageHeader
 {
-    public static RocksdbMessageHeaderSerializer SERIALIZER = new RocksdbMessageHeaderSerializer();
+    public static RocksDBMessageHeaderSerializer SERIALIZER = new RocksDBMessageHeaderSerializer();
     public final UUID cfId;
     public final int sequenceNumber;
     public final long estimatedBytes;
@@ -77,7 +73,7 @@ public class RocksDBMessageHeader
         return result;
     }
 
-    static class RocksdbMessageHeaderSerializer
+    static class RocksDBMessageHeaderSerializer
     {
         public void seriliaze(RocksDBMessageHeader header, DataOutputPlus out) throws IOException
         {

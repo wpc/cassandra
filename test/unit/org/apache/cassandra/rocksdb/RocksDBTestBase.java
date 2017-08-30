@@ -98,13 +98,13 @@ public class RocksDBTestBase extends CQLTester
 
     protected void triggerCompaction() throws RocksDBException
     {
-        RocksDB rocksDBInstance = rocksdbFlush();
+        RocksDB rocksDBInstance = rocksDBFlush();
         rocksDBInstance.compactRange();
     }
 
-    protected RocksDB rocksdbFlush() throws RocksDBException
+    protected RocksDB rocksDBFlush() throws RocksDBException
     {
-        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(getCurrentColumnFamilyStore().metadata.cfId);
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(getCurrentColumnFamilyStore().metadata.cfId);
         rocksDBCF.forceFlush();
         return rocksDBCF.getRocksDB();
     }

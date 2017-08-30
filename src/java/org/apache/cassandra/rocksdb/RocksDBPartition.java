@@ -158,7 +158,7 @@ public class RocksDBPartition implements Partition
     {
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
-        RocksIteratorAdapter rocksIterator = db.newIterator();
+        RocksDBIteratorAdapter rocksIterator = db.newIterator();
 
         byte[] minKey = slice.start() == Slice.Bound.BOTTOM ? null :
                              RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metadata);

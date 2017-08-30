@@ -77,12 +77,11 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
-import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
 import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
 import org.apache.cassandra.schema.*;
@@ -2506,7 +2505,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBUtils.getMinToken(getPartitioner()),
                                                                          RocksDBUtils.getMaxToken(getPartitioner())));
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksEngine.getRocksDBCF(metadata.cfId), ranges);
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksDBEngine.getRocksDBCF(metadata.cfId), ranges);
         BufferedDataOutputStreamPlus out = new BufferedDataOutputStreamPlus(new FileOutputStream(outputFile));
         long startTimeMs = System.currentTimeMillis();
         writer.write(out, limit);
@@ -2536,7 +2535,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         try
         {
-            return RocksEngine.getRocksDBCF(metadata.cfId).getProperty(property);
+            return RocksDBEngine.getRocksDBCF(metadata.cfId).getProperty(property);
         } catch (Throwable e) {
             logger.warn("Failed to get rocksBD property " + property, e);
             return "Failed to get property:" + property + ", reason:" + e.toString();

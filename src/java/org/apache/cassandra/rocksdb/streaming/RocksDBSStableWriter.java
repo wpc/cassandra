@@ -52,7 +52,7 @@ public class RocksDBSStableWriter
         this.sstableIngested = 0;
         this.envOptions = new EnvOptions();
         this.options = new Options();
-        RocksdbThroughputManager.getInstance().registerIncomingStreamWriter(this);
+        RocksDBThroughputManager.getInstance().registerIncomingStreamWriter(this);
     }
 
     private synchronized void createSstable() throws IOException, RocksDBException

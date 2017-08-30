@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ning.compress.lzf.LZFOutputStream;
-import com.ning.compress.lzf.util.LZFFileOutputStream;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.marshal.AsciiType;
@@ -44,8 +43,8 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.rocksdb.RocksDBCF;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamPlan;
 import org.apache.cassandra.streaming.StreamResultFuture;
@@ -53,13 +52,12 @@ import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamState;
 import org.apache.cassandra.streaming.messages.StreamMessage;
 import org.apache.cassandra.utils.FBUtilities;
-import org.rocksdb.RocksDB;
 
 import static org.junit.Assert.fail;
 
-public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
+public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RocksdbStreamTransferTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBStreamTransferTest.class);
 
     public static final InetAddress LOCAL = FBUtilities.getBroadcastAddress();
 
@@ -120,7 +118,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             List<Range<Token>> ranges = new ArrayList<>();
             ranges.add(
                       new Range<Token>(RocksDBUtils.getMinToken(inCfs.getPartitioner()),
@@ -172,7 +170,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             transferRanges(inCfs, ranges);
         } finally
         {
@@ -223,7 +221,7 @@ public class RocksdbStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             List<Range<Token>> ranges = new ArrayList<>();
 
             IPartitioner partitioner = inCfs.getPartitioner();

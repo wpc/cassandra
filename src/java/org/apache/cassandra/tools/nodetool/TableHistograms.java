@@ -107,7 +107,7 @@ public class TableHistograms extends NodeToolCmd
         double[] sstablesPerRead = null;
 
         if (probe.isRocksDBBacked(keyspace, table))
-            sstablesPerRead = probe.rocksDBMetricPercentilesAsArray((CassandraMetricsRegistry.JmxHistogramMBean) probe.getRocksdbMetric(keyspace, table, "ReadNumMergeOperands"));
+            sstablesPerRead = probe.rocksDBMetricPercentilesAsArray((CassandraMetricsRegistry.JmxHistogramMBean) probe.getRocksDBMetric(keyspace, table, "ReadNumMergeOperands"));
         else
             sstablesPerRead = probe.metricPercentilesAsArray((CassandraMetricsRegistry.JmxHistogramMBean) probe.getColumnFamilyMetric(keyspace, table, "SSTablesPerReadHistogram"));
 

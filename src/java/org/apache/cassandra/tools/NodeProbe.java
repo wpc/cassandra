@@ -68,7 +68,7 @@ import org.apache.cassandra.gms.GossiperMBean;
 import org.apache.cassandra.db.HintedHandOffManager;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import org.apache.cassandra.metrics.CassandraMetricsRegistry;
-import org.apache.cassandra.metrics.RocksdbTableMetrics;
+import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.metrics.TableMetrics;
@@ -1208,11 +1208,11 @@ public class NodeProbe implements AutoCloseable
      * @param cf ColumnFamily for which stats are to be displayed.
      * @param metricName View {@link TableMetrics}.
      */
-    public Object getRocksdbMetric(String ks, String cf, String metricName)
+    public Object getRocksDBMetric(String ks, String cf, String metricName)
     {
         try
         {
-            ObjectName oName = new ObjectName(String.format("org.apache.cassandra.metrics:type=%s,keyspace=%s,scope=%s,name=%s", RocksdbTableMetrics.RocksMetricNameFactory.TYPE, ks, cf, metricName));
+            ObjectName oName = new ObjectName(String.format("org.apache.cassandra.metrics:type=%s,keyspace=%s,scope=%s,name=%s", RocksDBTableMetrics.RocksMetricNameFactory.TYPE, ks, cf, metricName));
             if (metricName.startsWith("SSTableCountPerLevel") || metricName.equals("PendingCompactionBytes"))
                 return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxGaugeMBean.class);
             else if (metricName.equals("RocksIterMove") || metricName.equals("RocksIterMove") || metricName.equals("RocksIterNew"))

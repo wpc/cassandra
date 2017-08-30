@@ -31,7 +31,7 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.metrics.StreamingMetrics;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.rocksdb.RocksIteratorAdapter;
+import org.apache.cassandra.rocksdb.RocksDBIteratorAdapter;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamManager;
@@ -57,7 +57,7 @@ public class RocksDBStreamWriter
         this.limiter = limiter;
         this.outgoingBytes = 0;
         this.estimatedTotalSize = estimatedTotalSize;
-        RocksdbThroughputManager.getInstance().registerOutgoingStreamWriter(this);
+        RocksDBThroughputManager.getInstance().registerOutgoingStreamWriter(this);
     }
 
     public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamSession session, long estimatedTotalSize)
@@ -83,7 +83,7 @@ public class RocksDBStreamWriter
         // Iterate through all possible key-value pairs and send to stream.
         outerloop:
         for (Range<Token> range : ranges) {
-            RocksIteratorAdapter iterator = rocksDBCF.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
+            RocksDBIteratorAdapter iterator = rocksDBCF.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
             try
             {
                 iterator.seekToFirst();

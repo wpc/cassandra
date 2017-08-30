@@ -29,10 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class RocksdbThroughputManager
+public class RocksDBThroughputManager
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RocksdbThroughputManager.class);
-    private static final RocksdbThroughputManager INSTANCE = new RocksdbThroughputManager();
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBThroughputManager.class);
+    private static final RocksDBThroughputManager INSTANCE = new RocksDBThroughputManager();
     public static long STREAM_THROUGHPUT_PEEK_INTERVAL_MS = 200;
     private final Map<RocksDBStreamWriter, Long> outgoingStreamWriters;
     private final Map<RocksDBSStableWriter, Long> incomingStreamWriters;
@@ -41,12 +41,12 @@ public class RocksdbThroughputManager
     private volatile long outgoingThroughput = 0; /* Byte per second */
     private volatile long incomingThroughput = 0; /* Byte per second */
 
-    public static RocksdbThroughputManager getInstance()
+    public static RocksDBThroughputManager getInstance()
     {
         return INSTANCE;
     }
 
-    private RocksdbThroughputManager()
+    private RocksDBThroughputManager()
     {
         outgoingStreamWriters = new WeakHashMap<RocksDBStreamWriter, Long>();
         incomingStreamWriters = new WeakHashMap<RocksDBSStableWriter, Long>();

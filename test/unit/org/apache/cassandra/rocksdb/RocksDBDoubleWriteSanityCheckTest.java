@@ -36,13 +36,13 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
         RowIteratorSanityCheck.Report report = SanityCheckUtils.checkSanity(cfs);
         assertEquals(report.partitions, 3);
         assertEquals(report.cassandraMissingPartitions, 0);
-        assertEquals(report.rocksdbMissingPartitions, 0);
+        assertEquals(report.rocksDBMissingPartitions, 0);
         assertEquals(report.mismatcPartitions, 0);
         assertEquals(report.partitionDeletionMismatch, 0);
         assertEquals(report.rangeTombstoneSkipped, 0);
         assertEquals(report.rows, 3);
         assertEquals(report.cassandraMissingRows, 0);
-        assertEquals(report.rocksdbMissingRows, 0);
+        assertEquals(report.rocksDBMissingRows, 0);
         assertEquals(report.mismatchRows, 0);
     }
 }

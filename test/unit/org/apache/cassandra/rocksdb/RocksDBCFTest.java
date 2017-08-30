@@ -36,7 +36,7 @@ public class RocksDBCFTest extends RocksDBTestBase
 
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         
-        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(cfs.metadata.cfId);
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
 
         byte[] key = "test_key".getBytes();
         byte[] value = "test_value".getBytes();
@@ -53,7 +53,7 @@ public class RocksDBCFTest extends RocksDBTestBase
 
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
 
-        RocksDBCF rocksDBCF = RocksEngine.getRocksDBCF(cfs.metadata.cfId);
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
 
         byte[] key = "test_key".getBytes();
         byte[] value = "test_value".getBytes();

@@ -30,27 +30,27 @@ import com.codahale.metrics.Histogram;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
-import org.apache.cassandra.rocksdb.RocksEngine;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.encoding.metrics.MetricsFactory;
-import org.apache.cassandra.rocksdb.streaming.RocksdbThroughputManager;
+import org.apache.cassandra.rocksdb.streaming.RocksDBThroughputManager;
 import org.rocksdb.HistogramType;
 import org.rocksdb.Statistics;
 import org.rocksdb.TickerType;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
-public class RocksdbTableMetrics
+public class RocksDBTableMetrics
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RocksdbTableMetrics.class);
-    public final Histogram rocksdbIngestTimeHistogram;
-    public final Histogram rocksdbIngestWaitTimeHistogram;
+    private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBTableMetrics.class);
+    public final Histogram rocksDBIngestTimeHistogram;
+    public final Histogram rocksDBIngestWaitTimeHistogram;
 
-    public final List<Gauge<Integer>> rocksdbNumSstablePerLevel;
-    public final Gauge<Long> rocksdbPendingCompactionBytes;
+    public final List<Gauge<Integer>> rocksDBNumSstablePerLevel;
+    public final Gauge<Long> rocksDBPendingCompactionBytes;
 
-    public final Counter rocksdbIterMove;
-    public final Counter rocksdbIterSeek;
-    public final Counter rocksdbIterNew;
+    public final Counter rocksDBIterMove;
+    public final Counter rocksDBIterSeek;
+    public final Counter rocksDBIterNew;
 
     static
     {
@@ -59,7 +59,7 @@ public class RocksdbTableMetrics
                          {
                              public Long getValue()
                              {
-                                 return RocksdbThroughputManager.getInstance().getOutgoingThroughput();
+                                 return RocksDBThroughputManager.getInstance().getOutgoingThroughput();
                              }
                          });
 
@@ -68,12 +68,12 @@ public class RocksdbTableMetrics
                          {
                              public Long getValue()
                              {
-                                 return RocksdbThroughputManager.getInstance().getIncomingThroughput();
+                                 return RocksDBThroughputManager.getInstance().getIncomingThroughput();
                              }
                          });
     }
 
-    public RocksdbTableMetrics(ColumnFamilyStore cfs, Statistics stats)
+    public RocksDBTableMetrics(ColumnFamilyStore cfs, Statistics stats)
     {
         MetricNameFactory factory = new RocksMetricNameFactory(cfs);
 
@@ -153,21 +153,21 @@ public class RocksdbTableMetrics
         Metrics.register(factory.createMetricName("MergeOperationTotalTime"),
                          MetricsFactory.createCounter(stats, TickerType.MERGE_OPERATION_TOTAL_TIME));
 
-        rocksdbIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
-        rocksdbIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
+        rocksDBIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
+        rocksDBIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
 
-        rocksdbNumSstablePerLevel = new ArrayList<>(RocksDBConfigs.MAX_LEVELS);
+        rocksDBNumSstablePerLevel = new ArrayList<>(RocksDBConfigs.MAX_LEVELS);
         for (int level = 0; level < RocksDBConfigs.MAX_LEVELS; level++)
         {
             final int fLevel = level;
-            rocksdbNumSstablePerLevel.add(Metrics.register(factory.createMetricName("SSTableCountPerLevel." + fLevel),
+            rocksDBNumSstablePerLevel.add(Metrics.register(factory.createMetricName("SSTableCountPerLevel." + fLevel),
                                                            new Gauge<Integer>()
                                                            {
                                                                public Integer getValue()
                                                                {
                                                                    try
                                                                    {
-                                                                       return RocksDBUtils.getNumberOfSstablesByLevel(RocksEngine.getRocksDBInstance(cfs), fLevel);
+                                                                       return RocksDBUtils.getNumberOfSstablesByLevel(RocksDBEngine.getRocksDBInstance(cfs), fLevel);
                                                                    }
                                                                    catch (Throwable e)
                                                                    {
@@ -178,14 +178,14 @@ public class RocksdbTableMetrics
                                                            }));
         }
 
-        rocksdbPendingCompactionBytes = Metrics.register(factory.createMetricName("PendingCompactionBytes"),
+        rocksDBPendingCompactionBytes = Metrics.register(factory.createMetricName("PendingCompactionBytes"),
                                                          new Gauge<Long>()
                                                          {
                                                              public Long getValue()
                                                              {
                                                                  try
                                                                  {
-                                                                     return RocksDBUtils.getPendingCompactionBytes(RocksEngine.getRocksDBInstance(cfs));
+                                                                     return RocksDBUtils.getPendingCompactionBytes(RocksDBEngine.getRocksDBInstance(cfs));
                                                                  }
                                                                  catch (Throwable e)
                                                                  {
@@ -195,9 +195,9 @@ public class RocksdbTableMetrics
                                                              }
                                                          });
 
-        rocksdbIterMove = Metrics.counter(factory.createMetricName("RocksIterMove"));
-        rocksdbIterSeek = Metrics.counter(factory.createMetricName("RocksIterSeek"));
-        rocksdbIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
+        rocksDBIterMove = Metrics.counter(factory.createMetricName("RocksIterMove"));
+        rocksDBIterSeek = Metrics.counter(factory.createMetricName("RocksIterSeek"));
+        rocksDBIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
     }
 
     public static class RocksMetricNameFactory implements MetricNameFactory
