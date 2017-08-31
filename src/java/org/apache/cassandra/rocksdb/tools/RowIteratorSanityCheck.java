@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.cassandra.rocksdb.tools;
 
 import java.security.MessageDigest;
@@ -7,6 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +43,7 @@ public class RowIteratorSanityCheck
     private static final Logger LOGGER = LoggerFactory.getLogger(SanityCheckUtils.class);
 
     private final Token startToken;
+    private final int nowInSecond;
     private long partitions;
     private long cassandraMissingPartitions;
     private long rocksDBMissingPartitions;
@@ -33,12 +53,15 @@ public class RowIteratorSanityCheck
 
     private long rows;
     private long cassandraMissingRows;
+    private long cassandraPurgedRows;
     private long rocksDBMissingRows;
+    private long rocksDBPurgedRows;
     private long mismatchRows;
 
-    public RowIteratorSanityCheck(Token startToken)
+    public RowIteratorSanityCheck(Token startToken, int nowInSecond)
     {
         this.startToken = startToken;
+        this.nowInSecond = nowInSecond;
         partitions = 0;
         cassandraMissingPartitions = 0;
         rocksDBMissingPartitions = 0;
@@ -48,6 +71,8 @@ public class RowIteratorSanityCheck
         rows = 0;
         cassandraMissingRows = 0;
         rocksDBMissingRows = 0;
+        cassandraPurgedRows = 0;
+        rocksDBPurgedRows = 0;
         mismatchRows = 0;
     }
 
@@ -114,13 +139,29 @@ public class RowIteratorSanityCheck
         {
             if (!cassandraRows.containsKey(c))
             {
-                cassandraMissingRows++;
-                match = false;
+                Row rocksdbRow = rocksdbRows.get(c);
+                if (rocksdbRow.hasLiveData(nowInSecond))
+                {
+                    cassandraMissingRows++;
+                    match = false;
+                }
+                else
+                {
+                    cassandraPurgedRows++;
+                }
             }
             else if (!rocksdbRows.containsKey(c))
             {
-                rocksDBMissingRows++;
-                match = false;
+                Row cassandraRow = cassandraRows.get(c);
+                if (cassandraRow.hasLiveData(nowInSecond))
+                {
+                    rocksDBMissingRows++;
+                    match = false;
+                }
+                else
+                {
+                    rocksDBPurgedRows++;
+                }
             }
             else
             {
@@ -150,6 +191,11 @@ public class RowIteratorSanityCheck
         }
     }
 
+    private boolean hasLiveDate(Row row, int nowInSecond)
+    {
+        return Iterables.any(row.cells(), cell -> cell.isLive(nowInSecond));
+    }
+
     public Report getReport()
     {
         return new Report(this);
@@ -173,7 +219,9 @@ public class RowIteratorSanityCheck
 
         public final long rows;
         public final long cassandraMissingRows;
+        public final long cassandraPurgedRows;
         public final long rocksDBMissingRows;
+        public final long rocksDBPurgedRows;
         public final long mismatchRows;
 
         public Report(RowIteratorSanityCheck comparator)
@@ -189,6 +237,8 @@ public class RowIteratorSanityCheck
             this.cassandraMissingRows = comparator.cassandraMissingRows;
             this.rocksDBMissingRows = comparator.rocksDBMissingRows;
             this.mismatchRows = comparator.mismatchRows;
+            this.cassandraPurgedRows = comparator.cassandraPurgedRows;
+            this.rocksDBPurgedRows = comparator.rocksDBPurgedRows;
         }
 
         @Override
@@ -206,6 +256,8 @@ public class RowIteratorSanityCheck
               .append("\n    total rows: ").append(rows)
               .append("\n    cassandra missing rows: ").append(cassandraMissingRows)
               .append("\n    rocksdb missing rows: ").append(rocksDBMissingRows)
+              .append("\n    cassandra purged rows: ").append(cassandraPurgedRows)
+              .append("\n    rocksdb purged rows: ").append(rocksDBPurgedRows)
               .append("\n    mismatched rows: ").append(mismatchRows);
             return sb.toString();
         }

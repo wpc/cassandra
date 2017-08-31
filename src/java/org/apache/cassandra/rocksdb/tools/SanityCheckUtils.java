@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.cassandra.rocksdb.tools;
 
 import java.util.Optional;
@@ -14,6 +32,7 @@ import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.utils.FBUtilities;
 
 public class SanityCheckUtils
 {
@@ -31,11 +50,14 @@ public class SanityCheckUtils
      */
     public static RowIteratorSanityCheck.Report checkSanity(ColumnFamilyStore cfs, boolean randomStartToken, long limit)
     {
+        int nowInSecond = FBUtilities.nowInSeconds();
         Token fromToken = randomStartToken ? cfs.metadata.partitioner.getRandomToken() : cfs.metadata.partitioner.getMinimumToken();
-        InternalPartitionRangeReadCommand command = new InternalPartitionRangeReadCommand((PartitionRangeReadCommand) (new AbstractReadCommandBuilder.PartitionRangeBuilder(cfs).fromToken(fromToken, true)).build());
+        InternalPartitionRangeReadCommand command = new InternalPartitionRangeReadCommand(
+            (PartitionRangeReadCommand) (new AbstractReadCommandBuilder.PartitionRangeBuilder(cfs).fromToken(fromToken, true))
+                                        .withNowInSeconds(nowInSecond).build());
         ReadOrderGroup orderGroup = command.startOrderGroup();
         UnfilteredPartitionIterator partitionIterator = command.queryStorageInternal(cfs, orderGroup);
-        RowIteratorSanityCheck check = new RowIteratorSanityCheck(fromToken);
+        RowIteratorSanityCheck check = new RowIteratorSanityCheck(fromToken, nowInSecond);
         long count = 0;
         while (partitionIterator.hasNext())
         {
@@ -43,7 +65,7 @@ public class SanityCheckUtils
 
             UnfilteredRowIterator rocksdbRowIterator = cfs.engine.queryStorage(
                cfs,
-               SinglePartitionReadCommand.fullPartitionRead(cfs.metadata, 0, // Set time to be zero so we don't trim expring data.
+               SinglePartitionReadCommand.fullPartitionRead(cfs.metadata, nowInSecond,
                                                             cassandraRowIterator.partitionKey()));
             check.compare(cassandraRowIterator, rocksdbRowIterator);
             if (count++ % 1000 == 0)
