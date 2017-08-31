@@ -538,4 +538,24 @@ public class BasicSelectTest extends RocksDBTestBase
                    row(9), row(6));
 
     }
+
+    @Test
+    public void testCompositeRowKey() throws Throwable
+    {
+        createTable("CREATE TABLE %s (k1 varint, k2 int, c int, v int, PRIMARY KEY ((k1, k2), c))");
+
+        BigInteger zero = BigInteger.valueOf(0);
+        for (int i = 0; i < 4; i++)
+            execute("INSERT INTO %s (k1, k2, c, v) VALUES (?, ?, ?, ?)", zero, i, i, i);
+
+        assertRows(execute("SELECT * FROM %s WHERE k1 = ? and k2 = 2", zero),
+                   row(zero, 2, 2, 2));
+
+
+        assertRows(execute("SELECT * FROM %s WHERE k1 = ? and k2 IN (1, 3)", zero),
+                   row(zero, 1, 1, 1),
+                   row(zero, 3, 3, 3));
+
+        assertInvalid("SELECT * FROM %s WHERE k2 = 3");
+    }
 }

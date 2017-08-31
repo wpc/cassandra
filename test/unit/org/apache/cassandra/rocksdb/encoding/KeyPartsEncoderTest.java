@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.UUID;
 
@@ -51,10 +52,9 @@ import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.UUIDGen;
 
-import static org.apache.cassandra.rocksdb.encoding.RowKeyEncoder.encode;
 import static org.junit.Assert.assertTrue;
 
-public class RowKeyEncoderTest
+public class KeyPartsEncoderTest
 {
     private static final long START_EPOCH = -12219292800000L;
 
@@ -238,6 +238,11 @@ public class RowKeyEncoderTest
             keys[i] = encode(createKeyPart(keyVals[i], type));
         }
         assertKeysAreInOrder(keys);
+    }
+
+    private byte[] encode(Pair<AbstractType, ByteBuffer>... keyParts)
+    {
+        return KeyPartsEncoder.encode(Arrays.asList(keyParts));
     }
 
     private void assertKeysAreInOrder(byte[]... keys)
