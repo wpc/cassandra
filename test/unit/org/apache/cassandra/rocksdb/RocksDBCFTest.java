@@ -66,4 +66,23 @@ public class RocksDBCFTest extends RocksDBTestBase
         rocksDBCF.getRocksDB().compactRange();
         assertNull(rocksDBCF.get(key));
     }
+
+    @Test
+    public void testClose() throws RocksDBException
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+
+        byte[] key = "test_key".getBytes();
+        byte[] value = "test_value".getBytes();
+
+        rocksDBCF.merge(key, value);
+
+        assertArrayEquals(value, rocksDBCF.get(key));
+
+        cfs.engine.close(cfs);
+    }
 }

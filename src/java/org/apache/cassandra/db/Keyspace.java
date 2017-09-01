@@ -718,6 +718,15 @@ public class Keyspace
         return Iterables.transform(Schema.SYSTEM_KEYSPACE_NAMES, keyspaceTransformer);
     }
 
+    public void close()
+    {
+        if (engine == null)
+            return;
+
+        for (ColumnFamilyStore cfs : columnFamilyStores.values())
+            engine.close(cfs);
+    }
+
     @Override
     public String toString()
     {

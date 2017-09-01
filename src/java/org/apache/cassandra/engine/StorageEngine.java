@@ -48,6 +48,8 @@ public interface StorageEngine
 
     void truncate(final ColumnFamilyStore cfs);
 
+    void close(final ColumnFamilyStore cfs);
+
     /**
      *  Streaming APIs
      */

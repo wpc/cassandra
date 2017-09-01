@@ -56,6 +56,7 @@ public class RocksDBCF
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private final UUID cfID;
+    private final ColumnFamilyStore cfs;
     private final IPartitioner partitioner;
     private final RocksDBEngine engine;
     private final RocksDB rocksDB;
@@ -70,6 +71,7 @@ public class RocksDBCF
     
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
+        this.cfs = cfs;
         cfID = cfs.metadata.cfId;
         partitioner = cfs.getPartitioner();
         engine = (RocksDBEngine) cfs.engine;
@@ -185,6 +187,7 @@ public class RocksDBCF
 
     public void forceFlush() throws RocksDBException
     {
+        logger.info("Flushing rocksdb table: " + cfs.name);
         rocksDB.flush(flushOptions);
     }
 
@@ -198,5 +201,17 @@ public class RocksDBCF
         // TODO: use delete range for now, could have a better solution
         rocksDB.deleteRange(RowKeyEncoder.encodeToken(RocksDBUtils.getMinToken(partitioner)),
                             RowKeyEncoder.encodeToken(RocksDBUtils.getMaxToken(partitioner)));
+    }
+
+    protected void close() throws RocksDBException
+    {
+        logger.info("Closing rocksdb table: " + cfs.name);
+        synchronized (engine.rocksDBFamily)
+        {
+            rocksDB.close();
+            
+            // remove the rocksdb instance, since it's not usable
+            engine.rocksDBFamily.remove(cfID);
+        }
     }
 }

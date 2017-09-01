@@ -108,7 +108,12 @@ public class RocksDBEngine implements StorageEngine
     {
         try
         {
-            RocksDBEngine.getRocksDBCF(cfs.metadata.cfId).forceFlush();
+            RocksDBCF rocksDBCF = getRocksDBCF(cfs);
+
+            if (rocksDBCF != null)
+                rocksDBCF.forceFlush();
+            else
+                logger.info("Can not find rocksdb table: " + cfs.metadata.cfId);
         }
         catch (RocksDBException e)
         {
@@ -120,7 +125,30 @@ public class RocksDBEngine implements StorageEngine
     {
         try
         {
-            getRocksDBCF(cfs.metadata.cfId).truncate();
+            RocksDBCF rocksDBCF = getRocksDBCF(cfs);
+
+            if (rocksDBCF != null)
+                rocksDBCF.truncate();
+            else
+                logger.info("Can not find rocksdb table: " + cfs.name);
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
+        }
+    }
+
+    public void close(ColumnFamilyStore cfs)
+    {
+        try
+        {
+            RocksDBCF rocksDBCF = getRocksDBCF(cfs);
+            if (rocksDBCF != null)
+            {
+                rocksDBCF.close();
+            }
+            else
+                logger.info("Can not find rocksdb table: " + cfs.name);
         }
         catch (RocksDBException e)
         {
@@ -175,22 +203,17 @@ public class RocksDBEngine implements StorageEngine
         return null;
     }
 
-    public static RocksDB getRocksDBInstance(UUID cfId)
-    {
-        ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
-        if (cfs != null && cfs.engine instanceof RocksDBEngine)
-        {
-            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfId).getRocksDB();
-        }
-        return null;
-    }
-
     public static RocksDBCF getRocksDBCF(UUID cfId)
     {
         ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
+        return getRocksDBCF(cfs);
+    }
+
+    public static RocksDBCF getRocksDBCF(final ColumnFamilyStore cfs)
+    {
         if (cfs != null && cfs.engine instanceof RocksDBEngine)
         {
-            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfId);
+            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId);
         }
         return null;
     }
