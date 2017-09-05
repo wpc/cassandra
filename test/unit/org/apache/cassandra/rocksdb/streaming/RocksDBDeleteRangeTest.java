@@ -27,6 +27,7 @@ import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.rocksdb.RocksDB;
@@ -59,7 +60,7 @@ public class RocksDBDeleteRangeTest extends RocksDBStreamTestBase
         Range<Token> toRemove = new Range<Token>(minToken, midToken);
 
         RocksDBEngine rocksEngine = (RocksDBEngine)cfs.engine;
-        RocksDB db = RocksDBEngine.getRocksDBInstance(cfs);
+        RocksDBCF db = RocksDBEngine.getRocksDBCF(cfs);
         rocksEngine.deleteRange(db, toRemove);
         db.compactRange();
         

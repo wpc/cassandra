@@ -194,15 +194,6 @@ public class RocksDBEngine implements StorageEngine
         }
     }
 
-    public static RocksDB getRocksDBInstance(ColumnFamilyStore cfs)
-    {
-        if (cfs.engine instanceof RocksDBEngine)
-        {
-            return ((RocksDBEngine) cfs.engine).rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
-        }
-        return null;
-    }
-
     public static RocksDBCF getRocksDBCF(UUID cfId)
     {
         ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(cfId);
@@ -229,7 +220,7 @@ public class RocksDBEngine implements StorageEngine
         }
         final Collection<Range<Token>> ranges = StorageService.instance.getLocalRanges(keyspace.getName());
         final Collection<Range<Token>> completeRanges = RocksDBStreamUtils.calcluateComplementRanges(cfs.getPartitioner(), ranges);
-        RocksDB db = rocksDBFamily.get(cfs.metadata.cfId).getRocksDB();
+        RocksDBCF db = rocksDBFamily.get(cfs.metadata.cfId);
         for (Range range : completeRanges)
         {
             try
@@ -246,7 +237,7 @@ public class RocksDBEngine implements StorageEngine
     }
 
     @VisibleForTesting
-    public void deleteRange(RocksDB db, Range<Token> range) throws RocksDBException
+    public void deleteRange(RocksDBCF db, Range<Token> range) throws RocksDBException
     {
         db.deleteRange(RowKeyEncoder.encodeToken(range.left), RowKeyEncoder.encodeToken(range.right));
     }

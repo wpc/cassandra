@@ -185,6 +185,16 @@ public class RocksDBCF
         }
     }
 
+    public void deleteRange(byte[] start, byte[] end) throws RocksDBException
+    {
+        rocksDB.deleteRange(start, end);
+    }
+
+    public void compactRange() throws RocksDBException
+    {
+        rocksDB.compactRange();
+    }
+
     public void forceFlush() throws RocksDBException
     {
         logger.info("Flushing rocksdb table: " + cfs.name);

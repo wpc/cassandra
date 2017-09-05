@@ -63,7 +63,7 @@ public class RocksDBCFTest extends RocksDBTestBase
 
         rocksDBCF.truncate();
 
-        rocksDBCF.getRocksDB().compactRange();
+        rocksDBCF.compactRange();
         assertNull(rocksDBCF.get(key));
     }
 

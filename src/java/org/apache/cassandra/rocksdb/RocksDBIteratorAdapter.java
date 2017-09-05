@@ -22,7 +22,7 @@ package org.apache.cassandra.rocksdb;
 import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.rocksdb.RocksIterator;
 
-public class RocksDBIteratorAdapter
+public class RocksDBIteratorAdapter implements AutoCloseable
 {
     private final RocksIterator iterator;
     private final RocksDBTableMetrics metrics;
