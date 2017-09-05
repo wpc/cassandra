@@ -690,12 +690,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     private boolean shouldBootstrap()
     {
-        return DatabaseDescriptor.isAutoBootstrap() && !SystemKeyspace.bootstrapComplete() && !isSeed();
-    }
-
-    public static boolean isSeed()
-    {
-        return DatabaseDescriptor.getSeeds().contains(FBUtilities.getBroadcastAddress());
+        return DatabaseDescriptor.isAutoBootstrap() && !SystemKeyspace.bootstrapComplete() && !DatabaseDescriptor.getSeeds().contains(FBUtilities.getBroadcastAddress());
     }
 
     private void prepareToJoin() throws ConfigurationException
@@ -767,27 +762,6 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
     }
 
-    private void waitForSchema(int delay)
-    {
-        // first sleep the delay to make sure we see all our peers
-        for (int i = 0; i < delay; i += 1000)
-        {
-            // if we see schema, we can proceed to the next check directly
-            if (!Schema.instance.getVersion().equals(Schema.emptyVersion))
-            {
-                logger.info("got schema: {}", Schema.instance.getVersion());
-                break;
-            }
-            Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-        }
-        // if our schema hasn't matched yet, keep sleeping until it does
-        // (post CASSANDRA-1391 we don't expect this to be necessary very often, but it doesn't hurt to be careful)
-        while (!MigrationManager.isReadyForBootstrap())
-        {
-            Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-        }
-    }
-
     private void joinTokenRing(int delay) throws ConfigurationException
     {
         joined = true;
@@ -823,7 +797,25 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             else
                 SystemKeyspace.setBootstrapState(SystemKeyspace.BootstrapState.IN_PROGRESS);
             setMode(Mode.JOINING, "waiting for ring information", true);
-            waitForSchema(delay);
+            // first sleep the delay to make sure we see all our peers
+            for (int i = 0; i < delay; i += 1000)
+            {
+                // if we see schema, we can proceed to the next check directly
+                if (!Schema.instance.getVersion().equals(Schema.emptyVersion))
+                {
+                    logger.debug("got schema: {}", Schema.instance.getVersion());
+                    break;
+                }
+                Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+            }
+            // if our schema hasn't matched yet, wait until it has
+            // we do this by waiting for all in-flight migration requests and responses to complete
+            // (post CASSANDRA-1391 we don't expect this to be necessary very often, but it doesn't hurt to be careful)
+            if (!MigrationManager.isReadyForBootstrap())
+            {
+                setMode(Mode.JOINING, "waiting for schema information to complete", true);
+                MigrationManager.waitUntilReadyForBootstrap();
+            }
             setMode(Mode.JOINING, "schema complete, ready to bootstrap", true);
             setMode(Mode.JOINING, "waiting for pending range calculation", true);
             PendingRangeCalculatorService.instance.blockUntilFinished();
@@ -906,8 +898,22 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             bootstrapTokens = SystemKeyspace.getSavedTokens();
             if (bootstrapTokens.isEmpty())
             {
-                waitForSchema(delay);
-                bootstrapTokens = BootStrapper.getBootstrapTokens(tokenMetadata, FBUtilities.getBroadcastAddress());
+                Collection<String> initialTokens = DatabaseDescriptor.getInitialTokens();
+                if (initialTokens.size() < 1)
+                {
+                    bootstrapTokens = BootStrapper.getRandomTokens(tokenMetadata, DatabaseDescriptor.getNumTokens());
+                    if (DatabaseDescriptor.getNumTokens() == 1)
+                        logger.warn("Generated random token {}. Random tokens will result in an unbalanced ring; see http://wiki.apache.org/cassandra/Operations", bootstrapTokens);
+                    else
+                        logger.info("Generated random tokens. tokens are {}", bootstrapTokens);
+                }
+                else
+                {
+                    bootstrapTokens = new ArrayList<>(initialTokens.size());
+                    for (String token : initialTokens)
+                        bootstrapTokens.add(getTokenFactory().fromString(token));
+                    logger.info("Saved tokens not found. Using configuration value: {}", bootstrapTokens);
+                }
             }
             else
             {

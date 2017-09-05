@@ -38,7 +38,6 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.TokenMetadata;
-import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.*;
 import org.apache.cassandra.utils.progress.ProgressEvent;
 import org.apache.cassandra.utils.progress.ProgressEventNotifierSupport;
@@ -170,7 +169,7 @@ public class BootStrapper extends ProgressEventNotifierSupport
         if (numTokens < 1)
             throw new ConfigurationException("num_tokens must be >= 1");
 
-        if (!StorageService.isSeed() && allocationKeyspace != null)
+        if (allocationKeyspace != null)
             return allocateTokens(metadata, address, allocationKeyspace, numTokens);
 
         if (numTokens == 1)
@@ -182,7 +181,7 @@ public class BootStrapper extends ProgressEventNotifierSupport
     private static Collection<Token> getSpecifiedTokens(final TokenMetadata metadata,
                                                         Collection<String> initialTokens)
     {
-        logger.info("tokens manually specified as {}",  initialTokens);
+        logger.trace("tokens manually specified as {}",  initialTokens);
         List<Token> tokens = new ArrayList<>(initialTokens.size());
         for (String tokenString : initialTokens)
         {
@@ -216,8 +215,6 @@ public class BootStrapper extends ProgressEventNotifierSupport
             if (metadata.getEndpoint(token) == null)
                 tokens.add(token);
         }
-
-        logger.info("Generated random tokens. tokens are {}", tokens);
         return tokens;
     }
 
