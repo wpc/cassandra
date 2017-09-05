@@ -27,20 +27,20 @@ import java.util.TreeMap;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.IEndpointSnitch;
 import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.SimpleStrategy;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.locator.TokenMetadata.Topology;
-import org.apache.cassandra.utils.FBUtilities;
 
 public class TokenAllocation
 {
@@ -51,9 +51,6 @@ public class TokenAllocation
                                                    final InetAddress endpoint,
                                                    int numTokens)
     {
-        if (!FBUtilities.getBroadcastAddress().equals(InetAddress.getLoopbackAddress()))
-            Gossiper.waitForGossipToSettle();
-
         TokenMetadata tokenMetadataCopy = tokenMetadata.cloneOnlyTokenMap();
         StrategyAdapter strategy = getStrategy(tokenMetadataCopy, rs, endpoint);
         Collection<Token> tokens = create(tokenMetadata, strategy).addUnit(endpoint, numTokens);
@@ -200,31 +197,6 @@ public class TokenAllocation
     {
         final String dc = snitch.getDatacenter(endpoint);
         final int replicas = rs.getReplicationFactor(dc);
-
-        if (replicas == 0 || replicas == 1)
-        {
-            // No replication, each node treated as separate.
-            return new StrategyAdapter()
-            {
-                @Override
-                public int replicas()
-                {
-                    return replicas;
-                }
-
-                @Override
-                public Object getGroup(InetAddress unit)
-                {
-                    return unit;
-                }
-
-                @Override
-                public boolean inAllocationRing(InetAddress other)
-                {
-                    return dc.equals(snitch.getDatacenter(other));
-                }
-            };
-        }
 
         Topology topology = tokenMetadata.getTopology();
         int racks = topology.getDatacenterRacks().get(dc).asMap().size();
