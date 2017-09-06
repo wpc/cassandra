@@ -24,6 +24,7 @@ import org.apache.cassandra.db.ColumnFamilyStore;
 import org.rocksdb.RocksDBException;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 
@@ -84,5 +85,22 @@ public class RocksDBCFTest extends RocksDBTestBase
         assertArrayEquals(value, rocksDBCF.get(key));
 
         cfs.engine.close(cfs);
+    }
+
+    @Test
+    public void testDumpPrefix() throws Exception
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+
+        rocksDBCF.merge("test_key1".getBytes(), "test_value11".getBytes());
+        rocksDBCF.merge("test_key1".getBytes(), "test_value12".getBytes());
+        rocksDBCF.merge("test_key2".getBytes(), "test_value2".getBytes());
+
+        String dump = rocksDBCF.dumpPrefix("test_key".getBytes(), Integer.MAX_VALUE);
+        assertEquals(2, dump.split("\n").length);
+        String dumpLimited = rocksDBCF.dumpPrefix("test_key".getBytes(), 1);
+        assertEquals(1, dumpLimited.split("\n").length);
     }
 }

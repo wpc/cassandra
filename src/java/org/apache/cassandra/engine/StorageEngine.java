@@ -66,4 +66,9 @@ public interface StorageEngine
 
     long load();
 
+    /**
+     * Dump low level partition data for debugging purpose
+     * used by 'nodetool dumppartition'.
+     */
+    String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit);
 }

@@ -187,4 +187,6 @@ public interface ColumnFamilyStoreMBean
     public String getRocksDBProperty(String property);
 
     public boolean isRocksDBBacked();
+
+    String dumpPartition(String partitionKey, int limit);
 }

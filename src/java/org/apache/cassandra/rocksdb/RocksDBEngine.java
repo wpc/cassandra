@@ -18,7 +18,9 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -27,6 +29,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.cql3.Terms;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
@@ -42,6 +46,7 @@ import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
@@ -49,6 +54,7 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
+import org.apache.cassandra.utils.Hex;
 import org.rocksdb.RateLimiter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -262,5 +268,21 @@ public class RocksDBEngine implements StorageEngine
             }
         }
         return result;
+    }
+
+    @Override
+    public String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit)
+    {
+        List<ColumnDefinition> keyColumns = cfs.metadata.partitionKeyColumns();
+        if (keyColumns.size() > 1)
+        {
+            throw new UnsupportedOperationException("Composite partition key is not supported");
+        }
+
+        ByteBuffer keyBytes = Terms.asBytes(cfs.keyspace.getName(), partitionKey, keyColumns.get(0).type);
+        DecoratedKey decoratedKey = cfs.metadata.partitioner.decorateKey(keyBytes);
+        byte[] rocksKeyPrefix = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
+        RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
+        return rocksDBCF.dumpPrefix(rocksKeyPrefix, limit);
     }
 }

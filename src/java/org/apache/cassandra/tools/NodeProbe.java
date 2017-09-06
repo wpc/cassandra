@@ -1438,6 +1438,11 @@ public class NodeProbe implements AutoCloseable
         return cfsProxy.isRocksDBBacked();
     }
 
+    public String dumpPartition(String keyspace, String table, String partitionKey, int limit)
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
+        return cfsProxy.dumpPartition(partitionKey, limit);
+    }
 }
 
 class ColumnFamilyStoreMBeanIterator implements Iterator<Map.Entry<String, ColumnFamilyStoreMBean>>

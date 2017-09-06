@@ -30,6 +30,8 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
+import org.apache.cassandra.utils.Hex;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CassandraCompactionFilter;
@@ -68,7 +70,7 @@ public class RocksDBCF
     private final WriteOptions disableWAL;
     private final FlushOptions flushOptions;
     private final CassandraValueMergeOperator mergeOperator;
-    
+
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
         this.cfs = cfs;
@@ -219,9 +221,44 @@ public class RocksDBCF
         synchronized (engine.rocksDBFamily)
         {
             rocksDB.close();
-            
+
             // remove the rocksdb instance, since it's not usable
             engine.rocksDBFamily.remove(cfID);
         }
+    }
+
+    public String dumpPrefix(byte[] rocksKeyPrefix, int limit)
+    {
+        StringBuilder sb = new StringBuilder();
+        try (RocksDBIteratorAdapter rocksIterator = newIterator())
+        {
+            rocksIterator.seek(rocksKeyPrefix);
+            while (limit > 0 && rocksIterator.isValid())
+            {
+                byte[] key = rocksIterator.key();
+                if (!Bytes.startsWith(key, rocksKeyPrefix))
+                {
+                    break;
+                }
+                sb.append("0x")
+                  .append(Hex.bytesToHex(key))
+                  .append('\t');
+
+                byte[] value = rocksIterator.value();
+                if (value == null)
+                {
+                    sb.append("null\n");
+                }
+                else
+                {
+                    sb.append("0x")
+                      .append(Hex.bytesToHex(value))
+                      .append('\n');
+                }
+                limit--;
+                rocksIterator.next();
+            }
+        }
+        return sb.toString();
     }
 }

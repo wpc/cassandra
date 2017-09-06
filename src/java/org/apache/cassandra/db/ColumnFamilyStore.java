@@ -2545,4 +2545,23 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             return "Failed to get property:" + property + ", reason:" + e.toString();
         }
     }
+
+    @Override
+    public String dumpPartition(String partitionKey, int limit)
+    {
+        if (engine == null)
+        {
+            return "operation is not supported by current storage engine";
+        }
+
+        try
+        {
+            return engine.dumpPartition(this, partitionKey, limit);
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Failed to dump parition " + partitionKey, e);
+            return "Failed to dump:" + partitionKey + ", reason:" + e.toString();
+        }
+    }
 }
