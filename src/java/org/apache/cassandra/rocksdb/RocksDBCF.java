@@ -80,11 +80,14 @@ public class RocksDBCF
 
         final long writeBufferSize = 8 * 512 * 1024 * 1024L;
         final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
+        int gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
+        boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
         DBOptions dbOptions = new DBOptions();
         stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
-        compactionFilter = new CassandraCompactionFilter(cfs.metadata.params.purgeTtlOnExpiration);
-        mergeOperator = new CassandraValueMergeOperator(cfs.metadata.params.gcGraceSeconds);
+
+        compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
+        mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds);
 
         dbOptions.setCreateIfMissing(true);
         dbOptions.setAllowConcurrentMemtableWrite(true);
@@ -121,8 +124,9 @@ public class RocksDBCF
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
         rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
-        logger.info("Open rocksdb instance for cf {}.{} with path:{}, purgeTTL:{}",
-                    cfs.keyspace.getName(), cfs.name, rocksDBTableDir, cfs.metadata.params.purgeTtlOnExpiration);
+        logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
+                    cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
+                    gcGraceSeconds, purgeTtlOnExpiration);
 
         rocksMetrics = new RocksDBTableMetrics(cfs, stats);
 
@@ -142,11 +146,6 @@ public class RocksDBCF
     public Statistics getStatistics()
     {
         return stats;
-    }
-
-    public UUID getCfID()
-    {
-        return cfID;
     }
 
     public RocksDBTableMetrics getRocksMetrics()

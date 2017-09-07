@@ -18,9 +18,20 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.nio.ByteBuffer;
+
 import org.junit.Test;
 
+import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.rows.BTreeRow;
+import org.apache.cassandra.db.rows.BufferCell;
+import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.encoding.value.ColumnEncoder;
+import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
+import org.apache.cassandra.utils.Hex;
 import org.rocksdb.RocksDBException;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -38,13 +49,19 @@ public class RocksDBCFTest extends RocksDBTestBase
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
-
         byte[] key = "test_key".getBytes();
-        byte[] value = "test_value".getBytes();
-
+        byte[] value = encodeValue(cfs, "test_value");
         rocksDBCF.merge(key, value);
-
         assertArrayEquals(value, rocksDBCF.get(key));
+    }
+
+    private byte[] encodeValue(ColumnFamilyStore cfs, String value)
+    {
+        Row.Builder builder = BTreeRow.sortedBuilder();
+        ColumnDefinition v = cfs.metadata.getColumnDefinition(ColumnIdentifier.getInterned("v", true));
+        BufferCell cell = BufferCell.live(cfs.metadata, v, 0, ByteBuffer.wrap(value.getBytes()));
+        builder.addCell(cell);
+        return RowValueEncoder.encode(cfs.metadata, builder.build());
     }
 
     @Test
@@ -57,7 +74,7 @@ public class RocksDBCFTest extends RocksDBTestBase
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
 
         byte[] key = "test_key".getBytes();
-        byte[] value = "test_value".getBytes();
+        byte[] value = encodeValue(cfs, "test_value");
 
         rocksDBCF.merge(key, value);
         assertArrayEquals(value, rocksDBCF.get(key));
@@ -78,7 +95,7 @@ public class RocksDBCFTest extends RocksDBTestBase
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
 
         byte[] key = "test_key".getBytes();
-        byte[] value = "test_value".getBytes();
+        byte[] value = encodeValue(cfs, "test_value");
 
         rocksDBCF.merge(key, value);
 

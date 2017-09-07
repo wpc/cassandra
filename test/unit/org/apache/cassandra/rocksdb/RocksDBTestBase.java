@@ -128,4 +128,14 @@ public class RocksDBTestBase extends CQLTester
                                               key,
                                               sliceFilter);
     }
+
+    protected int numOfRocksdbKeysInPartition(String partitionKey, ColumnFamilyStore cfs)
+    {
+        return getCurrentEngine().dumpPartition(cfs, partitionKey, Integer.MAX_VALUE).split("\n").length;
+    }
+
+    private StorageEngine getCurrentEngine()
+    {
+        return getCurrentColumnFamilyStore().engine;
+    }
 }

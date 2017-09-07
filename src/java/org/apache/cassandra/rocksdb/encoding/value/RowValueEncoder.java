@@ -71,7 +71,6 @@ public class RowValueEncoder
         for (ColumnDefinition c : metaData.partitionColumns())
         {
             Cell cell = row.getCell(c);
-            ;
             if (cell != null)
             {
                 encodeColumn(index, cell, buff);

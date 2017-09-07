@@ -20,7 +20,9 @@ package org.apache.cassandra.rocksdb;
 
 import org.junit.Test;
 
+import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.engine.StorageEngine;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -85,5 +87,32 @@ public class CompactionTest extends RocksDBTestBase
 
         assertEquals(0, queryEngine(readCommand).size());
         assertRows(execute("SELECT p, v FROM %s WHERE p=?", "p1"));
+    }
+
+    @Test
+    public void testTombstoneCellAreRemovedAfterGCGracePassed() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, t text, v text, PRIMARY KEY (p, t)) WITH gc_grace_seconds=0");
+        SinglePartitionReadCommand readCommand = readCommand("p0", "v");
+        execute("INSERT INTO %s (p, t, v) values (?, ?, ?)",
+                "p0", "t0", "v0");
+        execute("INSERT INTO %s (p, t, v) values (?, ?, ?)",
+                "p0", "t1", "v1");
+        execute("INSERT INTO %s (p, t, v) values (?, ?, ?)",
+                "p1", "t0", "v0");
+        rocksDBFlush();
+        execute("DELETE v FROM %s WHERE p=? AND t=?",
+                "p0", "t0");
+        execute("DELETE v FROM %s WHERE p=? AND t=?",
+                "p0", "t1");
+        rocksDBFlush();
+
+        assertEquals(0, queryEngine(readCommand).size());
+        assertEquals(2, numOfRocksdbKeysInPartition("'p0'", getCurrentColumnFamilyStore()));
+
+        triggerCompaction();
+        triggerCompaction(); // trigger compaction twice since we gc and remove key in different cycle
+        assertEquals(0, queryEngine(readCommand).size());
+        assertTrue(numOfRocksdbKeysInPartition("'p0'", getCurrentColumnFamilyStore()) < 2);
     }
 }

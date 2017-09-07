@@ -503,7 +503,7 @@
                 artifactId="cassandra-parent"
                 version="${version}"/>
         <dependency groupId="org.json" artifactId="json" version="20160212" />
-        <dependency groupId="org.rocksdb" artifactId="rocksdbjni" version="5.7.0" scope="system" systemPath="${basedir}/lib/rocksdbjni-5.7.0.jar"/>
+        <dependency groupId="org.rocksdb" artifactId="rocksdbjni" version="5.8.0" scope="system" systemPath="${basedir}/lib/rocksdbjni-5.8.0.jar"/>
         <dependency groupId="io.netty" artifactId="netty" version="3.10.5.Final" />
         <dependency groupId="io.airlift" artifactId="log" version="0.134" />
         <dependency groupId="org.iq80.snappy" artifactId="snappy" version="0.3" />
