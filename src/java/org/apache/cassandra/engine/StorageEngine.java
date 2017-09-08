@@ -50,6 +50,8 @@ public interface StorageEngine
 
     void close(final ColumnFamilyStore cfs);
 
+    void setCompactionThroughputMbPerSec(int throughputMbPerSec);
+
     /**
      *  Streaming APIs
      */

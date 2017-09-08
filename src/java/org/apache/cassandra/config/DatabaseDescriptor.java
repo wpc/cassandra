@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Key;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -41,6 +42,7 @@ import org.apache.cassandra.config.Config.RequestSchedulerId;
 import org.apache.cassandra.config.EncryptionOptions.ClientEncryptionOptions;
 import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -1217,6 +1219,13 @@ public class DatabaseDescriptor
     public static void setCompactionThroughputMbPerSec(int value)
     {
         conf.compaction_throughput_mb_per_sec = value;
+
+        for (String ksName : Schema.instance.getNonSystemKeyspaces())
+        {
+            Keyspace keyspace = Keyspace.open(ksName);
+            if (keyspace.engine != null)
+                keyspace.engine.setCompactionThroughputMbPerSec(value);
+        }
     }
 
     public static int getCompactionLargePartitionWarningThreshold() { return conf.compaction_large_partition_warning_threshold_mb * 1024 * 1024; }

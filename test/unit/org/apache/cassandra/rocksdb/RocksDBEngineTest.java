@@ -42,4 +42,23 @@ public class RocksDBEngineTest extends RocksDBTestBase
         String dump = engine.dumpPartition(cfs, "'p1'", Integer.MAX_VALUE);
         assertEquals(2, dump.split("\n").length);
     }
+
+    @Test
+    public void testSetCompactionThroughput() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k1", "v1");
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k2", "v2");
+
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF cf = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+        cf.forceFlush();
+
+        cfs.engine.setCompactionThroughputMbPerSec(1);
+        assertEquals(1, ((RocksDBEngine)cfs.engine).compactionthroughputMbPerSec);
+        cfs.engine.forceMajorCompaction(cfs);
+
+        assertTrue(RocksDBProperty.getEstimatedLiveDataSize(cf) > 0);
+    }
 }

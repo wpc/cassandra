@@ -23,7 +23,7 @@ public class RocksDBConfigs
 
     // rateBytesPerSecond for RocksDB's rate limiter, which is used to control write rate of flush and compaction.
     // It's per keyspace, and shared across all RocksDB instances within the same keyspace.
-    public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandrda.rocksdb.rate_mbytes_per_second", 150);
+    public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
 
     /**
      * Streaming configs

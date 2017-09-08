@@ -1,14 +1,9 @@
 package org.apache.cassandra.rocksdb;
 
-import java.util.UUID;
-
 import org.junit.Test;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.metrics.StorageMetrics;
-import org.rocksdb.FlushOptions;
-import org.rocksdb.RocksDB;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -32,5 +27,4 @@ public class RocksDBPropertyTest extends RocksDBTestBase
         assertEquals(RocksDBProperty.getPendingCompactionBytes(cf), 0);
         assertTrue(StorageMetrics.getStorageEngineLoad() > 0);
     }
-
 }

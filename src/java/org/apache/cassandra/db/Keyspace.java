@@ -304,7 +304,7 @@ public class Keyspace
         createReplicationStrategy(metadata);
 
         if (keyspaceName.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
-            engine = new RocksDBEngine();
+            engine = new RocksDBEngine(this);
         else
             engine = null;
 
@@ -325,7 +325,7 @@ public class Keyspace
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
         if (metadata.name.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
-            engine = new RocksDBEngine();
+            engine = new RocksDBEngine(this);
         else
             engine = null;
     }

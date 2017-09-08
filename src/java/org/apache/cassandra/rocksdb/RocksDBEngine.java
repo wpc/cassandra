@@ -68,8 +68,16 @@ public class RocksDBEngine implements StorageEngine
         RocksDB.loadLibrary();
     }
 
-    public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L *
-                                                           RocksDBConfigs.RATE_MBYTES_PER_SECOND);
+    protected int compactionthroughputMbPerSec = RocksDBConfigs.RATE_MBYTES_PER_SECOND;
+    public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L * compactionthroughputMbPerSec);
+
+    private final Keyspace keyspace;
+
+    public RocksDBEngine(Keyspace keyspace)
+    {
+        this.keyspace = keyspace;
+    }
+
 
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {
@@ -97,7 +105,6 @@ public class RocksDBEngine implements StorageEngine
         {
             applyRowToRocksDB(cfs, writeCommitLog, partitionKey, staticRow);
         }
-
     }
 
     public UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs, SinglePartitionReadCommand readCommand)
@@ -158,6 +165,14 @@ public class RocksDBEngine implements StorageEngine
         {
             logger.error(e.toString(), e);
         }
+    }
+
+    public void setCompactionThroughputMbPerSec(int throughputMbPerSec)
+    {
+        compactionthroughputMbPerSec = throughputMbPerSec;
+        rateLimiter.setBytesPerSecond(1024L * 1024L * compactionthroughputMbPerSec);
+        logger.info("Change keyspace " + keyspace.getName() +
+                    " compaction throughput MB per sec to " + compactionthroughputMbPerSec);
     }
 
     public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,
