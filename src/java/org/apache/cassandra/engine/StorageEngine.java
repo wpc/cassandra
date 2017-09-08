@@ -71,4 +71,6 @@ public interface StorageEngine
      * used by 'nodetool dumppartition'.
      */
     String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit);
+
+    void forceMajorCompaction(ColumnFamilyStore cfs);
 }

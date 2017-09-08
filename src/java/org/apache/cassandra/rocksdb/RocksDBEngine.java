@@ -46,7 +46,6 @@ import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
-import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
@@ -54,7 +53,6 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
-import org.apache.cassandra.utils.Hex;
 import org.rocksdb.RateLimiter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -284,5 +282,19 @@ public class RocksDBEngine implements StorageEngine
         byte[] rocksKeyPrefix = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
         RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
         return rocksDBCF.dumpPrefix(rocksKeyPrefix, limit);
+    }
+
+    public void forceMajorCompaction(ColumnFamilyStore cfs)
+    {
+        RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
+        try
+        {
+            rocksDBCF.compactRange();
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
+            throw new RuntimeException(e);
+        }
     }
 }

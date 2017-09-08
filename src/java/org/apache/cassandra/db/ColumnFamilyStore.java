@@ -1949,7 +1949,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public void forceMajorCompaction(boolean splitOutput) throws InterruptedException, ExecutionException
     {
-        CompactionManager.instance.performMaximal(this, splitOutput);
+        if (engine != null)
+        {
+            engine.forceMajorCompaction(this);
+        }
+        else
+        {
+            CompactionManager.instance.performMaximal(this, splitOutput);
+        }
     }
 
     public static Iterable<ColumnFamilyStore> all()
