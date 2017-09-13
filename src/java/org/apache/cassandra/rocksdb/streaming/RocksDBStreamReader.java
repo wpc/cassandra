@@ -45,22 +45,19 @@ public class RocksDBStreamReader
     private static final long INCOMING_BYTES_DELTA_UPDATE_THRESHOLD = 1 * 1024 * 1024;
     private final RocksDBMessageHeader header;
     private final StreamSession session;
-    private final long estimatedIncomingBytes;
     private final MessageDigest digest;
+    private final long estimatedIncomingKeys;
     private long totalIncomingBytes;
+    private long totalIncomingKeys;
 
     public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session)
-    {
-        this(header, session, 0);
-    }
-
-    public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session, long estimatedIncomingBytes)
     {
         this.header = header;
         this.session = session;
         this.totalIncomingBytes = 0;
         this.digest = FBUtilities.newMessageDigest("MD5");
-        this.estimatedIncomingBytes = estimatedIncomingBytes;
+        this.totalIncomingKeys = 0;
+        this.estimatedIncomingKeys = header.estimatedKeys;
     }
 
     public RocksDBSStableWriter read(DataInputPlus input) throws IOException
@@ -97,11 +94,12 @@ public class RocksDBStreamReader
                 writer.write(key, value);
                 incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
                 totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+                totalIncomingKeys ++;
                 if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
                 {
                     StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
                     incomingBytesDelta = 0;
-                    session.progress("RocksdbSstable", ProgressInfo.Direction.IN, totalIncomingBytes, estimatedIncomingBytes);
+                    RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, false);
                 }
             }
             byte[] actualDigest = digest.digest();
@@ -114,6 +112,7 @@ public class RocksDBStreamReader
             {
                 throw new StreamingDigestMismatchException(header, expectedDigest, actualDigest);
             }
+            RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, true);
         }
         catch (Throwable e)
         {

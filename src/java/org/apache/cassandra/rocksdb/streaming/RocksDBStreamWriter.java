@@ -49,25 +49,27 @@ public class RocksDBStreamWriter
     private final RocksDBCF rocksDBCF;
     private final Collection<Range<Token>> ranges;
     private final StreamManager.StreamRateLimiter limiter;
-    private final long estimatedTotalSize;
     private final MessageDigest digest;
+    private final long estimatedTotalKeys;
     private StreamSession session = null;
+    private long streamedPairs = 0;
     private long outgoingBytes;
 
-    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamManager.StreamRateLimiter limiter, long estimatedTotalSize)
+    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamManager.StreamRateLimiter limiter, long estimatedTotalKeys)
     {
         this.rocksDBCF = rocksDBCF;
         this.ranges = RocksDBStreamUtils.normalizeRanges(ranges);
         this.limiter = limiter;
         this.outgoingBytes = 0;
-        this.estimatedTotalSize = estimatedTotalSize;
         this.digest = FBUtilities.newMessageDigest("MD5");
+        this.estimatedTotalKeys = estimatedTotalKeys;
+
         RocksDBThroughputManager.getInstance().registerOutgoingStreamWriter(this);
     }
 
-    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamSession session, long estimatedTotalSize)
+    public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamSession session, long estimatedTotalKeys)
     {
-        this(rocksDBCF, ranges, StreamManager.getRateLimiter(session.peer), estimatedTotalSize);
+        this(rocksDBCF, ranges, StreamManager.getRateLimiter(session.peer), estimatedTotalKeys);
         this.session = session;
     }
 
@@ -114,9 +116,7 @@ public class RocksDBStreamWriter
                     {
                         StreamingMetrics.totalOutgoingBytes.inc(outgoingBytesDelta);
                         outgoingBytesDelta = 0;
-                        if (session != null) {
-                            session.progress("Rocksdb sstable", ProgressInfo.Direction.OUT, outgoingBytes, estimatedTotalSize);
-                        }
+                        updateProgress(false);
                     }
                     streamedPairs++;
 
@@ -138,6 +138,7 @@ public class RocksDBStreamWriter
         out.write(ByteBufferUtil.bytes(md5Digest.length).array());
         out.write(md5Digest);
         LOGGER.info("Stream digest: " + Hex.bytesToHex(md5Digest));
+        updateProgress(true);
     }
 
     public long getOutgoingBytes()
@@ -145,4 +146,8 @@ public class RocksDBStreamWriter
         return outgoingBytes;
     }
 
+    private void updateProgress(boolean completed)
+    {
+        RocksDBStreamUtils.rocksDBProgress(session, rocksDBCF.getCfID().toString(), ProgressInfo.Direction.OUT, outgoingBytes, streamedPairs, estimatedTotalKeys, completed);
+    }
 }

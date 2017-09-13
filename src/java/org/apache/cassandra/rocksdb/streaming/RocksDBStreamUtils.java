@@ -45,6 +45,8 @@ import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBProperty;
+import org.apache.cassandra.streaming.ProgressInfo;
+import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
@@ -244,5 +246,13 @@ public class RocksDBStreamUtils
             LOGGER.warn("Failed to estimate num of keys", e);
             return 0;
         }
+    }
+
+    public static void rocksDBProgress(StreamSession session, String fileName, ProgressInfo.Direction direction, long bytes, long keys, long estimatedTotalKeys, boolean completed)
+    {
+        if (session == null)
+            return;
+        ProgressInfo progress = new RocksDBProgressInfo(session.peer, session.getSessionInfo().sessionIndex, fileName, direction, bytes, keys, estimatedTotalKeys, completed);
+        session.progress(progress);
     }
 }

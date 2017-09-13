@@ -262,4 +262,9 @@ public class RocksDBCF
         }
         return sb.toString();
     }
+
+    public UUID getCfID()
+    {
+        return cfID;
+    }
 }

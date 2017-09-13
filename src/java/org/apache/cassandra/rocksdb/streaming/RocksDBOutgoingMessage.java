@@ -65,7 +65,7 @@ public class RocksDBOutgoingMessage extends OutgoingMessage
     {
         RocksDBMessageHeader.SERIALIZER.seriliaze(header, out);
         LZFOutputStream lzfOutputStream = new LZFOutputStream(out);
-        RocksDBStreamWriter writer = new RocksDBStreamWriter(rocksDBCF, ranges, session, header.estimatedBytes);
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(rocksDBCF, ranges, session, header.estimatedKeys);
         writer.write(lzfOutputStream);
         lzfOutputStream.flush();
         return writer.getOutgoingBytes();

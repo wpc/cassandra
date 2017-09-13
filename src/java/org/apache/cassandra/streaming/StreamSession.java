@@ -52,7 +52,6 @@ import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.messages.*;
-import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.Pair;
@@ -643,9 +642,8 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         streamResult.handleProgress(progress);
     }
 
-    public void progress(String fileName, ProgressInfo.Direction direction, long bytes, long total)
+    public void progress(ProgressInfo progress)
     {
-        ProgressInfo progress = new ProgressInfo(peer, index, fileName, direction, bytes, total);
         if (streamResult != null)
             streamResult.handleProgress(progress);
     }
