@@ -21,6 +21,7 @@ package org.apache.cassandra.rocksdb.streaming;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.Collection;
 
 import org.slf4j.Logger;
@@ -36,7 +37,9 @@ import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamManager;
 import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.Hex;
 import org.rocksdb.ReadOptions;
 
 public class RocksDBStreamWriter
@@ -47,6 +50,7 @@ public class RocksDBStreamWriter
     private final Collection<Range<Token>> ranges;
     private final StreamManager.StreamRateLimiter limiter;
     private final long estimatedTotalSize;
+    private final MessageDigest digest;
     private StreamSession session = null;
     private long outgoingBytes;
 
@@ -57,6 +61,7 @@ public class RocksDBStreamWriter
         this.limiter = limiter;
         this.outgoingBytes = 0;
         this.estimatedTotalSize = estimatedTotalSize;
+        this.digest = FBUtilities.newMessageDigest("MD5");
         RocksDBThroughputManager.getInstance().registerOutgoingStreamWriter(this);
     }
 
@@ -97,10 +102,12 @@ public class RocksDBStreamWriter
                         break;
                     limiter.acquire(RocksDBStreamUtils.MORE.length + Integer.BYTES * 2 + key.length + value.length);
                     out.write(RocksDBStreamUtils.MORE);
-                    out.write(ByteBuffer.allocate(Integer.BYTES).putInt(key.length).array());
+                    out.write(ByteBufferUtil.bytes(key.length).array());
                     out.write(key);
-                    out.write(ByteBuffer.allocate(Integer.BYTES).putInt(value.length).array());
+                    out.write(ByteBufferUtil.bytes(value.length).array());
                     out.write(value);
+                    digest.update(key);
+                    digest.update(value);
                     outgoingBytes += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
                     outgoingBytesDelta +=  RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
                     if (outgoingBytesDelta > OUTGOING_BYTES_DELTA_UPDATE_THRESHOLD)
@@ -127,6 +134,10 @@ public class RocksDBStreamWriter
         LOGGER.info("Ranges streamed: " + ranges);
         LOGGER.info("Number of rocksdb entries written: " + streamedPairs);
         out.write(RocksDBStreamUtils.EOF);
+        byte[] md5Digest = digest.digest();
+        out.write(ByteBufferUtil.bytes(md5Digest.length).array());
+        out.write(md5Digest);
+        LOGGER.info("Stream digest: " + Hex.bytesToHex(md5Digest));
     }
 
     public long getOutgoingBytes()

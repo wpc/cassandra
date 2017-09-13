@@ -646,7 +646,8 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     public void progress(String fileName, ProgressInfo.Direction direction, long bytes, long total)
     {
         ProgressInfo progress = new ProgressInfo(peer, index, fileName, direction, bytes, total);
-        streamResult.handleProgress(progress);
+        if (streamResult != null)
+            streamResult.handleProgress(progress);
     }
 
     public void received(UUID cfId, int sequenceNumber)

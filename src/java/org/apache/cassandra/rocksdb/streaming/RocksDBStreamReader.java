@@ -19,6 +19,8 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.util.Arrays;
 
 import com.google.common.base.Throwables;
 import org.slf4j.Logger;
@@ -29,8 +31,11 @@ import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.service.DigestMismatchException;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
 
 public class RocksDBStreamReader
@@ -41,6 +46,7 @@ public class RocksDBStreamReader
     private final RocksDBMessageHeader header;
     private final StreamSession session;
     private final long estimatedIncomingBytes;
+    private final MessageDigest digest;
     private long totalIncomingBytes;
 
     public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session)
@@ -53,6 +59,7 @@ public class RocksDBStreamReader
         this.header = header;
         this.session = session;
         this.totalIncomingBytes = 0;
+        this.digest = FBUtilities.newMessageDigest("MD5");
         this.estimatedIncomingBytes = estimatedIncomingBytes;
     }
 
@@ -85,6 +92,8 @@ public class RocksDBStreamReader
                 int valueLength = input.readInt();
                 byte[] value = new byte[valueLength];
                 input.readFully(value);
+                digest.update(key);
+                digest.update(value);
                 writer.write(key, value);
                 incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
                 totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
@@ -94,6 +103,16 @@ public class RocksDBStreamReader
                     incomingBytesDelta = 0;
                     session.progress("RocksdbSstable", ProgressInfo.Direction.IN, totalIncomingBytes, estimatedIncomingBytes);
                 }
+            }
+            byte[] actualDigest = digest.digest();
+            int expectedDigestLength = input.readInt();
+            byte[] expectedDigest = new byte[expectedDigestLength];
+            input.readFully(expectedDigest);
+
+            LOGGER.info("Received stream, expected digest: " + Hex.bytesToHex(expectedDigest) + ", actual digest: " + Hex.bytesToHex(actualDigest));
+            if (!Arrays.equals(expectedDigest, actualDigest))
+            {
+                throw new StreamingDigestMismatchException(header, expectedDigest, actualDigest);
             }
         }
         catch (Throwable e)
