@@ -38,6 +38,9 @@ import static org.junit.Assert.assertTrue;
 
 public class RocksDBStreamUtilsTest
 {
+    private static final BigInteger MAX_BIGINT_TOKEN = RandomPartitioner.MAXIMUM;
+    private static final BigInteger MIN_BIGINT_TOKEN = RandomPartitioner.MINIMUM.getTokenValue();
+
     private static long[][][] LIST_OF_LONG_RANGES =
     {
       {},
@@ -53,38 +56,104 @@ public class RocksDBStreamUtilsTest
         {1, 2},
         {11, 12},
       },
-//      {{Long.MAX_VALUE - 1000, Long.MIN_VALUE + 1000}},
-//      TODO: Range.normalize can't deal with this case, we probably need fix it.
+      {{Long.MAX_VALUE - 1000, Long.MIN_VALUE + 1000}},
     };
 
     private static BigInteger[][][] LIST_OF_BIGINTEGER_RANGES =
     {
         {},
         {
-            {RandomPartitioner.ZERO, RandomPartitioner.MAXIMUM},
+            {MIN_BIGINT_TOKEN, MAX_BIGINT_TOKEN},
         },
         {
-            {RandomPartitioner.MAXIMUM.add(BigInteger.valueOf(-1000)), RandomPartitioner.MAXIMUM},
-            {RandomPartitioner.ZERO, RandomPartitioner.ZERO.add(BigInteger.valueOf(1000))},
+            {MAX_BIGINT_TOKEN.add(BigInteger.valueOf(-1000)), MAX_BIGINT_TOKEN},
+            {MIN_BIGINT_TOKEN, MIN_BIGINT_TOKEN.add(BigInteger.valueOf(1000))},
         },
         {
             {BigInteger.valueOf(-1), BigInteger.valueOf(2)},
             {BigInteger.valueOf(11), BigInteger.valueOf(15)},
             {BigInteger.valueOf(19), BigInteger.valueOf(100)},
         },
+        {
+            {MAX_BIGINT_TOKEN.add(BigInteger.valueOf(-1000)), MIN_BIGINT_TOKEN.add(BigInteger.valueOf(1000))},
+        },
     };
+
+    private static long[][][] UNNORMALIZED_LONG_RANGES =
+    {
+        {},
+        {{Long.MIN_VALUE, Long.MAX_VALUE}},
+        {{Long.MIN_VALUE, Long.MIN_VALUE}},
+        {{1, 1}},
+        {{1, 3}, {3, 1}},
+        {
+            {1, 3}, {2, 4}, {7, 9}
+        },
+        {{Long.MAX_VALUE - 1000, Long.MIN_VALUE + 1000}},
+    };
+
+    private static long[][][] EXPECTED_NORMALIZED_LONG_RANGES =
+    {
+        {},
+        {{Long.MIN_VALUE, Long.MAX_VALUE}},
+        {{Long.MIN_VALUE, Long.MAX_VALUE}},
+        {{Long.MIN_VALUE, Long.MAX_VALUE}},
+        {{Long.MIN_VALUE, Long.MAX_VALUE}},
+        {{1, 4}, {7, 9}},
+        {{Long.MIN_VALUE, Long.MIN_VALUE + 1000}, {Long.MAX_VALUE - 1000, Long.MAX_VALUE}},
+    };
+
+    private static BigInteger[][][] UNNORMALIZED_BIGINTEGER_RANGES =
+    {
+        {},
+        {{MIN_BIGINT_TOKEN, MIN_BIGINT_TOKEN}},
+        {{MIN_BIGINT_TOKEN, MAX_BIGINT_TOKEN}},
+        {{MAX_BIGINT_TOKEN.add(BigInteger.valueOf(-1000)), MIN_BIGINT_TOKEN.add(BigInteger.valueOf(1000))}},
+    };
+
+    private static BigInteger[][][] EXPECTED_NORMALIZED_BIGINTEGER_RANGES =
+    {
+        {},
+        {{MIN_BIGINT_TOKEN, MAX_BIGINT_TOKEN}},
+        {{MIN_BIGINT_TOKEN, MAX_BIGINT_TOKEN }},
+        {
+            {MIN_BIGINT_TOKEN, MIN_BIGINT_TOKEN.add(BigInteger.valueOf(1000))},
+            {MAX_BIGINT_TOKEN.add(BigInteger.valueOf(-1000)), MAX_BIGINT_TOKEN}
+        },
+    };
+
+    @Test
+    public void testNormalizeRanges()
+    {
+        for (int i = 0; i < UNNORMALIZED_LONG_RANGES.length; i++)
+        {
+            long[][] rawRanges = UNNORMALIZED_LONG_RANGES[i];
+            long[][] expectedNormalizedRawRanges = EXPECTED_NORMALIZED_LONG_RANGES[i];
+            Collection<Range<Token>> ranges = getLongRanges(rawRanges);
+            Collection<Range<Token>> expectedNormalizedRanges = getLongRanges(expectedNormalizedRawRanges);
+
+            Collection<Range<Token>> normalized = RocksDBStreamUtils.normalizeRanges(ranges);
+            assertEquals(normalized, expectedNormalizedRanges);
+        }
+
+        for (int i = 0; i < UNNORMALIZED_BIGINTEGER_RANGES.length; i++)
+        {
+            BigInteger[][] rawRanges = UNNORMALIZED_BIGINTEGER_RANGES[i];
+            BigInteger[][] expectedNormalizedRawRanges = EXPECTED_NORMALIZED_BIGINTEGER_RANGES[i];
+            Collection<Range<Token>> ranges = getBigIntegerRanges(rawRanges);
+            Collection<Range<Token>> expectedNormalizedRanges = getBigIntegerRanges(expectedNormalizedRawRanges);
+
+            Collection<Range<Token>> normalized = RocksDBStreamUtils.normalizeRanges(ranges);
+            assertEquals(normalized, expectedNormalizedRanges);
+        }
+    }
 
     @Test
     public void testCalculateComplementRanges()
     {
         for (long[][] rawRanges : LIST_OF_LONG_RANGES)
         {
-            Collection<Range<Token>> ranges = new ArrayList<>(rawRanges.length);
-            for (long[] range : rawRanges)
-            {
-                ranges.add(new Range<>(new Murmur3Partitioner.LongToken(range[0]),
-                                                   new Murmur3Partitioner.LongToken(range[1])));
-            }
+            Collection<Range<Token>> ranges = getLongRanges(rawRanges);
             Collection<Range<Token>> complementRanges =
                 RocksDBStreamUtils.calcluateComplementRanges(Murmur3Partitioner.instance, ranges);
             assertNoOverlap(ranges, complementRanges);
@@ -94,12 +163,7 @@ public class RocksDBStreamUtilsTest
 
         for (BigInteger[][] rawRanges : LIST_OF_BIGINTEGER_RANGES)
         {
-            Collection<Range<Token>> ranges = new ArrayList<>(rawRanges.length);
-            for (BigInteger[] range : rawRanges)
-            {
-                ranges.add(new Range<>(new RandomPartitioner.BigIntegerToken(range[0]),
-                                       new RandomPartitioner.BigIntegerToken(range[1])));
-            }
+            Collection<Range<Token>> ranges = getBigIntegerRanges(rawRanges);
             Collection<Range<Token>> complementRanges =
             RocksDBStreamUtils.calcluateComplementRanges(RandomPartitioner.instance, ranges);
             assertNoOverlap(ranges, complementRanges);
@@ -124,7 +188,7 @@ public class RocksDBStreamUtilsTest
                      RocksDBStreamUtils.getRangeSpaceSize(
                                                          Arrays.asList(
                                                                       new Range<Token>(RandomPartitioner.MINIMUM,
-                                                                                       new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM.divide(BigInteger.valueOf(2)))
+                                                                                       new RandomPartitioner.BigIntegerToken(MAX_BIGINT_TOKEN.divide(BigInteger.valueOf(2)))
                                                                                        ))),
                      1e-10);
     }
@@ -148,7 +212,7 @@ public class RocksDBStreamUtilsTest
     {
         List<Range<Token>> combined = new ArrayList<>(ranges);
         combined.addAll(complementRanges);
-        Collection<Range<Token>> normalized = Range.normalize(combined);
+        Collection<Range<Token>> normalized = RocksDBStreamUtils.normalizeRanges(combined);
         assertEquals(normalized.size(), 1);
         Range<Token> range = normalized.iterator().next();
         assertEquals(range.left, RocksDBUtils.getMinToken(range.left.getPartitioner()));
@@ -166,5 +230,27 @@ public class RocksDBStreamUtilsTest
             }
             previous = range.left;
         }
+    }
+
+    private Collection<Range<Token>> getLongRanges(long[][] rawRanges)
+    {
+        Collection<Range<Token>> ranges = new ArrayList<>(rawRanges.length);
+        for (long[] range : rawRanges)
+        {
+            ranges.add(new Range<>(new Murmur3Partitioner.LongToken(range[0]),
+                                   new Murmur3Partitioner.LongToken(range[1])));
+        }
+        return ranges;
+    }
+
+    private Collection<Range<Token>> getBigIntegerRanges(BigInteger[][] rawRanges)
+    {
+        Collection<Range<Token>> ranges = new ArrayList<>(rawRanges.length);
+        for (BigInteger[] range : rawRanges)
+        {
+            ranges.add(new Range<>(new RandomPartitioner.BigIntegerToken(range[0]),
+                                   new RandomPartitioner.BigIntegerToken(range[1])));
+        }
+        return ranges;
     }
 }

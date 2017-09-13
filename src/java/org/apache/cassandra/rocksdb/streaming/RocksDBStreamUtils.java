@@ -120,29 +120,31 @@ public class RocksDBStreamUtils
     }
 
     /**
-     * While streaming, the ranges is sorted by range.left and deoverlaped. For the last
-     * range in ranges, there is a possibility that  MinToken < range.right < range.left < MaxToken
-     * as this is a valid range in consistent hash ring. Hoewever rocksdb writer can't deal this
-     * case as it requires key value pairs streamed in order, so we need to normalize this range by
-     * split it into [right, MaxToken] [MinToken, left], and insert back to ranges and keep the ranges
-     * order by range.left.
+     * Normalize ranges: ensure each range is not overlapped and sorted in asending order.
+     *
+     * {@link org.apache.cassandra.dht.Range#normalize(Collection)}} deoverlap overlapped ranges, and unwrap wrapped ranges
+     * (whose range.left > range.right) by splitting them to two ranges (range.left, minToken] and (minToken, range.right].
+     * This is no ideal for RocksDB engine and makes logic complicated as we expect the normalize should ensure all range's left < right.
+     * This function fix this issue by converting all ranges whose upper bound is minToken to maxToken.
+     * This shouldn't affect the correctness as minToken should be smaller than any possible token according
+     * to {@link IPartitioner#getMinimumToken()}.
+     *
+     * @return normalized ranges.
      */
     public static Collection<Range<Token>> normalizeRanges(Collection<Range<Token>> ranges)
     {
         if (ranges.isEmpty())
             return ranges;
 
-        List<Range<Token>> normalized = new ArrayList<>(ranges);
-        Range<Token> last = normalized.get(normalized.size() - 1);
-        if (last.left.compareTo(last.right) <= 0)
-            return ranges;
+        ranges = Range.normalize(ranges);
+        List<Range<Token>> normalized = new ArrayList<>();
+        for (Range<Token> range : ranges)
+        {
+            if (range.right.isMinimum())
+                range = new Range<>(range.left, getMaxToken(range.left.getPartitioner()));
 
-        Token maxToken = getMaxToken(last.left.getPartitioner());
-        Token minToken = getMinToken(last.left.getPartitioner());
-
-        normalized.remove(normalized.get(normalized.size() - 1));
-        normalized.add(new Range<>(last.left, maxToken));
-        normalized.add(0, new Range<>(minToken, last.right));
+            normalized.add(range);
+        }
         return normalized;
     }
 
@@ -151,7 +153,7 @@ public class RocksDBStreamUtils
      */
     public static Collection<Range<Token>> calcluateComplementRanges(IPartitioner partitioner, Collection<Range<Token>> ranges)
     {
-        Collection<Range<Token>> normalized = normalizeRanges(Range.normalize(ranges));
+        Collection<Range<Token>> normalized = normalizeRanges(ranges);
 
         ArrayList<Range<Token>> result = new ArrayList<>(ranges.size() + 1);
 
@@ -243,6 +245,4 @@ public class RocksDBStreamUtils
             return 0;
         }
     }
-
-
 }
