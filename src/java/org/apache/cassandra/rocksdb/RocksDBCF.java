@@ -112,10 +112,12 @@ public class RocksDBCF
         columnFamilyOptions.setCompactionFilter(compactionFilter);
         columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
         columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+        columnFamilyOptions.setLevelCompactionDynamicLevelBytes(RocksDBConfigs.DYNAMIC_LEVEL_BYTES_ENABLED);
 
         final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
         final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
         tableOptions.setFilter(bloomFilter);
+        tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
         columnFamilyOptions.setTableFormatConfig(tableOptions);
 
         ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);

@@ -25,6 +25,12 @@ public class RocksDBConfigs
     // It's per keyspace, and shared across all RocksDB instances within the same keyspace.
     public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
 
+    // rocksdb block cache size, default to be 4G per rocksdb instance
+    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 4096);
+
+    // enable level_compaction_dynamic_level_bytes or not, defaut is false
+    public static final boolean DYNAMIC_LEVEL_BYTES_ENABLED = Boolean.getBoolean("cassandra.rocksdb.enable_dynamic_level_bytes");
+
     /**
      * Streaming configs
      */
