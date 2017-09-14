@@ -1,4 +1,5 @@
 3.0.15
+ * Fix counter application order in short read protection (CASSANDRA-12872)
  * Make isBuilt volatile in PartitionUpdate (CASSANDRA-13619)
  * Don't block RepairJob execution on validation futures (CASSANDRA-13797)
  * Use new token allocation for non bootstrap case as well (CASSANDRA-13080)
@@ -13,7 +14,7 @@
  * Better handle corrupt final commitlog segment (CASSANDRA-11995)
  * StreamingHistogram is not thread safe (CASSANDRA-13756)
  * Fix MV timestamp issues (CASSANDRA-11500)
- * Better tolerate improperly formatted bcrypt hashes (CASSANDRA-13626) 
+ * Better tolerate improperly formatted bcrypt hashes (CASSANDRA-13626)
  * Fix race condition in read command serialization (CASSANDRA-13363)
  * Enable segement creation before recovering commitlogs (CASSANDRA-13587)
  * Fix AssertionError in short read protection (CASSANDRA-13747)
