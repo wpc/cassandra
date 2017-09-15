@@ -78,7 +78,7 @@ public class RocksDBCF
         partitioner = cfs.getPartitioner();
         engine = (RocksDBEngine) cfs.engine;
 
-        final long writeBufferSize = 8 * 512 * 1024 * 1024L;
+        final long writeBufferSize = RocksDBConfigs.WRITE_BUFFER_SIZE_MBYTES * 1024 * 1024L;
         final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
         int gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
         boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
@@ -104,7 +104,7 @@ public class RocksDBCF
         columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
         columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
         columnFamilyOptions.setWriteBufferSize(writeBufferSize);
-        columnFamilyOptions.setMaxBytesForLevelBase(4 * writeBufferSize);
+        columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
         columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
         columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
         columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
@@ -178,13 +178,13 @@ public class RocksDBCF
 
     public void merge(byte[] key, byte[] value, boolean writeCommitLog) throws RocksDBException
     {
-        if (writeCommitLog)
+        if ((!writeCommitLog) || RocksDBConfigs.DISABLE_WRITE_TO_COMMITLOG)
         {
-            rocksDB.merge(key, value);
+            rocksDB.merge(disableWAL, key, value);
         }
         else
         {
-            rocksDB.merge(disableWAL, key, value);
+            rocksDB.merge(key, value);
         }
     }
 

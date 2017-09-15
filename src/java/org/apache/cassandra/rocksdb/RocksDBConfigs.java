@@ -31,6 +31,14 @@ public class RocksDBConfigs
     // enable level_compaction_dynamic_level_bytes or not, defaut is false
     public static final boolean DYNAMIC_LEVEL_BYTES_ENABLED = Boolean.getBoolean("cassandra.rocksdb.enable_dynamic_level_bytes");
 
+    // rocksdb write buffer size, default to be 1G per rocksdb instance
+    public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 1024);
+
+    public static final int MAX_MBYTES_FOR_LEVEL_BASE = Integer.getInteger("cassandra.rocksdb.max_mbytes_for_level_base", 1024 * 16);
+
+    // disable write to rocksdb commit log or not, default is false
+    public static final boolean DISABLE_WRITE_TO_COMMITLOG = Boolean.getBoolean("cassandra.rocksdb.disable_write_to_commitlog");
+
     /**
      * Streaming configs
      */
