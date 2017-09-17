@@ -52,6 +52,10 @@ public interface StorageEngine
 
     void setCompactionThroughputMbPerSec(int throughputMbPerSec);
 
+    void forceMajorCompaction(ColumnFamilyStore cfs);
+
+    long load();
+
     /**
      *  Streaming APIs
      */
@@ -66,13 +70,9 @@ public interface StorageEngine
 
     boolean doubleWrite();
 
-    long load();
-
     /**
      * Dump low level partition data for debugging purpose
      * used by 'nodetool dumppartition'.
      */
     String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit);
-
-    void forceMajorCompaction(ColumnFamilyStore cfs);
 }

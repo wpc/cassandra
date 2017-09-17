@@ -119,6 +119,8 @@ public class RocksDBCF implements RocksDBCFMBean
         dbOptions.setWalBytesPerSync(1024 * 1024);
         dbOptions.setMaxBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
         dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
+        dbOptions.setMaxBackgroundFlushes(4);
+        
         dbOptions.setMaxSubcompactions(8);
         dbOptions.setStatistics(stats);
         dbOptions.setRateLimiter(engine.rateLimiter);
@@ -127,6 +129,7 @@ public class RocksDBCF implements RocksDBCFMBean
         columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
         columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
         columnFamilyOptions.setWriteBufferSize(writeBufferSize);
+        columnFamilyOptions.setMaxWriteBufferNumber(4);
         columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
         columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
         columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
@@ -135,7 +138,7 @@ public class RocksDBCF implements RocksDBCFMBean
         columnFamilyOptions.setCompactionFilter(compactionFilter);
         columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
         columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevelCompactionDynamicLevelBytes(RocksDBConfigs.DYNAMIC_LEVEL_BYTES_ENABLED);
+        columnFamilyOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
 
         final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
         final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();

@@ -25,14 +25,14 @@ public class RocksDBConfigs
     // It's per keyspace, and shared across all RocksDB instances within the same keyspace.
     public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
 
-    // rocksdb block cache size, default to be 4G per rocksdb instance
-    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 4096);
+    // rocksdb block cache size, default to be 1G per rocksdb instance
+    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 1024);
 
-    // enable level_compaction_dynamic_level_bytes or not, defaut is false
-    public static final boolean DYNAMIC_LEVEL_BYTES_ENABLED = Boolean.getBoolean("cassandra.rocksdb.enable_dynamic_level_bytes");
+    // disable level_compaction_dynamic_level_bytes or not, defaut is false
+    public static final boolean DYNAMIC_LEVEL_BYTES_DISABLED = Boolean.getBoolean("cassandra.rocksdb.disable_dynamic_level_bytes");
 
-    // rocksdb write buffer size, default to be 1G per rocksdb instance
-    public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 1024);
+    // rocksdb write buffer size, default to be 4G per rocksdb instance
+    public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 4096);
 
     public static final int MAX_MBYTES_FOR_LEVEL_BASE = Integer.getInteger("cassandra.rocksdb.max_mbytes_for_level_base", 1024 * 16);
 
