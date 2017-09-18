@@ -29,7 +29,9 @@ import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.Clustering;
+import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
@@ -42,8 +44,10 @@ public class RowIteratorSanityCheck
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SanityCheckUtils.class);
 
+    private final CFMetaData metaData;
     private final Token startToken;
     private final int nowInSecond;
+    private final boolean verbose;
     private long partitions;
     private long cassandraMissingPartitions;
     private long rocksDBMissingPartitions;
@@ -58,10 +62,12 @@ public class RowIteratorSanityCheck
     private long rocksDBPurgedRows;
     private long mismatchRows;
 
-    public RowIteratorSanityCheck(Token startToken, int nowInSecond)
+    public RowIteratorSanityCheck(CFMetaData metaData, Token startToken, int nowInSecond, boolean verbose)
     {
+        this.metaData = metaData;
         this.startToken = startToken;
         this.nowInSecond = nowInSecond;
+        this.verbose = verbose;
         partitions = 0;
         cassandraMissingPartitions = 0;
         rocksDBMissingPartitions = 0;
@@ -76,7 +82,7 @@ public class RowIteratorSanityCheck
         mismatchRows = 0;
     }
 
-    public void compare(UnfilteredRowIterator cassandraPartition, UnfilteredRowIterator rocksdbPartition)
+    public void compare(DecoratedKey key, UnfilteredRowIterator cassandraPartition, UnfilteredRowIterator rocksdbPartition)
     {
         partitions++;
         if (cassandraPartition == null && rocksdbPartition == null)
@@ -118,18 +124,17 @@ public class RowIteratorSanityCheck
         {
             // We don't support range tombstone in RocksDBEngine yet.
             Row row = (Row) rocksdbPartition.next();
-            LOGGER.info(row.toString());
             rocksdbRows.put(row.clustering(), row);
         }
 
         rangeTombstoneSkipped += hasRowTombstone ? 1 : 0;
-        if (!compare(cassandraRows, rocksdbRows))
+        if (!compare(key, cassandraRows, rocksdbRows))
         {
             mismatcPartitions++;
         }
     }
 
-    public boolean compare(Map<Clustering, Row> cassandraRows, Map<Clustering, Row> rocksdbRows)
+    public boolean compare(DecoratedKey key, Map<Clustering, Row> cassandraRows, Map<Clustering, Row> rocksdbRows)
     {
         Set<Clustering> clusterings = new HashSet<>(cassandraRows.keySet());
         clusterings.addAll(rocksdbRows.keySet());
@@ -144,6 +149,8 @@ public class RowIteratorSanityCheck
                 {
                     cassandraMissingRows++;
                     match = false;
+                    if (verbose)
+                        LOGGER.info("Cassandra Row Missing, RocksDB Row:" + rowToString(key, c, rocksdbRow));
                 }
                 else
                 {
@@ -157,6 +164,8 @@ public class RowIteratorSanityCheck
                 {
                     rocksDBMissingRows++;
                     match = false;
+                    if (verbose)
+                        LOGGER.info("RocksDB Row Missing, Cassandra Row:" + rowToString(key, c, cassandraRow));
                 }
                 else
                 {
@@ -171,6 +180,8 @@ public class RowIteratorSanityCheck
                 {
                     match = false;
                     mismatchRows++;
+                    if (verbose)
+                        LOGGER.info("Row Mismatch, Cassandra Row:" + rowToString(key, c, cassandraRow) + ", RocksDB Row:" + rowToString(key, c, rocksdbRow));
                 }
             }
         }
@@ -263,4 +274,12 @@ public class RowIteratorSanityCheck
         }
     }
 
+    private String rowToString(DecoratedKey key, Clustering clustering, Row row)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Partition:").append(key.toString()).append(", ");
+        sb.append("Clustering:").append(clustering.toString(metaData)).append(", ");
+        sb.append("Value:").append(row.toString(metaData, true /* full detail */));
+        return sb.toString();
+    }
 }

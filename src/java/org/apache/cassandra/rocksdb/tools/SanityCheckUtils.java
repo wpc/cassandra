@@ -46,9 +46,10 @@ public class SanityCheckUtils
      * @param cfs ColumnFamilyStore which has double write enabled.
      * @param randomStartToken Choose a random token in the ring to start with instead of minimal token.
      * @param limit number of rows to check, 0 means unlimited.
+     * @param verbose write mismatch row's detail into log.
      * @return Comparator Report.
      */
-    public static RowIteratorSanityCheck.Report checkSanity(ColumnFamilyStore cfs, boolean randomStartToken, long limit)
+    public static RowIteratorSanityCheck.Report checkSanity(ColumnFamilyStore cfs, boolean randomStartToken, long limit, boolean verbose)
     {
         int nowInSecond = FBUtilities.nowInSeconds();
         Token fromToken = randomStartToken ? cfs.metadata.partitioner.getRandomToken() : cfs.metadata.partitioner.getMinimumToken();
@@ -57,7 +58,7 @@ public class SanityCheckUtils
                                         .withNowInSeconds(nowInSecond).build());
         ReadOrderGroup orderGroup = command.startOrderGroup();
         UnfilteredPartitionIterator partitionIterator = command.queryStorageInternal(cfs, orderGroup);
-        RowIteratorSanityCheck check = new RowIteratorSanityCheck(fromToken, nowInSecond);
+        RowIteratorSanityCheck check = new RowIteratorSanityCheck(cfs.metadata, fromToken, nowInSecond, verbose);
         long count = 0;
         while (partitionIterator.hasNext())
         {
@@ -67,9 +68,7 @@ public class SanityCheckUtils
                cfs,
                SinglePartitionReadCommand.fullPartitionRead(cfs.metadata, nowInSecond,
                                                             cassandraRowIterator.partitionKey()));
-            check.compare(cassandraRowIterator, rocksdbRowIterator);
-            if (count++ % 1000 == 0)
-                LOGGER.info(check.toString());
+            check.compare(cassandraRowIterator.partitionKey(), cassandraRowIterator, rocksdbRowIterator);
             if (limit > 0 && count >= limit)
                 break;
         }

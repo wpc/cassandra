@@ -33,7 +33,7 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
         assertEquals(1, queryCassandraStorage(readCommand).size());
 
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        RowIteratorSanityCheck.Report report = SanityCheckUtils.checkSanity(cfs, false, 0);
+        RowIteratorSanityCheck.Report report = SanityCheckUtils.checkSanity(cfs, false, 0, false);
         assertEquals(report.partitions, 3);
         assertEquals(report.cassandraMissingPartitions, 0);
         assertEquals(report.rocksDBMissingPartitions, 0);

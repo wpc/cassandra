@@ -40,6 +40,9 @@ public class SanityCheck extends NodeToolCmd
     @Option(name = "-l", description = "Number of rows to check (Default: 0, unlimited).")
     private long limit = 0;
 
+    @Option(name = "-v", description = "Write detailed mismatch into logs (Default: false).")
+    private boolean verbose = false;
+
     @Override
     public void execute(NodeProbe probe)
     {
@@ -47,6 +50,6 @@ public class SanityCheck extends NodeToolCmd
         String ks = args.get(0);
         String cf = args.get(1);
 
-        System.out.println(probe.sanityCheck(ks, cf, randomStartToken, limit));
+        System.out.println(probe.sanityCheck(ks, cf, randomStartToken, limit, verbose));
     }
 }

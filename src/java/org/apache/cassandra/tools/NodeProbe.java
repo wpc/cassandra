@@ -727,10 +727,10 @@ public class NodeProbe implements AutoCloseable
         }));
     }
 
-    public String sanityCheck(String keyspace, String cf, boolean randomStartToken, long limit)
+    public String sanityCheck(String keyspace, String cf, boolean randomStartToken, long limit, boolean verbose)
     {
         ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
-        return cfsProxy.rocksDBSanityCheck(randomStartToken, limit);
+        return cfsProxy.rocksDBSanityCheck(randomStartToken, limit, verbose);
     }
 
     public String getOperationMode()
