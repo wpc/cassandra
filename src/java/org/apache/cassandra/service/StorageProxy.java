@@ -1601,10 +1601,13 @@ public class StorageProxy implements StorageProxyMBean
         try
         {
             PartitionIterator result = fetchRows(group.commands, consistencyLevel);
+            // Note that the only difference between the command in a group must be the partition key on which
+            // they applied.
+            boolean enforceStrictLiveness = group.commands.get(0).metadata().enforceStrictLiveness();
             // If we have more than one command, then despite each read command honoring the limit, the total result
             // might not honor it and so we should enforce it
             if (group.commands.size() > 1)
-                result = group.limits().filter(result, group.nowInSec(), group.selectsFullPartition());
+                result = group.limits().filter(result, group.nowInSec(), group.selectsFullPartition(), enforceStrictLiveness);
             return result;
         }
         catch (UnavailableException e)
@@ -1999,6 +2002,7 @@ public class StorageProxy implements StorageProxyMBean
         private final PartitionRangeReadCommand command;
         private final Keyspace keyspace;
         private final ConsistencyLevel consistency;
+        private final boolean enforceStrictLiveness;
 
         private final long startTime;
         private DataLimits.Counter counter;
@@ -2019,6 +2023,7 @@ public class StorageProxy implements StorageProxyMBean
             this.totalRangeCount = ranges.rangeCount();
             this.consistency = consistency;
             this.keyspace = keyspace;
+            this.enforceStrictLiveness = command.metadata().enforceStrictLiveness();
         }
 
         public RowIterator computeNext()
@@ -2123,7 +2128,7 @@ public class StorageProxy implements StorageProxyMBean
             Tracing.trace("Submitted {} concurrent range requests", concurrentQueries.size());
             // We want to count the results for the sake of updating the concurrency factor (see updateConcurrencyFactor) but we don't want to
             // enforce any particular limit at this point (this could break code than rely on postReconciliationProcessing), hence the DataLimits.NONE.
-            counter = DataLimits.NONE.newCounter(command.nowInSec(), true, command.selectsFullPartition());
+            counter = DataLimits.NONE.newCounter(command.nowInSec(), true, command.selectsFullPartition(), enforceStrictLiveness);
             return counter.applyTo(PartitionIterators.concat(concurrentQueries));
         }
 
@@ -2167,7 +2172,8 @@ public class StorageProxy implements StorageProxyMBean
 
         return command.limits().filter(command.postReconciliationProcessing(new RangeCommandIterator(ranges, command, concurrencyFactor, keyspace, consistencyLevel)),
                                        command.nowInSec(),
-                                       command.selectsFullPartition());
+                                       command.selectsFullPartition(),
+                                       command.metadata().enforceStrictLiveness());
     }
 
     public Map<String, List<String>> getSchemaVersions()
