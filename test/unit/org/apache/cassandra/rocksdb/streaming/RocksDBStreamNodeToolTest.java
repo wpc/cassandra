@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTestBase;
 import org.apache.cassandra.rocksdb.tools.RowIteratorSanityCheck;
 import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
@@ -30,7 +31,7 @@ public class RocksDBStreamNodeToolTest extends RocksDBStreamTestBase
         ColumnFamilyStore cfsStreamFrom = getCurrentColumnFamilyStore();
         File tempFile = File.createTempFile("streamtest-", ".tmp");
         tempFile.deleteOnExit();
-        cfsStreamFrom.exportRocksDBStream(tempFile.getAbsolutePath(), 0);
+        RocksDBEngine.getRocksDBCF(cfsStreamFrom).exportRocksDBStream(tempFile.getAbsolutePath(), 0);
 
         // Create a new table to ingest stream.
         createTable("CREATE TABLE %s (p text, v text, PRIMARY KEY (p))");
@@ -42,7 +43,7 @@ public class RocksDBStreamNodeToolTest extends RocksDBStreamTestBase
 
 
         ColumnFamilyStore cfsIngestStream = getCurrentColumnFamilyStore();
-        cfsIngestStream.ingestRocksDBStream(tempFile.getAbsolutePath());
+        RocksDBEngine.getRocksDBCF(cfsIngestStream).ingestRocksDBStream(tempFile.getAbsolutePath());
 
         for (int i = 0; i < numberOfRows; i ++)
         {

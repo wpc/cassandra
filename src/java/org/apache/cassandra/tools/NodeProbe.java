@@ -75,6 +75,8 @@ import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.ThreadPoolMetrics;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.MessagingServiceMBean;
+import org.apache.cassandra.rocksdb.RocksDBCF;
+import org.apache.cassandra.rocksdb.RocksDBCFMBean;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.CacheServiceMBean;
 import org.apache.cassandra.service.GCInspector;
@@ -729,8 +731,7 @@ public class NodeProbe implements AutoCloseable
 
     public String sanityCheck(String keyspace, String cf, boolean randomStartToken, long limit, boolean verbose)
     {
-        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
-        return cfsProxy.rocksDBSanityCheck(randomStartToken, limit, verbose);
+        return getRocksDBCFProxy(keyspace, cf).rocksDBSanityCheck(randomStartToken, limit, verbose);
     }
 
     public String getOperationMode()
@@ -798,6 +799,32 @@ public class NodeProbe implements AutoCloseable
         }
 
         return cfsProxy;
+    }
+
+    public RocksDBCFMBean getRocksDBCFProxy(String keyspace, String table)
+    {
+        RocksDBCFMBean proxy = null;
+        try
+        {
+            Set<ObjectName> beans = mbeanServerConn.queryNames(new ObjectName(RocksDBCF.getMbeanName(keyspace, table)), null);
+            if (beans.isEmpty())
+                throw new MalformedObjectNameException("Couldn't find that bean.");
+            assert beans.size() == 1;
+            for (ObjectName bean : beans)
+                proxy = JMX.newMBeanProxy(mbeanServerConn, bean, RocksDBCFMBean.class);
+        }
+        catch (MalformedObjectNameException e)
+        {
+            System.err.println("RocksDBCF for " + keyspace + "/" + table + " not found.");
+            System.exit(1);
+        }
+        catch (IOException e)
+        {
+            System.err.println("RocksDBCF for " + keyspace + "/" + table + " not found: " + e);
+            System.exit(1);
+        }
+
+        return proxy;
     }
 
     public StorageProxyMBean getSpProxy()
@@ -1416,20 +1443,17 @@ public class NodeProbe implements AutoCloseable
 
     public String exportRocksDBStream(String keyspace, String cf, String output, int limit) throws IOException, RocksDBException
     {
-        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
-        return cfsProxy.exportRocksDBStream(output, limit);
+        return getRocksDBCFProxy(keyspace, cf).exportRocksDBStream(output, limit);
     }
 
     public String ingestRocksDBStream(String keyspace, String cf, String input) throws IOException, RocksDBException
     {
-        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, cf);
-        return cfsProxy.ingestRocksDBStream(input);
+        return getRocksDBCFProxy(keyspace, cf).ingestRocksDBStream(input);
     }
 
     public String getRocksDBProperty(String keyspace, String table, String property)
     {
-        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
-        return cfsProxy.getRocksDBProperty(property);
+        return getRocksDBCFProxy(keyspace, table).getRocksDBProperty(property);
     }
 
     public boolean isRocksDBBacked(String keyspace, String table)
@@ -1440,8 +1464,7 @@ public class NodeProbe implements AutoCloseable
 
     public String dumpPartition(String keyspace, String table, String partitionKey, int limit)
     {
-        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
-        return cfsProxy.dumpPartition(partitionKey, limit);
+        return getRocksDBCFProxy(keyspace, table).dumpPartition(partitionKey, limit);
     }
 }
 

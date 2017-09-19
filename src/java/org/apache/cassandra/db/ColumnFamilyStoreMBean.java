@@ -175,18 +175,5 @@ public interface ColumnFamilyStoreMBean
      */
     public void compactionDiskSpaceCheck(boolean enable);
 
-    /*
-     * Check the consistency between rocksdb and Cassandra storage engine.
-     */
-    public String rocksDBSanityCheck(boolean randomStartToken, long limit, boolean verbose);
-
-    public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException;
-
-    public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException;
-
-    public String getRocksDBProperty(String property);
-
     public boolean isRocksDBBacked();
-
-    String dumpPartition(String partitionKey, int limit);
 }

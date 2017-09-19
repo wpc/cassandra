@@ -18,19 +18,40 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+
+import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
+import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
+import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
+import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
+import org.apache.cassandra.streaming.StreamSession;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Hex;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
@@ -54,7 +75,7 @@ import static org.apache.cassandra.rocksdb.RocksDBConfigs.ROCKSDB_DIR;
 /**
  * A wrapper around RocksDB instance.
  */
-public class RocksDBCF
+public class RocksDBCF implements RocksDBCFMBean
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private final UUID cfID;
@@ -65,6 +86,7 @@ public class RocksDBCF
     private final Statistics stats;
     private final RocksDBTableMetrics rocksMetrics;
     private final CassandraCompactionFilter compactionFilter;
+    private final String mbeanName;
 
     private final ReadOptions readOptions;
     private final WriteOptions disableWAL;
@@ -138,6 +160,23 @@ public class RocksDBCF
         readOptions = new ReadOptions().setIgnoreRangeDeletions(true);
         disableWAL = new WriteOptions().setDisableWAL(true);
         flushOptions = new FlushOptions().setWaitForFlush(true);
+
+        // Register the mbean.
+        mbeanName = getMbeanName(cfs.keyspace.getName(), cfs.getTableName());
+        try
+        {
+            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            mbs.registerMBean(this, new ObjectName(mbeanName));
+        }
+        catch (Exception e)
+        {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    public static String getMbeanName(String keyspace, String table)
+    {
+        return String.format("org.apache.cassandra.rocksdbcf:keyspace=%s,table=%s", keyspace, table);
     }
 
     public RocksDB getRocksDB()
@@ -266,5 +305,66 @@ public class RocksDBCF
     public UUID getCfID()
     {
         return cfID;
+    }
+
+    @Override
+    public String rocksDBSanityCheck(boolean randomStartToken, long limit, boolean verbose)
+    {
+        return SanityCheckUtils.checkSanity(cfs, randomStartToken, limit, verbose).toString();
+    }
+
+    @Override
+    public String exportRocksDBStream(String outputFile, int limit) throws IOException, RocksDBException
+    {
+        Collection<Range<Token>> ranges = Arrays.asList(new Range<Token>(RocksDBUtils.getMinToken(cfs.getPartitioner()),
+                                                                         RocksDBUtils.getMaxToken(cfs.getPartitioner())));
+        RocksDBStreamWriter writer = new RocksDBStreamWriter(RocksDBEngine.getRocksDBCF(cfs.metadata.cfId), ranges);
+        BufferedDataOutputStreamPlus out = new BufferedDataOutputStreamPlus(new FileOutputStream(outputFile));
+        long startTimeMs = System.currentTimeMillis();
+        writer.write(out, limit);
+        out.close();
+        long timeElapsedMs = Math.max(1, System.currentTimeMillis() - startTimeMs); // Avoid divde by 0 Exception.
+        double streamedMB = writer.getOutgoingBytes() / (1024.0 * 1024 /* MB in bytes */);
+        double throughputMBps = streamedMB / (timeElapsedMs / 1000.0f /* Ms in seconds */);
+        return "Data Streamed: " + streamedMB + "MB, time elapsed: " + timeElapsedMs + " MS, throughput: " + throughputMBps + " MB/S.";
+    }
+
+    @Override
+    public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException
+    {
+        RocksDBStreamReader reader = new RocksDBStreamReader(new RocksDBMessageHeader(cfs.metadata.cfId, 0),
+                                                             new StreamSession(FBUtilities.getBroadcastAddress(), FBUtilities.getBroadcastAddress(), null, 0, false, false));
+        BufferedInputStream stream = new BufferedInputStream(new FileInputStream(inputFile));
+        long startTimeMs = System.currentTimeMillis();
+        reader.read(new DataInputPlus.DataInputStreamPlus(stream));
+        long timeElapsedMs = Math.max(1, System.currentTimeMillis() - startTimeMs); // Avoid divde by 0 Exception.
+        double streamedMB = reader.getTotalIncomingBytes() / (1024.0 * 1024 /* MB in bytes */);
+        double throughputMBps = streamedMB / (timeElapsedMs / 1000.0f /* Ms in seconds */);
+        return "Data Streamed: " + streamedMB + "MB, time elapsed: " + timeElapsedMs + " MS, throughput: " + throughputMBps + " MB/S.";
+    }
+
+    @Override
+    public String getRocksDBProperty(String property)
+    {
+        try
+        {
+            return getProperty(property);
+        } catch (Throwable e) {
+            logger.warn("Failed to get rocksBD property " + property, e);
+            return "Failed to get property:" + property + ", reason:" + e.toString();
+        }
+    }
+
+    public String dumpPartition(String partitionKey, int limit)
+    {
+        try
+        {
+            return engine.dumpPartition(cfs, partitionKey, limit);
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Failed to dump parition " + partitionKey, e);
+            return "Failed to dump:" + partitionKey + ", reason:" + e.toString();
+        }
     }
 }
