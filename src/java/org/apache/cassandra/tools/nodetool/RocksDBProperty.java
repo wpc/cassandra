@@ -3,6 +3,7 @@ package org.apache.cassandra.tools.nodetool;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import io.airlift.command.Arguments;
 import io.airlift.command.Command;
 
 import io.airlift.command.Option;
+import org.apache.cassandra.db.ColumnFamilyStoreMBean;
 import org.apache.cassandra.tools.NodeProbe;
 import org.apache.cassandra.tools.NodeTool.NodeToolCmd;
 
@@ -85,7 +87,7 @@ public class RocksDBProperty extends NodeToolCmd
 
     }
 
-    @Arguments(usage = "<property> <keyspace> <table>", description = "Get rocksdb <property> for a given <keyspace>.<table>")
+    @Arguments(usage = "<property> <keyspace> <table(optional)>", description = "Get rocksdb <property> for a given <keyspace>.<table>")
     private List<String> args = new ArrayList<>();
 
     @Option(title = "list", name = {"-l", "--list"}, description = "List all avaliable properties")
@@ -101,10 +103,26 @@ public class RocksDBProperty extends NodeToolCmd
             }
             return;
         }
-        checkArgument(args.size() == 3, "rocks requires property, keyspace and table.");
+        checkArgument(args.size() >= 2, "rocks requires property, keyspace and table (optional)");
         String property = args.get(0);
         String keyspace = args.get(1);
-        String table = args.get(2);
-        System.out.println(probe.getRocksDBProperty(keyspace, table, PROPERTY_PREFIX + property));
+
+        if (args.size() == 3)
+        {
+            System.out.println(probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property));
+            return;
+        }
+
+        Iterator<Map.Entry<String, ColumnFamilyStoreMBean>> tables = probe.getColumnFamilyStoreMBeanProxies();
+        while (tables.hasNext())
+        {
+            Map.Entry<String, ColumnFamilyStoreMBean> entry = tables.next();
+            String keyspaceName = entry.getKey();
+            if (!keyspaceName.equals(keyspace))
+                continue;
+            String tableName = entry.getValue().getTableName();
+            System.out.println("Table: " + tableName);
+            System.out.println(probe.getRocksDBProperty(keyspace, tableName, PROPERTY_PREFIX + property));
+        }
     }
 }
