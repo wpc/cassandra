@@ -111,6 +111,7 @@ public class NodeTool
                 SetStreamThroughput.class,
                 SetInterDCStreamThroughput.class,
                 SetTraceProbability.class,
+                StreamingConsistencyCheck.class,
                 Snapshot.class,
                 ListSnapshots.class,
                 Status.class,

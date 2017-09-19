@@ -50,6 +50,7 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
 import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
+import org.apache.cassandra.rocksdb.tools.StreamingConsistencyCheckUtils;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Hex;
@@ -355,6 +356,7 @@ public class RocksDBCF implements RocksDBCFMBean
         }
     }
 
+    @Override
     public String dumpPartition(String partitionKey, int limit)
     {
         try
@@ -366,5 +368,11 @@ public class RocksDBCF implements RocksDBCFMBean
             logger.warn("Failed to dump parition " + partitionKey, e);
             return "Failed to dump:" + partitionKey + ", reason:" + e.toString();
         }
+    }
+
+    @Override
+    public String streamingConsistencyCheck(int expectedNumKeys)
+    {
+        return StreamingConsistencyCheckUtils.checkAndGenerateReport(cfs, expectedNumKeys);
     }
 }

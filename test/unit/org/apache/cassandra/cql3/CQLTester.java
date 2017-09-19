@@ -671,7 +671,7 @@ public abstract class CQLTester
         Assert.assertEquals(argTypes != null ? Arrays.asList(argTypes) : null, schemaChange.change.argTypes);
     }
 
-    protected static void schemaChange(String query)
+    protected static void schemaChange(String query, boolean validate)
     {
         try
         {
@@ -680,7 +680,8 @@ public abstract class CQLTester
             QueryState queryState = new QueryState(state);
 
             ParsedStatement.Prepared prepared = QueryProcessor.parseStatement(query, queryState);
-            prepared.statement.validate(state);
+            if (validate)
+                prepared.statement.validate(state);
 
             QueryOptions options = QueryOptions.forInternalCalls(Collections.<ByteBuffer>emptyList());
 
@@ -691,6 +692,11 @@ public abstract class CQLTester
             logger.info("Error performing schema change", e);
             throw new RuntimeException("Error setting schema for test (query was: " + query + ")", e);
         }
+    }
+
+    protected static void schemaChange(String query)
+    {
+        schemaChange(query, true);
     }
 
     protected CFMetaData currentTableMetadata()

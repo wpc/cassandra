@@ -734,6 +734,11 @@ public class NodeProbe implements AutoCloseable
         return getRocksDBCFProxy(keyspace, cf).rocksDBSanityCheck(randomStartToken, limit, verbose);
     }
 
+    public String streamingConsistencyCheck(String keyspace, String table, int expectedNumKeys)
+    {
+        return getRocksDBCFProxy(keyspace, table).streamingConsistencyCheck(expectedNumKeys);
+    }
+
     public String getOperationMode()
     {
         return ssProxy.getOperationMode();

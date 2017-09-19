@@ -18,6 +18,7 @@ package org.apache.cassandra.rocksdb;/*
 
 import java.io.IOException;
 
+import org.apache.cassandra.rocksdb.tools.StreamingConsistencyCheckUtils;
 import org.rocksdb.RocksDBException;
 
 public interface RocksDBCFMBean
@@ -34,4 +35,9 @@ public interface RocksDBCFMBean
     public String getRocksDBProperty(String property);
 
     String dumpPartition(String partitionKey, int limit);
+
+    /*
+     * Check the consistency of this table after streaming.
+     */
+    public String streamingConsistencyCheck(int expectedNumKeys);
 }
