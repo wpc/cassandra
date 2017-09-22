@@ -1,5 +1,6 @@
 package org.apache.cassandra.rocksdb;
 
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -20,8 +21,10 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
     }
 
     @Test
-    public void testDoubleWriteAndCheckSanity() throws Throwable
+    public void test() throws Throwable
     {
+        // There is some race condition between test set up and tear down which prevents me from spliting this into multiple tests.
+        // Took me some time to debug but I failed to find the root cause. I'll leave it as it's now.
         createTable("CREATE TABLE %s (p text, v text, PRIMARY KEY (p))");
         execute("INSERT INTO %s(p, v) values (?, ?)", "p1", "v0");
         execute("INSERT INTO %s(p, v) values (?, ?)", "p2", "v0");
@@ -29,9 +32,11 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
 
         SinglePartitionReadCommand readCommand = readCommand("p1", "v");
 
+        // Assert both RocksDB and Cassandra hava data.
         assertEquals(1, queryEngine(readCommand).size());
         assertEquals(1, queryCassandraStorage(readCommand).size());
 
+        // Verify the correctness of report.
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         RowIteratorSanityCheck.Report report = SanityCheckUtils.checkSanity(cfs, false, 0, false);
         assertEquals(report.partitions, 3);
@@ -44,5 +49,10 @@ public class RocksDBDoubleWriteSanityCheckTest extends RocksDBTestBase
         assertEquals(report.cassandraMissingRows, 0);
         assertEquals(report.rocksDBMissingRows, 0);
         assertEquals(report.mismatchRows, 0);
+
+        // Verify limit works.
+        int limit = 1;
+        report = SanityCheckUtils.checkSanity(cfs, false, limit, false);
+        assertEquals(report.partitions, limit);
     }
 }

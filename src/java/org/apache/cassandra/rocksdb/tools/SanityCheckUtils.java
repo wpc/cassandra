@@ -69,6 +69,8 @@ public class SanityCheckUtils
                SinglePartitionReadCommand.fullPartitionRead(cfs.metadata, nowInSecond,
                                                             cassandraRowIterator.partitionKey()));
             check.compare(cassandraRowIterator.partitionKey(), cassandraRowIterator, rocksdbRowIterator);
+
+            count ++;
             if (limit > 0 && count >= limit)
                 break;
         }

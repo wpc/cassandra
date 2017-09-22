@@ -220,6 +220,7 @@ public class RowIteratorSanityCheck
 
     public static class Report
     {
+        public final String tableName;
         public final Token startToken;
         public final long partitions;
         public final long cassandraMissingPartitions;
@@ -237,6 +238,7 @@ public class RowIteratorSanityCheck
 
         public Report(RowIteratorSanityCheck comparator)
         {
+            this.tableName = comparator.metaData.ksName + "." + comparator.metaData.cfName;
             this.startToken = comparator.startToken;
             this.partitions = comparator.partitions;
             this.cassandraMissingPartitions = comparator.cassandraMissingPartitions;
@@ -256,7 +258,7 @@ public class RowIteratorSanityCheck
         public String toString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.append("Sanity check result:")
+            sb.append("Sanity check result of ").append(tableName)
               .append("\n  start token: ").append(startToken)
               .append("\n  total partitions: ").append(partitions)
               .append("\n    cassandra missing partitions: ").append(cassandraMissingPartitions)
