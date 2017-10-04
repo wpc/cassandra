@@ -1,7 +1,7 @@
 # Pluggable storage engine
 
 The storage engine interface is defined at <code>org.apache.cassandra.engine.StorageEngine.java</code>,
-under the interface, we implement the <code>org.apache.cassandra.rocksdb.RocksDBEngine</code>.
+under the interface, we implement the <code>org.apache.cassandra.rocksdb.RocksDBEngine.java</code>.
 
 As in beta version, to enable RocksDBEngine for your keyspace, you just need to add following JVM options
 when starting Cassandrda:
@@ -10,7 +10,7 @@ when starting Cassandrda:
 -Dcassandra.rocksdb.dir=<your directory to put RocksDB data>
 -Dcassandra.rocksdb.stream.dir=<your temp directory to put RocksDB streaming files>
 ```
-Under the ```-Dcassandra.rocksdb.stream.dir```, directories will be created automatically for each RocksDB
+Under the ```-Dcassandra.rocksdb.dir```, directories will be created automatically for each RocksDB
 based keyspace and columnfamily.
 
 ## Features
