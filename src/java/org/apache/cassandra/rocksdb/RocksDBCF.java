@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import javax.management.MBeanServer;
@@ -63,7 +64,9 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Env;
 import org.rocksdb.FlushOptions;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -86,13 +89,13 @@ public class RocksDBCF implements RocksDBCFMBean
     private final RocksDB rocksDB;
     private final Statistics stats;
     private final RocksDBTableMetrics rocksMetrics;
-    private final CassandraCompactionFilter compactionFilter;
     private final String mbeanName;
+    private final CassandraCompactionFilter compactionFilter;
+    private final CassandraValueMergeOperator mergeOperator;
 
     private final ReadOptions readOptions;
     private final WriteOptions disableWAL;
     private final FlushOptions flushOptions;
-    private final CassandraValueMergeOperator mergeOperator;
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -101,57 +104,85 @@ public class RocksDBCF implements RocksDBCFMBean
         partitioner = cfs.getPartitioner();
         engine = (RocksDBEngine) cfs.engine;
 
-        final long writeBufferSize = RocksDBConfigs.WRITE_BUFFER_SIZE_MBYTES * 1024 * 1024L;
-        final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
-        int gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
-        boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
-        DBOptions dbOptions = new DBOptions();
-        stats = new Statistics();
-        stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
-
-        compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
-        mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds);
-
-        dbOptions.setCreateIfMissing(true);
-        dbOptions.setAllowConcurrentMemtableWrite(true);
-        dbOptions.setEnableWriteThreadAdaptiveYield(true);
-        dbOptions.setBytesPerSync(1024 * 1024);
-        dbOptions.setWalBytesPerSync(1024 * 1024);
-        dbOptions.setMaxBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
-        dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
-        dbOptions.setMaxBackgroundFlushes(4);
-        
-        dbOptions.setMaxSubcompactions(8);
-        dbOptions.setStatistics(stats);
-        dbOptions.setRateLimiter(engine.rateLimiter);
-
-        ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
-        columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
-        columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
-        columnFamilyOptions.setWriteBufferSize(writeBufferSize);
-        columnFamilyOptions.setMaxWriteBufferNumber(4);
-        columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
-        columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
-        columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
-        columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-        columnFamilyOptions.setMergeOperator(mergeOperator);
-        columnFamilyOptions.setCompactionFilter(compactionFilter);
-        columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
-
-        final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
-        final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-        tableOptions.setFilter(bloomFilter);
-        tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
-        columnFamilyOptions.setTableFormatConfig(tableOptions);
-
-        ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
-
         String rocksDBTableDir = ROCKSDB_DIR + "/" + cfs.keyspace.getName() + "/" + cfs.name;
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
-        rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, Collections.singletonList(columnFamilyDescriptor), new ArrayList<>(1));
+
+        final long writeBufferSize = RocksDBConfigs.WRITE_BUFFER_SIZE_MBYTES * 1024 * 1024L;
+        final long softPendingCompactionBytesLimit = 100 * 64 * 1073741824L;
+        
+        int gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
+        boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
+        compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
+        mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds);
+        
+        DBOptions dbOptions = new DBOptions();
+        List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
+
+        boolean loadedLatestOptions = false;
+        try
+        {
+            OptionsUtil.loadLatestOptions(rocksDBTableDir, Env.getDefault(), dbOptions, cfDescs, false);
+            loadedLatestOptions = true;
+        }
+        catch (RocksDBException ex)
+        {
+            logger.warn("Failed to load lastest RocksDB options for cf {}.{}",
+                        cfs.keyspace.getName(), cfs.name);
+        }
+
+        // create options
+        if (!loadedLatestOptions) {
+            // db options
+            dbOptions.setCreateIfMissing(true);
+            dbOptions.setAllowConcurrentMemtableWrite(true);
+            dbOptions.setEnableWriteThreadAdaptiveYield(true);
+            dbOptions.setBytesPerSync(1024 * 1024);
+            dbOptions.setWalBytesPerSync(1024 * 1024);
+            dbOptions.setMaxBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
+            dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
+            dbOptions.setMaxBackgroundFlushes(4);
+            dbOptions.setMaxSubcompactions(8);
+
+            // column family options
+            cfDescs.clear();
+
+            ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
+            columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
+            columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
+            columnFamilyOptions.setWriteBufferSize(writeBufferSize);
+            columnFamilyOptions.setMaxWriteBufferNumber(4);
+            columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
+            columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
+            columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
+            columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+            columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+            columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+            columnFamilyOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
+
+            final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
+            final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
+            tableOptions.setFilter(bloomFilter);
+            tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
+            columnFamilyOptions.setTableFormatConfig(tableOptions);
+            ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
+            cfDescs.add(columnFamilyDescriptor);
+        }
+
+        assert cfDescs.size() == 1;
+        assert Arrays.equals(cfDescs.get(0).columnFamilyName(), RocksDB.DEFAULT_COLUMN_FAMILY);
+
+        ColumnFamilyOptions cfOptions = cfDescs.get(0).columnFamilyOptions();
+        cfOptions.setMergeOperator(mergeOperator);
+        cfOptions.setCompactionFilter(compactionFilter);
+
+        stats = new Statistics();
+        stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
+        
+        dbOptions.setStatistics(stats);
+        dbOptions.setRateLimiter(engine.rateLimiter);
+        
+        rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, new ArrayList<>(1));
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
