@@ -87,7 +87,7 @@ public class RocksDBProperty extends NodeToolCmd
 
     }
 
-    @Arguments(usage = "<property> <keyspace> <table(optional)>", description = "Get rocksdb <property> for a given <keyspace>.<table>")
+    @Arguments(usage = "<property> <keyspace(optional)> <table(optional)>", description = "Get rocksdb <property> for a given <keyspace>.<table>")
     private List<String> args = new ArrayList<>();
 
     @Option(title = "list", name = {"-l", "--list"}, description = "List all avaliable properties")
@@ -103,9 +103,9 @@ public class RocksDBProperty extends NodeToolCmd
             }
             return;
         }
-        checkArgument(args.size() >= 2, "rocks requires property, keyspace and table (optional)");
+        checkArgument(args.size() >= 1, "rocks requires property, keyspace(optional) and table (optional)");
         String property = args.get(0);
-        String keyspace = args.get(1);
+        String keyspace = args.size() >= 2 ? args.get(1) : null;
 
         if (args.size() == 3)
         {
@@ -118,11 +118,15 @@ public class RocksDBProperty extends NodeToolCmd
         {
             Map.Entry<String, ColumnFamilyStoreMBean> entry = tables.next();
             String keyspaceName = entry.getKey();
-            if (!keyspaceName.equals(keyspace))
-                continue;
             String tableName = entry.getValue().getTableName();
-            System.out.println("Table: " + tableName);
-            System.out.println(probe.getRocksDBProperty(keyspace, tableName, PROPERTY_PREFIX + property));
+
+            if (!probe.isRocksDBBacked(keyspaceName, tableName))
+                continue;
+
+            if (keyspace != null && !keyspaceName.equals(keyspace))
+                continue;
+            System.out.println("Table: " + keyspaceName + "." + tableName);
+            System.out.println(probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property));
         }
     }
 }
