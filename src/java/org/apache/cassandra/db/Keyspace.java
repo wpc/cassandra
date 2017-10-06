@@ -45,6 +45,10 @@ import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.metrics.KeyspaceMetrics;
+import org.apache.cassandra.metrics.TableMetrics;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
+import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.tracing.Tracing;
@@ -65,6 +69,8 @@ public class Keyspace
     private static int TEST_FAIL_MV_LOCKS_COUNT = Integer.getInteger("cassandra.test.fail_mv_locks_count", 0);
 
     public final KeyspaceMetrics metric;
+
+    public final StorageEngine engine;
 
     // It is possible to call Keyspace.open without a running daemon, so it makes sense to ensure
     // proper directories here as well as in CassandraDaemon.
@@ -297,6 +303,11 @@ public class Keyspace
         assert metadata != null : "Unknown keyspace " + keyspaceName;
         createReplicationStrategy(metadata);
 
+        if (keyspaceName.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
+            engine = new RocksDBEngine(this);
+        else
+            engine = null;
+
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
         for (CFMetaData cfm : metadata.tablesAndViews())
@@ -313,6 +324,10 @@ public class Keyspace
         createReplicationStrategy(metadata);
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
+        if (metadata.name.equals(RocksDBConfigs.ROCKSDB_KEYSPACE))
+            engine = new RocksDBEngine(this);
+        else
+            engine = null;
     }
 
     public static Keyspace mockKS(KeyspaceMetadata metadata)
@@ -548,31 +563,50 @@ public class Keyspace
                     logger.error("Attempting to mutate non-existant table {} ({}.{})", upd.metadata().cfId, upd.metadata().ksName, upd.metadata().cfName);
                     continue;
                 }
-                AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
 
-                if (requiresViewUpdate)
+                // Update the storage engine first in the double writing senario:
+                // In case that Cassandra storage engine treats the bytebuffers in PartitionUpdate as mutable (such as read several bytes from the bytebuffer
+                // without duplicating it) and corrupts the data accordingly.
+                if (engine != null)
                 {
-                    try
-                    {
-                        Tracing.trace("Creating materialized view mutations from base table replica");
-                        viewManager.forTable(upd.metadata()).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
-                    }
-                    catch (Throwable t)
-                    {
-                        JVMStabilityInspector.inspectThrowable(t);
-                        logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s.%s",
-                                     upd.metadata().ksName, upd.metadata().cfName), t);
-                        throw t;
-                    }
+                    long start = System.nanoTime();
+                    engine.apply(cfs, upd, writeCommitLog);
+                    cfs.metric.samplers.get(TableMetrics.Sampler.WRITES).addSample(upd.partitionKey().getKey(), upd.partitionKey().hashCode(), 1);
+                    cfs.metric.writeLatency.addNano(System.nanoTime() - start);
                 }
 
-                Tracing.trace("Adding to {} memtable", upd.metadata().cfName);
-                UpdateTransaction indexTransaction = updateIndexes
-                                                     ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
-                                                     : UpdateTransaction.NO_OP;
-                cfs.apply(upd, indexTransaction, opGroup, replayPosition);
-                if (requiresViewUpdate)
-                    baseComplete.set(System.currentTimeMillis());
+                if (engine == null || engine.doubleWrite())
+                {
+
+                    AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
+
+                    if (requiresViewUpdate)
+                    {
+                        try
+                        {
+                            Tracing.trace("Creating materialized view mutations from base table replica");
+                            viewManager.forTable(upd.metadata()).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
+                        }
+                        catch (Throwable t)
+                        {
+                            JVMStabilityInspector.inspectThrowable(t);
+                            logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s.%s",
+                                                       upd.metadata().ksName, upd.metadata().cfName), t);
+                            throw t;
+                        }
+                    }
+
+                    Tracing.trace("Adding to {} memtable", upd.metadata().cfName);
+                    UpdateTransaction indexTransaction = updateIndexes
+                                                         ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
+                                                         : UpdateTransaction.NO_OP;
+
+                    cfs.apply(upd, indexTransaction, opGroup, replayPosition);
+
+                    if (requiresViewUpdate)
+                        baseComplete.set(System.currentTimeMillis());
+                }
+
             }
 
             if (future != null) {
@@ -682,6 +716,15 @@ public class Keyspace
     public static Iterable<Keyspace> system()
     {
         return Iterables.transform(Schema.SYSTEM_KEYSPACE_NAMES, keyspaceTransformer);
+    }
+
+    public void close()
+    {
+        if (engine == null)
+            return;
+
+        for (ColumnFamilyStore cfs : columnFamilyStores.values())
+            engine.close(cfs);
     }
 
     @Override

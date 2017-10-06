@@ -135,6 +135,7 @@ public final class SchemaKeyspace
                 + "max_index_interval int,"
                 + "memtable_flush_period_in_ms int,"
                 + "min_index_interval int,"
+                + "purge_ttl_on_expiration boolean,"
                 + "read_repair_chance double,"
                 + "speculative_retry text,"
                 + "PRIMARY KEY ((keyspace_name), table_name))");
@@ -198,6 +199,7 @@ public final class SchemaKeyspace
                 + "max_index_interval int,"
                 + "memtable_flush_period_in_ms int,"
                 + "min_index_interval int,"
+                + "purge_ttl_on_expiration boolean,"
                 + "read_repair_chance double,"
                 + "speculative_retry text,"
                 + "PRIMARY KEY ((keyspace_name), view_name))");
@@ -525,6 +527,7 @@ public final class SchemaKeyspace
              .add("read_repair_chance", params.readRepairChance)
              .add("speculative_retry", params.speculativeRetry.toString())
              .add("crc_check_chance", params.crcCheckChance)
+             .add("purge_ttl_on_expiration", params.purgeTtlOnExpiration)
              .frozenMap("caching", params.caching.asMap())
              .frozenMap("compaction", params.compaction.asMap())
              .frozenMap("compression", params.compression.asMap())
@@ -1031,6 +1034,7 @@ public final class SchemaKeyspace
                           .readRepairChance(row.getDouble("read_repair_chance"))
                           .crcCheckChance(row.getDouble("crc_check_chance"))
                           .speculativeRetry(SpeculativeRetryParam.fromString(row.getString("speculative_retry")))
+                          .purgeTtlOnExpiration(row.has("purge_ttl_on_expiration") ? row.getBoolean("purge_ttl_on_expiration") : false)
                           .build();
     }
 

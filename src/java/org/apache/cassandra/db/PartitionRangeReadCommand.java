@@ -61,7 +61,7 @@ public class PartitionRangeReadCommand extends ReadCommand
     private final DataRange dataRange;
     private int oldestUnrepairedTombstone = Integer.MAX_VALUE;
 
-    private PartitionRangeReadCommand(boolean isDigest,
+    protected PartitionRangeReadCommand(boolean isDigest,
                                       int digestVersion,
                                       boolean isForThrift,
                                       CFMetaData metadata,

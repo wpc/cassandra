@@ -57,7 +57,7 @@ public class ProgressInfo implements Serializable
 
     public ProgressInfo(InetAddress peer, int sessionIndex, String fileName, Direction direction, long currentBytes, long totalBytes)
     {
-        assert totalBytes > 0;
+        totalBytes = Math.max(totalBytes, 1);
 
         this.peer = peer;
         this.sessionIndex = sessionIndex;

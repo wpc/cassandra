@@ -68,6 +68,7 @@ cp -p redhat/%{username} %{buildroot}%{_sysconfdir}/rc.d/init.d/
 cp -p redhat/%{username}.conf %{buildroot}%{_sysconfdir}/security/limits.d/
 cp -p redhat/default %{buildroot}%{_sysconfdir}/default/%{username}
 cp -p lib/*.jar %{buildroot}/usr/share/%{username}/lib
+cp -p tools/lib/*.jar %{buildroot}/usr/share/%{username}/lib
 cp -p pylib/*.py %{buildroot}/usr/share/%{username}/pylib
 cp -p pylib/cqlshlib/*.py %{buildroot}/usr/share/%{username}/pylib/cqlshlib
 cp -p %{SOURCE1} %{buildroot}%{_sysconfdir}/profile.d/

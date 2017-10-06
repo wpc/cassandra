@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2015-present, Facebook, Inc.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the LICENSE file in
+# the root directory of this source tree.
+
+import logging
+import os
+import shutil
+import sys
+import subprocess
+
+# Set up the logging early on in the process.
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+# Add the lib/ directory to $PYTHONPATH so library code can be imported.
+sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
+import util
+
+if len(sys.argv) != 2:
+   logging.error("Usage: scripts/publish <everstore-handle>")
+   sys.exit(-1)
+
+everstore_handle = sys.argv[1]
+
+rpm_dir = os.path.join(util.PROJECT_ROOT, 'build/rpm')
+artifact_bundle = "/tmp/%s.tgz" % everstore_handle
+shutil.rmtree(rpm_dir, ignore_errors=True)
+
+logging.info(">>>> Dowload from everstore handle %s", everstore_handle)
+subprocess.check_call(['everstore_get', artifact_bundle, everstore_handle])
+
+logging.info(">>>> Unpack %s to %s", artifact_bundle, rpm_dir)
+subprocess.check_call(['tar', '-zxvf', artifact_bundle, '-C', util.PROJECT_ROOT])
+
+
+os.chdir(rpm_dir)
+rpms = [f for f in os.listdir('.') if f.endswith('.rpm')]
+if len(rpms) == 0:
+    logging.error("Can not find any rpm to publish, check your build log!")
+    sys.exit(-1)
+
+if len(rpms) > 1:
+    logging.error("Multiple rpms in the artifact exists, check your build log! ")
+    sys.exit(-1)
+
+
+logging.info(">>>> Start publishing %s", rpms[0])
+subprocess.check_call(['svnyum', 'publish', 'common', rpms[0]])

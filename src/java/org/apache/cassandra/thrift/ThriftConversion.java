@@ -327,6 +327,8 @@ public class ThriftConversion
                 newCFMD.comment(cf_def.comment);
             if (cf_def.isSetCompression_options())
                 newCFMD.compression(compressionParametersFromThrift(cf_def.compression_options));
+            if (cf_def.isSetPurge_ttl_on_expiration())
+                newCFMD.purgeTtlOnExpiration(cf_def.purge_ttl_on_expiration);
 
             return newCFMD;
         }
@@ -439,6 +441,9 @@ public class ThriftConversion
             // ensure the max is at least as large as the min
             cf_def.setMax_index_interval(Math.max(cf_def.min_index_interval, TableParams.DEFAULT_MAX_INDEX_INTERVAL));
         }
+
+        if (!cf_def.isSetPurge_ttl_on_expiration())
+            cf_def.setPurge_ttl_on_expiration(TableParams.DEFAULT_PURGE_TTL_ON_EXPIRATION);
     }
 
     public static CfDef toThrift(CFMetaData cfm)
@@ -480,6 +485,7 @@ public class ThriftConversion
         def.setDefault_time_to_live(cfm.params.defaultTimeToLive);
         def.setSpeculative_retry(cfm.params.speculativeRetry.toString());
         def.setTriggers(triggerDefinitionsToThrift(cfm.getTriggers()));
+        def.setPurge_ttl_on_expiration(cfm.params.purgeTtlOnExpiration);
 
         return def;
     }

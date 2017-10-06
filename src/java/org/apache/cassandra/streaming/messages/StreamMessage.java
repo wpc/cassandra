@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
+import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
+import org.apache.cassandra.rocksdb.streaming.RocksDBOutgoingMessage;
 import org.apache.cassandra.streaming.StreamSession;
 
 /**
@@ -85,7 +87,8 @@ public abstract class StreamMessage
         RECEIVED(3, 4, ReceivedMessage.serializer),
         RETRY(4, 4, RetryMessage.serializer),
         COMPLETE(5, 1, CompleteMessage.serializer),
-        SESSION_FAILED(6, 5, SessionFailedMessage.serializer);
+        SESSION_FAILED(6, 5, SessionFailedMessage.serializer),
+        ROCKSFILE(7, 0, RocksDBIncomingMessage.serializer, RocksDBOutgoingMessage.SERIALIZER);
 
         public static Type get(byte type)
         {

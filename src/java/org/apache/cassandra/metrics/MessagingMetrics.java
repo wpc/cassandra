@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.cassandra.metrics;
 
 import java.net.InetAddress;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Timer;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -67,7 +67,6 @@ public class MessagingMetrics
         Timer timer = processingLatency.get(verb);
         if (timer == null)
         {
-
             timer = processingLatency.computeIfAbsent(verb, k -> Metrics.timer(factory.createMetricName(verb.toString() + "-ProcessingLatency")));
         }
         timer.update(timeTaken, timeUnit);

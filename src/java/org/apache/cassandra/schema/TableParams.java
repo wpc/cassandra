@@ -48,7 +48,8 @@ public final class TableParams
         MIN_INDEX_INTERVAL,
         READ_REPAIR_CHANCE,
         SPECULATIVE_RETRY,
-        CRC_CHECK_CHANCE;
+        CRC_CHECK_CHANCE,
+        PURGE_TTL_ON_EXPIRATION;
 
         @Override
         public String toString()
@@ -66,6 +67,7 @@ public final class TableParams
     public static final int DEFAULT_MIN_INDEX_INTERVAL = 128;
     public static final int DEFAULT_MAX_INDEX_INTERVAL = 2048;
     public static final double DEFAULT_CRC_CHECK_CHANCE = 1.0;
+    public static final boolean DEFAULT_PURGE_TTL_ON_EXPIRATION = false;
 
     public final String comment;
     public final double readRepairChance;
@@ -82,6 +84,7 @@ public final class TableParams
     public final CompactionParams compaction;
     public final CompressionParams compression;
     public final ImmutableMap<String, ByteBuffer> extensions;
+    public final boolean purgeTtlOnExpiration;
 
     private TableParams(Builder builder)
     {
@@ -102,6 +105,7 @@ public final class TableParams
         compaction = builder.compaction;
         compression = builder.compression;
         extensions = builder.extensions;
+        purgeTtlOnExpiration = builder.purgeTtlOnExpiration;
     }
 
     public static Builder builder()
@@ -125,7 +129,8 @@ public final class TableParams
                             .minIndexInterval(params.minIndexInterval)
                             .readRepairChance(params.readRepairChance)
                             .speculativeRetry(params.speculativeRetry)
-                            .extensions(params.extensions);
+                            .extensions(params.extensions)
+                            .purgeTtlOnExpiration(params.purgeTtlOnExpiration);
     }
 
     public void validate()
@@ -215,7 +220,8 @@ public final class TableParams
             && caching.equals(p.caching)
             && compaction.equals(p.compaction)
             && compression.equals(p.compression)
-            && extensions.equals(p.extensions);
+            && extensions.equals(p.extensions)
+            && purgeTtlOnExpiration == p.purgeTtlOnExpiration;
     }
 
     @Override
@@ -235,7 +241,8 @@ public final class TableParams
                                 caching,
                                 compaction,
                                 compression,
-                                extensions);
+                                extensions,
+                                purgeTtlOnExpiration);
     }
 
     @Override
@@ -257,6 +264,7 @@ public final class TableParams
                           .add(Option.COMPACTION.toString(), compaction)
                           .add(Option.COMPRESSION.toString(), compression)
                           .add(Option.EXTENSIONS.toString(), extensions)
+                          .add(Option.PURGE_TTL_ON_EXPIRATION.toString(), purgeTtlOnExpiration)
                           .toString();
     }
 
@@ -277,6 +285,7 @@ public final class TableParams
         private CompactionParams compaction = CompactionParams.DEFAULT;
         private CompressionParams compression = CompressionParams.DEFAULT;
         private ImmutableMap<String, ByteBuffer> extensions = ImmutableMap.of();
+        private boolean purgeTtlOnExpiration = DEFAULT_PURGE_TTL_ON_EXPIRATION;
 
         public Builder()
         {
@@ -374,6 +383,12 @@ public final class TableParams
         public Builder extensions(Map<String, ByteBuffer> val)
         {
             extensions = ImmutableMap.copyOf(val);
+            return this;
+        }
+
+        public Builder purgeTtlOnExpiration(Boolean val)
+        {
+            purgeTtlOnExpiration = val;
             return this;
         }
     }

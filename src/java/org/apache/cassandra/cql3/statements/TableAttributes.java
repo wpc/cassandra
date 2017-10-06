@@ -131,6 +131,9 @@ public final class TableAttributes extends PropertyDefinitions
         if (hasOption(Option.CRC_CHECK_CHANCE))
             builder.crcCheckChance(getDouble(Option.CRC_CHECK_CHANCE));
 
+        if (hasOption(Option.PURGE_TTL_ON_EXPIRATION))
+            builder.purgeTtlOnExpiration(getBoolean(Option.PURGE_TTL_ON_EXPIRATION));
+
         return builder.build();
     }
 
@@ -145,6 +148,12 @@ public final class TableAttributes extends PropertyDefinitions
         {
             throw new SyntaxException(String.format("Invalid double value %s for crc_check_chance.'", value));
         }
+    }
+
+    private boolean getBoolean(Option option)
+    {
+        String value = getString(option);
+        return Boolean.parseBoolean(value);
     }
 
     private double getDouble(Option option)

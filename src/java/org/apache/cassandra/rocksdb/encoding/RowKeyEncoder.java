@@ -1,0 +1,148 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.cassandra.rocksdb.encoding;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.db.ClusteringPrefix;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.CompositeType;
+import org.apache.cassandra.db.marshal.IntegerType;
+import org.apache.cassandra.db.marshal.LongType;
+import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.dht.RandomPartitioner;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.utils.Pair;
+
+public class RowKeyEncoder
+{
+
+    public static byte[] encode(DecoratedKey partitionKey, ClusteringPrefix clustering, CFMetaData metadata)
+    {
+        int keyPartsSize = metadata.partitionKeyColumns().size() + metadata.clusteringColumns().size() + 1;
+        List<Pair<AbstractType, ByteBuffer>> keyParts = new ArrayList<>(keyPartsSize);
+        appendTokenKeyPart(keyParts, partitionKey);
+        appendPartitionKeyParts(keyParts, metadata.partitionKeyColumns(), partitionKey);
+        appendClusteringKeyParts(keyParts, metadata.clusteringColumns(), clustering);
+        assert keyParts.size() == keyPartsSize;
+        return KeyPartsEncoder.encode(keyParts);
+    }
+
+    public static byte[] encode(DecoratedKey partitionKey, CFMetaData metadata)
+    {
+        int keyPartsSize = metadata.partitionKeyColumns().size() + 1;
+        List<Pair<AbstractType, ByteBuffer>> keyParts = new ArrayList<>(keyPartsSize);
+        appendTokenKeyPart(keyParts, partitionKey);
+        appendPartitionKeyParts(keyParts, metadata.partitionKeyColumns(), partitionKey);
+        assert keyParts.size() == keyPartsSize;
+        return KeyPartsEncoder.encode(keyParts);
+    }
+
+    public static byte[] encodeToken(Token token)
+    {
+        return KeyPartsEncoder.encode(Collections.singletonList(createTokenKeyPart(token)));
+    }
+
+    public static ByteBuffer[] decode(byte[] key, CFMetaData metadata)
+    {
+        List<ColumnDefinition> partitionKeyColumns = metadata.partitionKeyColumns();
+        List<ColumnDefinition> clusteringColumns = metadata.clusteringColumns();
+        List<AbstractType> types = new ArrayList<>(partitionKeyColumns.size() + clusteringColumns.size() + 1);
+        types.add(getTokenDataType(metadata.partitioner));
+        for (ColumnDefinition partitionKeyColumn : partitionKeyColumns)
+        {
+            types.add(partitionKeyColumn.type);
+        }
+        for (ColumnDefinition clusteringColumn : clusteringColumns)
+        {
+            types.add(clusteringColumn.type);
+        }
+
+        ByteBuffer[] decoded = KeyPartsEncoder.decode(key, types);
+        assert decoded.length > 1;
+        return Arrays.copyOfRange(decoded, 1, decoded.length);
+    }
+
+
+    private static void appendClusteringKeyParts(List<Pair<AbstractType, ByteBuffer>> keyParts, List<ColumnDefinition> clusteringColumns, ClusteringPrefix clustering)
+    {
+        for (int i = 0; i < clusteringColumns.size(); i++)
+        {
+            ColumnDefinition clusteringColumn = clusteringColumns.get(i);
+            keyParts.add(Pair.create(clusteringColumn.type, clustering.get(i).duplicate()));
+        }
+    }
+
+    private static void appendPartitionKeyParts(List<Pair<AbstractType, ByteBuffer>> keyParts, List<ColumnDefinition> partitionKeyColumns, DecoratedKey partitionKey)
+    {
+        ByteBuffer paritionkeyBuffer = partitionKey.getKey().duplicate();
+        if (partitionKeyColumns.size() == 1) {
+            // optimize for none composite situation
+            keyParts.add(Pair.create(partitionKeyColumns.get(0).type, paritionkeyBuffer));
+            return;
+        }
+
+        List<AbstractType<?>> types = new ArrayList<>(partitionKeyColumns.size());
+        for (ColumnDefinition partitionKeyColumn : partitionKeyColumns)
+        {
+            types.add(partitionKeyColumn.type);
+        }
+        CompositeType compositeType = CompositeType.getInstance(types);
+        ByteBuffer[] buffers = compositeType.split(paritionkeyBuffer);
+        for (int i = 0; i < buffers.length; i++)
+        {
+            keyParts.add(Pair.create(types.get(i), buffers[i]));
+        }
+    }
+
+    private static void appendTokenKeyPart(List<Pair<AbstractType, ByteBuffer>> keyParts, DecoratedKey partitionKey)
+    {
+        keyParts.add(createTokenKeyPart(partitionKey.getToken()));
+    }
+
+    private static Pair<AbstractType, ByteBuffer> createTokenKeyPart(Token token)
+    {
+        AbstractType type = getTokenDataType(token.getPartitioner());
+        return Pair.create(type, type.decompose(token.getTokenValue()));
+    }
+
+    private static AbstractType getTokenDataType(IPartitioner partitioner)
+    {
+        if (partitioner == Murmur3Partitioner.instance)
+        {
+            return LongType.instance;
+        }
+
+        if (partitioner == RandomPartitioner.instance)
+        {
+            return IntegerType.instance;
+        }
+
+        throw new RuntimeException("Partitioner: " + partitioner.getClass().getName() + " is not supported yet");
+    }
+
+}

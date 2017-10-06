@@ -68,12 +68,15 @@ import org.apache.cassandra.gms.GossiperMBean;
 import org.apache.cassandra.db.HintedHandOffManager;
 import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import org.apache.cassandra.metrics.CassandraMetricsRegistry;
+import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.ThreadPoolMetrics;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.MessagingServiceMBean;
+import org.apache.cassandra.rocksdb.RocksDBCF;
+import org.apache.cassandra.rocksdb.RocksDBCFMBean;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.CacheServiceMBean;
 import org.apache.cassandra.service.GCInspector;
@@ -84,6 +87,7 @@ import org.apache.cassandra.service.StorageServiceMBean;
 import org.apache.cassandra.streaming.StreamManagerMBean;
 import org.apache.cassandra.streaming.StreamState;
 import org.apache.cassandra.streaming.management.StreamStateCompositeData;
+import org.rocksdb.RocksDBException;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -749,6 +753,16 @@ public class NodeProbe implements AutoCloseable
         }));
     }
 
+    public String sanityCheck(String keyspace, String cf, boolean randomStartToken, long limit, boolean verbose)
+    {
+        return getRocksDBCFProxy(keyspace, cf).rocksDBSanityCheck(randomStartToken, limit, verbose);
+    }
+
+    public String streamingConsistencyCheck(String keyspace, String table, int expectedNumKeys)
+    {
+        return getRocksDBCFProxy(keyspace, table).streamingConsistencyCheck(expectedNumKeys);
+    }
+
     public String getOperationMode()
     {
         return ssProxy.getOperationMode();
@@ -814,6 +828,32 @@ public class NodeProbe implements AutoCloseable
         }
 
         return cfsProxy;
+    }
+
+    public RocksDBCFMBean getRocksDBCFProxy(String keyspace, String table)
+    {
+        RocksDBCFMBean proxy = null;
+        try
+        {
+            Set<ObjectName> beans = mbeanServerConn.queryNames(new ObjectName(RocksDBCF.getMbeanName(keyspace, table)), null);
+            if (beans.isEmpty())
+                throw new MalformedObjectNameException("Couldn't find that bean.");
+            assert beans.size() == 1;
+            for (ObjectName bean : beans)
+                proxy = JMX.newMBeanProxy(mbeanServerConn, bean, RocksDBCFMBean.class);
+        }
+        catch (MalformedObjectNameException e)
+        {
+            System.err.println("RocksDBCF for " + keyspace + "/" + table + " not found.");
+            System.exit(1);
+        }
+        catch (IOException e)
+        {
+            System.err.println("RocksDBCF for " + keyspace + "/" + table + " not found: " + e);
+            System.exit(1);
+        }
+
+        return proxy;
     }
 
     public StorageProxyMBean getSpProxy()
@@ -1219,6 +1259,29 @@ public class NodeProbe implements AutoCloseable
     }
 
     /**
+     * Retrieves Rocksdb metrics
+     * @param ks Keyspace for which stats are to be displayed.
+     * @param cf ColumnFamily for which stats are to be displayed.
+     * @param metricName View {@link TableMetrics}.
+     */
+    public Object getRocksDBMetric(String ks, String cf, String metricName)
+    {
+        try
+        {
+            ObjectName oName = new ObjectName(String.format("org.apache.cassandra.metrics:type=%s,keyspace=%s,scope=%s,name=%s", RocksDBTableMetrics.RocksMetricNameFactory.TYPE, ks, cf, metricName));
+            if (metricName.startsWith("SSTableCountPerLevel") || metricName.equals("PendingCompactionBytes"))
+                return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxGaugeMBean.class);
+            else if (metricName.equals("RocksIterMove") || metricName.equals("RocksIterMove") || metricName.equals("RocksIterNew"))
+                return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxCounterMBean.class);
+            return JMX.newMBeanProxy(mbeanServerConn, oName, CassandraMetricsRegistry.JmxHistogramMBean.class);
+        }
+        catch (MalformedObjectNameException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Retrieve Proxy metrics
      * @param scope RangeSlice, Read or Write
      */
@@ -1296,6 +1359,18 @@ public class NodeProbe implements AutoCloseable
                 metric.get99thPercentile(),
                 metric.getMin(),
                 metric.getMax()};
+    }
+
+    public double[] rocksDBMetricPercentilesAsArray(CassandraMetricsRegistry.JmxHistogramMBean metric)
+    {
+        // Rocksdb histogram doens't have 75/99/Min/Max.
+        return new double[]{ metric.get50thPercentile(),
+                             Double.NaN,
+                             metric.get95thPercentile(),
+                             Double.NaN,
+                             metric.get99thPercentile(),
+                             Double.NaN,
+                             Double.NaN};
     }
 
     public double[] metricPercentilesAsArray(CassandraMetricsRegistry.JmxTimerMBean metric)
@@ -1393,6 +1468,32 @@ public class NodeProbe implements AutoCloseable
         {
             throw new RuntimeException(e);
         }
+    }
+
+    public String exportRocksDBStream(String keyspace, String cf, String output, int limit) throws IOException, RocksDBException
+    {
+        return getRocksDBCFProxy(keyspace, cf).exportRocksDBStream(output, limit);
+    }
+
+    public String ingestRocksDBStream(String keyspace, String cf, String input) throws IOException, RocksDBException
+    {
+        return getRocksDBCFProxy(keyspace, cf).ingestRocksDBStream(input);
+    }
+
+    public String getRocksDBProperty(String keyspace, String table, String property)
+    {
+        return getRocksDBCFProxy(keyspace, table).getRocksDBProperty(property);
+    }
+
+    public boolean isRocksDBBacked(String keyspace, String table)
+    {
+        ColumnFamilyStoreMBean cfsProxy = getCfsProxy(keyspace, table);
+        return cfsProxy.isRocksDBBacked();
+    }
+
+    public String dumpPartition(String keyspace, String table, String partitionKey, int limit)
+    {
+        return getRocksDBCFProxy(keyspace, table).dumpPartition(partitionKey, limit);
     }
 }
 

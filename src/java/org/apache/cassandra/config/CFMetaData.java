@@ -115,12 +115,10 @@ public final class CFMetaData
     // that as convenience to access that column more easily (but we could replace calls by partitionColumns().iterator().next()
     // for those tables in practice).
     private volatile ColumnDefinition compactValueColumn;
-
     public final DataResource resource;
 
     //For hot path serialization it's often easier to store this info here
     private volatile ColumnFilter allColumnFilter;
-
     /*
      * All of these methods will go away once CFMetaData becomes completely immutable.
      */
@@ -217,6 +215,12 @@ public final class CFMetaData
     public CFMetaData extensions(Map<String, ByteBuffer> extensions)
     {
         params = TableParams.builder(params).extensions(extensions).build();
+        return this;
+    }
+
+    public CFMetaData purgeTtlOnExpiration(boolean prop)
+    {
+        params = TableParams.builder(params).purgeTtlOnExpiration(prop).build();
         return this;
     }
 
@@ -837,7 +841,7 @@ public final class CFMetaData
         return columnMetadata.get(name.bytes);
     }
 
-    // In general it is preferable to work with ColumnIdentifier to make it
+    // In general it is preferable to work with ColumnIdentifiear to make it
     // clear that we are talking about a CQL column, not a cell name, but there
     // is a few cases where all we have is a ByteBuffer (when dealing with IndexExpression
     // for instance) so...

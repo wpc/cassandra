@@ -65,6 +65,7 @@ import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token.TokenFactory;
+import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.exceptions.*;
 import org.apache.cassandra.gms.*;
 import org.apache.cassandra.hints.HintVerbHandler;
@@ -2495,7 +2496,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     public String getLoadString()
     {
-        return FileUtils.stringifyFileSize(StorageMetrics.load.getCount());
+        return FileUtils.stringifyFileSize(StorageMetrics.getLoad());
     }
 
     public Map<String, String> getLoadMap()

@@ -17,12 +17,15 @@
  */
 package org.apache.cassandra.db;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.OpenDataException;
+
+import org.rocksdb.RocksDBException;
 
 /**
  * The MBean interface for ColumnFamilyStore
@@ -171,4 +174,6 @@ public interface ColumnFamilyStoreMBean
        Enable/Disable compaction space check
      */
     public void compactionDiskSpaceCheck(boolean enable);
+
+    public boolean isRocksDBBacked();
 }

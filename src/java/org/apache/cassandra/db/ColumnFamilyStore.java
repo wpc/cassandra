@@ -17,7 +17,10 @@
  */
 package org.apache.cassandra.db;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
@@ -36,6 +39,11 @@ import com.google.common.base.*;
 import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
+
+import org.apache.cassandra.io.sstable.SSTableMultiWriter;
+import org.apache.cassandra.io.util.BufferedDataOutputStreamPlus;
+import org.apache.cassandra.io.util.DataInputPlus;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,16 +72,24 @@ import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.CorruptSSTableException;
 import org.apache.cassandra.io.sstable.Descriptor;
-import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.*;
 import org.apache.cassandra.io.sstable.format.big.BigFormat;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
+import org.apache.cassandra.rocksdb.RocksDBUtils;
+import org.apache.cassandra.engine.StorageEngine;
+import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
+import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.TopKSampler.SamplerResult;
 import org.apache.cassandra.utils.concurrent.OpOrder;
@@ -81,6 +97,7 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.rocksdb.RocksDBException;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 
@@ -223,6 +240,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     private volatile boolean compactionSpaceCheck = true;
 
+    public StorageEngine engine = null;
+
+
     public static void shutdownPostFlushExecutor() throws InterruptedException
     {
         postFlushExecutor.shutdown();
@@ -255,6 +275,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         // because the old one still aliases the previous comparator.
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
+
+        if (engine != null)
+        {
+            engine.openColumnFamilyStore(this);
+        }
     }
 
     void scheduleFlush()
@@ -378,6 +403,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         this.keyspace = keyspace;
         this.metadata = metadata;
+        engine = keyspace.engine;
         name = columnFamilyName;
         minCompactionThreshold = new DefaultValue<>(metadata.params.compaction.minCompactionThreshold());
         maxCompactionThreshold = new DefaultValue<>(metadata.params.compaction.maxCompactionThreshold());
@@ -467,6 +493,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             latencyCalculator = ScheduledExecutors.optionalTasks.schedule(Runnables.doNothing(), 0, TimeUnit.NANOSECONDS);
             mbeanName = null;
             oldMBeanName= null;
+        }
+
+        if (engine != null)
+        {
+            engine.openColumnFamilyStore(this);
         }
     }
 
@@ -882,6 +913,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         synchronized (data)
         {
+            // call the flush in engine first
+            if (engine != null)
+                engine.forceFlush(this);
+
             Memtable current = data.getView().getCurrentMemtable();
             for (ColumnFamilyStore cfs : concatWithIndexes())
                 if (!cfs.data.getView().getCurrentMemtable().isClean())
@@ -1223,6 +1258,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     }
 
+    @Override
+    public boolean isRocksDBBacked() {
+        return keyspace.getName().equals(RocksDBConfigs.ROCKSDB_KEYSPACE);
+    }
+
     /**
      * @param sstables
      * @return sstables whose key range overlaps with that of the given sstables, not including itself.
@@ -1376,7 +1416,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public CompactionManager.AllSSTableOpStatus forceCleanup(int jobs) throws ExecutionException, InterruptedException
     {
-        return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        if (engine == null)
+            return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        else
+            return engine.cleanUpRanges(ColumnFamilyStore.this) ?
+                   CompactionManager.AllSSTableOpStatus.SUCCESSFUL : CompactionManager.AllSSTableOpStatus.ABORTED;
     }
 
     public CompactionManager.AllSSTableOpStatus scrub(boolean disableSnapshot, boolean skipCorrupted, boolean checkData, int jobs) throws ExecutionException, InterruptedException
@@ -1922,7 +1966,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public void forceMajorCompaction(boolean splitOutput) throws InterruptedException, ExecutionException
     {
-        CompactionManager.instance.performMaximal(this, splitOutput);
+        if (engine != null)
+        {
+            engine.forceMajorCompaction(this);
+        }
+        else
+        {
+            CompactionManager.instance.performMaximal(this, splitOutput);
+        }
     }
 
     public static Iterable<ColumnFamilyStore> all()

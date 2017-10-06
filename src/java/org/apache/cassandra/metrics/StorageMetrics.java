@@ -18,6 +18,9 @@
 package org.apache.cassandra.metrics;
 
 import com.codahale.metrics.Counter;
+import org.apache.cassandra.config.Schema;
+import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.engine.StorageEngine;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
@@ -32,4 +35,22 @@ public class StorageMetrics
     public static final Counter exceptions = Metrics.counter(factory.createMetricName("Exceptions"));
     public static final Counter totalHintsInProgress  = Metrics.counter(factory.createMetricName("TotalHintsInProgress"));
     public static final Counter totalHints = Metrics.counter(factory.createMetricName("TotalHints"));
+
+    public static long getLoad()
+    {
+        return load.getCount() + getStorageEngineLoad();
+    }
+
+    public static long getStorageEngineLoad()
+    {
+        long result = 0;
+        for (String keyspaceName : Schema.instance.getKeyspaces())
+        {
+            Keyspace keyspace = Schema.instance.getKeyspaceInstance(keyspaceName);
+            if (keyspace == null || keyspace.engine == null)
+                continue;
+            result += keyspace.engine.load();
+        }
+        return result;
+    }
 }

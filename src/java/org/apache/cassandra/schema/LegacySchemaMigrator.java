@@ -500,6 +500,9 @@ public final class LegacySchemaMigrator
         if (row.has("bloom_filter_fp_chance"))
             params.bloomFilterFpChance(row.getDouble("bloom_filter_fp_chance"));
 
+        if (row.has("purge_ttl_on_expiration"))
+            params.purgeTtlOnExpiration(row.getBoolean("purge_ttl_on_expiration"));
+
         return params.build();
     }
 

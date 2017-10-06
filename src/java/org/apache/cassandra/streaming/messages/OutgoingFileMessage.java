@@ -36,7 +36,7 @@ import org.apache.cassandra.utils.concurrent.Ref;
 /**
  * OutgoingFileMessage is used to transfer the part(or whole) of a SSTable data file.
  */
-public class OutgoingFileMessage extends StreamMessage
+public class OutgoingFileMessage extends OutgoingMessage
 {
     public static Serializer<OutgoingFileMessage> serializer = new Serializer<OutgoingFileMessage>()
     {
@@ -51,7 +51,7 @@ public class OutgoingFileMessage extends StreamMessage
             try
             {
                 message.serialize(out, version, session);
-                session.fileSent(message.header);
+                session.fileSent(message.header.cfId, message.header.sequenceNumber, message.header.size());
             }
             finally
             {

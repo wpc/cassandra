@@ -59,7 +59,6 @@ import org.apache.cassandra.utils.btree.BTreeSet;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.apache.cassandra.utils.memory.HeapAllocator;
 
-
 /**
  * A read command that selects a (part of a) single partition.
  */
@@ -646,6 +645,12 @@ public class SinglePartitionReadCommand extends ReadCommand
     public UnfilteredRowIterator queryMemtableAndDisk(ColumnFamilyStore cfs, OpOrder.Group readOp)
     {
         Tracing.trace("Executing single-partition query on {}", cfs.name);
+
+        if (cfs.engine != null)
+        {
+            cfs.metric.samplers.get(TableMetrics.Sampler.READS).addSample(partitionKey().getKey(), partitionKey().hashCode(), 1);
+            return cfs.engine.queryStorage(cfs, this);
+        }
 
         return queryMemtableAndDiskInternal(cfs);
     }

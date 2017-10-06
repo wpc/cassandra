@@ -329,6 +329,7 @@ public class ColumnFamilyStoreCQLHelperTest extends CQLTester
         cfm.minIndexInterval(6);
         cfm.maxIndexInterval(7);
         cfm.memtableFlushPeriod(8);
+        cfm.purgeTtlOnExpiration(false);
         cfm.readRepairChance(0.9);
         cfm.speculativeRetry(SpeculativeRetryParam.always());
         cfm.extensions(ImmutableMap.of("ext1",
@@ -348,6 +349,7 @@ public class ColumnFamilyStoreCQLHelperTest extends CQLTester
         "\tAND min_index_interval = 6\n" +
         "\tAND max_index_interval = 7\n" +
         "\tAND memtable_flush_period_in_ms = 8\n" +
+        "\tAND purge_ttl_on_expiration = false\n" +
         "\tAND read_repair_chance = 0.9\n" +
         "\tAND speculative_retry = 'ALWAYS'\n" +
         "\tAND comment = 'comment'\n" +

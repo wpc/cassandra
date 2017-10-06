@@ -34,6 +34,7 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.utils.EstimatedHistogram;
 import org.apache.cassandra.utils.TopKSampler;
+import org.rocksdb.HistogramType;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 

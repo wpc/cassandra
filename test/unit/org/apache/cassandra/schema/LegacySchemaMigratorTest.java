@@ -637,7 +637,8 @@ public class LegacySchemaMigratorTest
              .add("min_compaction_threshold", table.params.compaction.minCompactionThreshold())
              .add("min_index_interval", table.params.minIndexInterval)
              .add("read_repair_chance", table.params.readRepairChance)
-             .add("speculative_retry", table.params.speculativeRetry.toString());
+             .add("speculative_retry", table.params.speculativeRetry.toString())
+             .add("purge_ttl_on_expiration", table.params.purgeTtlOnExpiration);
 
         for (Map.Entry<ByteBuffer, CFMetaData.DroppedColumn> entry : table.getDroppedColumns().entrySet())
         {
