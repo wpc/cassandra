@@ -252,7 +252,7 @@ public class RocksDBStreamUtils
     {
         if (session == null)
             return;
-        ProgressInfo progress = new RocksDBProgressInfo(session.peer, session.getSessionInfo().sessionIndex, fileName, direction, bytes, keys, estimatedTotalKeys, completed);
+        RocksDBProgressInfo progress = new RocksDBProgressInfo(session.peer, session.getSessionInfo().sessionIndex, fileName, direction, bytes, keys, estimatedTotalKeys, completed);
         session.progress(progress);
     }
 }

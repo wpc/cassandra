@@ -26,6 +26,7 @@ import javax.management.openmbean.*;
 
 import com.google.common.base.Throwables;
 
+import org.apache.cassandra.rocksdb.streaming.RocksDBProgressInfo;
 import org.apache.cassandra.streaming.ProgressInfo;
 
 public class ProgressInfoCompositeData
@@ -36,19 +37,31 @@ public class ProgressInfoCompositeData
                                                             "fileName",
                                                             "direction",
                                                             "currentBytes",
-                                                            "totalBytes"};
+                                                            "totalBytes",
+                                                            "isRocksDB",
+                                                            "completed",
+                                                            "currentKeys",
+                                                            "estimatedTotalKeys"};
     private static final String[] ITEM_DESCS = new String[]{"String representation of Plan ID",
                                                             "Session peer",
                                                             "Index of session",
                                                             "Name of the file",
                                                             "Direction('IN' or 'OUT')",
                                                             "Current bytes transferred",
-                                                            "Total bytes to transfer"};
+                                                            "Total bytes to transfer",
+                                                            "Is RocksDB progres",
+                                                            "RocksDB only: is completed",
+                                                            "RocksDB only: current transfered keys",
+                                                            "RocksDB only: estimated total keys to transer"};
     private static final OpenType<?>[] ITEM_TYPES = new OpenType[]{SimpleType.STRING,
                                                                    SimpleType.STRING,
                                                                    SimpleType.INTEGER,
                                                                    SimpleType.STRING,
                                                                    SimpleType.STRING,
+                                                                   SimpleType.LONG,
+                                                                   SimpleType.LONG,
+                                                                   SimpleType.BOOLEAN,
+                                                                   SimpleType.BOOLEAN,
                                                                    SimpleType.LONG,
                                                                    SimpleType.LONG};
 
@@ -78,6 +91,11 @@ public class ProgressInfoCompositeData
         valueMap.put(ITEM_NAMES[4], progressInfo.direction.name());
         valueMap.put(ITEM_NAMES[5], progressInfo.currentBytes);
         valueMap.put(ITEM_NAMES[6], progressInfo.totalBytes);
+        boolean isRocksDB = progressInfo instanceof RocksDBProgressInfo;
+        valueMap.put(ITEM_NAMES[7], isRocksDB);
+        valueMap.put(ITEM_NAMES[8], progressInfo.isCompleted());
+        valueMap.put(ITEM_NAMES[9], isRocksDB ? ((RocksDBProgressInfo)progressInfo).currentKeys : 0);
+        valueMap.put(ITEM_NAMES[10],isRocksDB ? ((RocksDBProgressInfo)progressInfo).estimatedTotalKeys : 0);
         try
         {
             return new CompositeDataSupport(COMPOSITE_TYPE, valueMap);
@@ -93,12 +111,23 @@ public class ProgressInfoCompositeData
         Object[] values = cd.getAll(ITEM_NAMES);
         try
         {
-            return new ProgressInfo(InetAddress.getByName((String) values[1]),
-                                    (int) values[2],
-                                    (String) values[3],
-                                    ProgressInfo.Direction.valueOf((String)values[4]),
-                                    (long) values[5],
-                                    (long) values[6]);
+            boolean isRocksDB = (boolean)values[7];
+            if (isRocksDB)
+                return new RocksDBProgressInfo(InetAddress.getByName((String) values[1]),
+                                               (int) values[2],
+                                               (String) values[3],
+                                               ProgressInfo.Direction.valueOf((String)values[4]),
+                                               (long) values[5],
+                                               (long) values[9],
+                                               (long) values[10],
+                                               (boolean) values[8]);
+            else
+                return new ProgressInfo(InetAddress.getByName((String) values[1]),
+                                        (int) values[2],
+                                        (String) values[3],
+                                        ProgressInfo.Direction.valueOf((String)values[4]),
+                                        (long) values[5],
+                                        (long) values[6]);
         }
         catch (UnknownHostException e)
         {

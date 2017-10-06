@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.net.MessagingServiceMBean;
+import org.apache.cassandra.rocksdb.streaming.RocksDBProgressInfo;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.SessionInfo;
 import org.apache.cassandra.streaming.StreamState;
@@ -37,6 +38,12 @@ public class NetStats extends NodeToolCmd
             name = {"-H", "--human-readable"},
             description = "Display bytes in human readable form, i.e. KB, MB, GB, TB")
     private boolean humanReadable = false;
+
+
+    @Option(title = "rocksdb",
+           name = {"-R", "--rocksdb"},
+           description = "Display Rocksdb Streaming info.")
+    private boolean rocksdb = false;
 
     @Override
     public void execute(NodeProbe probe)
@@ -59,7 +66,9 @@ public class NetStats extends NodeToolCmd
                 System.out.printf("%n");
                 if (!info.receivingSummaries.isEmpty())
                 {
-                    if (humanReadable)
+                    if (rocksdb)
+                        System.out.printf("        Receiving %d files. Already received %d files%n", info.getTotalFilesToReceive(), info.getTotalFilesReceived());
+                    else if (humanReadable)
                         System.out.printf("        Receiving %d files, %s total. Already received %d files, %s total%n", info.getTotalFilesToReceive(), FileUtils.stringifyFileSize(info.getTotalSizeToReceive()), info.getTotalFilesReceived(), FileUtils.stringifyFileSize(info.getTotalSizeReceived()));
                     else
                         System.out.printf("        Receiving %d files, %d bytes total. Already received %d files, %d bytes total%n", info.getTotalFilesToReceive(), info.getTotalSizeToReceive(), info.getTotalFilesReceived(), info.getTotalSizeReceived());
@@ -70,7 +79,9 @@ public class NetStats extends NodeToolCmd
                 }
                 if (!info.sendingSummaries.isEmpty())
                 {
-                    if (humanReadable)
+                    if (rocksdb)
+                        System.out.printf("        Sending %d files. Already sent %d files%n", info.getTotalFilesToSend(), info.getTotalFilesSent());
+                    else if (humanReadable)
                         System.out.printf("        Sending %d files, %s total. Already sent %d files, %s total%n", info.getTotalFilesToSend(), FileUtils.stringifyFileSize(info.getTotalSizeToSend()), info.getTotalFilesSent(), FileUtils.stringifyFileSize(info.getTotalSizeSent()));
                     else
                         System.out.printf("        Sending %d files, %d bytes total. Already sent %d files, %d bytes total%n", info.getTotalFilesToSend(), info.getTotalSizeToSend(), info.getTotalFilesSent(), info.getTotalSizeSent());

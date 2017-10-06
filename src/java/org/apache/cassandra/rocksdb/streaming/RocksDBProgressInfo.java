@@ -66,8 +66,8 @@ public class RocksDBProgressInfo extends ProgressInfo
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder(fileName);
-        sb.append(" ").append(currentBytes).append("bytes, ");
+        StringBuilder sb = new StringBuilder("RocksDB File ").append(fileName);
+        sb.append(" ").append(currentBytes).append(" bytes, ");
         sb.append(currentKeys).append("/").append(estimatedTotalKeys).append(" keys ");
         sb.append(direction == Direction.OUT ? "sent to " : "received from ");
         sb.append("idx:").append(sessionIndex);
