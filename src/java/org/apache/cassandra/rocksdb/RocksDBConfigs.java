@@ -39,6 +39,9 @@ public class RocksDBConfigs
     // disable write to rocksdb commit log or not, default is false
     public static final boolean DISABLE_WRITE_TO_COMMITLOG = Boolean.getBoolean("cassandra.rocksdb.disable_write_to_commitlog");
 
+    // Limit the number of operands in merge operator, 0 means no limit
+    public static final int MERGE_OPERANDS_LIMIT = Integer.getInteger("cassandra.rocksdb.merge_operands_limit", 0);
+
     /**
      * Streaming configs
      */

@@ -26,7 +26,6 @@ import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -74,6 +73,7 @@ import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.rocksdb.WriteOptions;
 
+import static org.apache.cassandra.rocksdb.RocksDBConfigs.MERGE_OPERANDS_LIMIT;
 import static org.apache.cassandra.rocksdb.RocksDBConfigs.ROCKSDB_DIR;
 
 /**
@@ -114,7 +114,7 @@ public class RocksDBCF implements RocksDBCFMBean
         int gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
         boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
         compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
-        mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds);
+        mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds, MERGE_OPERANDS_LIMIT);
         
         DBOptions dbOptions = new DBOptions();
         List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
