@@ -78,7 +78,19 @@ public class RocksDBTableMetrics
     {
         MetricNameFactory factory = new RocksMetricNameFactory(cfs);
 
-        Metrics.register(factory.createMetricName("WalFileSyncMicros"),
+        Metrics.register(factory.createMetricName("GetMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_GET));
+        Metrics.register(factory.createMetricName("WriteMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_WRITE));
+        Metrics.register(factory.createMetricName("CompactionTimeMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_TIME));
+        Metrics.register(factory.createMetricName("SubcompactionSetupTimeMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.SUBCOMPACTION_SETUP_TIME));
+        Metrics.register(factory.createMetricName("TableSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.TABLE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("CompactionOutfileSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_OUTFILE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("WALFileSyncMicros"),
                          MetricsFactory.createHistogram(stats, HistogramType.WAL_FILE_SYNC_MICROS));
         Metrics.register(factory.createMetricName("ManifiestSyncMicros"),
                          MetricsFactory.createHistogram(stats, HistogramType.MANIFEST_FILE_SYNC_MICROS));
