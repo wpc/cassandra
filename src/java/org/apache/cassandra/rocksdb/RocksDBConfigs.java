@@ -9,7 +9,7 @@ public class RocksDBConfigs
     public static File STREAMING_TMPFILE_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
 
     // Max levels for RocksDB. 7 is the default value.
-    public static final int MAX_LEVELS = 7;
+    public static final int MAX_LEVELS = Integer.getInteger("cassandra.rocksdb.max_levels", 7);
 
     // Tables created in this keyspace is backed by RocksDB.
     public static String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", "rocksdb");
@@ -26,21 +26,24 @@ public class RocksDBConfigs
     public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
 
     // rocksdb block cache size, default to be 1G per rocksdb instance
-    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 1024);
+    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 128);
 
     // disable level_compaction_dynamic_level_bytes or not, defaut is false
     public static final boolean DYNAMIC_LEVEL_BYTES_DISABLED = Boolean.getBoolean("cassandra.rocksdb.disable_dynamic_level_bytes");
 
     // rocksdb write buffer size, default to be 4G per rocksdb instance
-    public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 4096);
+    public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 512);
 
-    public static final int MAX_MBYTES_FOR_LEVEL_BASE = Integer.getInteger("cassandra.rocksdb.max_mbytes_for_level_base", 1024 * 16);
+    public static final int MAX_MBYTES_FOR_LEVEL_BASE = Integer.getInteger("cassandra.rocksdb.max_mbytes_for_level_base", 1024);
 
     // disable write to rocksdb commit log or not, default is false
     public static final boolean DISABLE_WRITE_TO_COMMITLOG = Boolean.getBoolean("cassandra.rocksdb.disable_write_to_commitlog");
 
     // Limit the number of operands in merge operator, 0 means no limit
     public static final int MERGE_OPERANDS_LIMIT = Integer.getInteger("cassandra.rocksdb.merge_operands_limit", 0);
+
+    // number of sharded rocksdb instance in one Cassandra table
+    public static final int NUM_SHARD = Integer.getInteger("cassandra.rocksdb.num_shard", 1);
 
     /**
      * Streaming configs

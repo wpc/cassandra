@@ -132,7 +132,7 @@ public class RocksDBPartition implements Partition
         try
         {
             byte[] key = RowKeyEncoder.encode(partitionKey, clustering, metadata);
-            byte[] values = db.get(key);
+            byte[] values = db.get(partitionKey, key);
 
             return makeRow(values, columnFilter, clustering);
         }
@@ -159,7 +159,7 @@ public class RocksDBPartition implements Partition
     {
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
-        RocksDBIteratorAdapter rocksIterator = db.newIterator();
+        RocksDBIteratorAdapter rocksIterator = db.newIterator(partitionKey);
 
         byte[] minKey = slice.start() == Slice.Bound.BOTTOM ? null :
                              RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metadata);

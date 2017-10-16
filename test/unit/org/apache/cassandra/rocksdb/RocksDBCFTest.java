@@ -22,9 +22,11 @@ import java.nio.ByteBuffer;
 
 import org.junit.Test;
 
+import org.apache.cassandra.Util;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Row;
@@ -41,6 +43,8 @@ import static org.junit.Assert.assertNull;
 
 public class RocksDBCFTest extends RocksDBTestBase
 {
+    final DecoratedKey dk = Util.dk("test_key");
+
     @Test
     public void testMerge() throws RocksDBException
     {
@@ -51,8 +55,8 @@ public class RocksDBCFTest extends RocksDBTestBase
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
         byte[] key = "test_key".getBytes();
         byte[] value = encodeValue(cfs, "test_value");
-        rocksDBCF.merge(key, value);
-        assertArrayEquals(value, rocksDBCF.get(key));
+        rocksDBCF.merge(dk, key, value);
+        assertArrayEquals(value, rocksDBCF.get(dk, key));
     }
 
     private byte[] encodeValue(ColumnFamilyStore cfs, String value)
@@ -76,13 +80,13 @@ public class RocksDBCFTest extends RocksDBTestBase
         byte[] key = "test_key".getBytes();
         byte[] value = encodeValue(cfs, "test_value");
 
-        rocksDBCF.merge(key, value);
-        assertArrayEquals(value, rocksDBCF.get(key));
+        rocksDBCF.merge(dk, key, value);
+        assertArrayEquals(value, rocksDBCF.get(dk, key));
 
         rocksDBCF.truncate();
 
         rocksDBCF.compactRange();
-        assertNull(rocksDBCF.get(key));
+        assertNull(rocksDBCF.get(dk, key));
     }
 
     @Test
@@ -97,9 +101,9 @@ public class RocksDBCFTest extends RocksDBTestBase
         byte[] key = "test_key".getBytes();
         byte[] value = encodeValue(cfs, "test_value");
 
-        rocksDBCF.merge(key, value);
+        rocksDBCF.merge(dk, key, value);
 
-        assertArrayEquals(value, rocksDBCF.get(key));
+        assertArrayEquals(value, rocksDBCF.get(dk, key));
 
         cfs.engine.close(cfs);
     }
@@ -111,13 +115,13 @@ public class RocksDBCFTest extends RocksDBTestBase
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
 
-        rocksDBCF.merge("test_key1".getBytes(), "test_value11".getBytes());
-        rocksDBCF.merge("test_key1".getBytes(), "test_value12".getBytes());
-        rocksDBCF.merge("test_key2".getBytes(), "test_value2".getBytes());
+        rocksDBCF.merge(dk, "test_key1".getBytes(), "test_value11".getBytes());
+        rocksDBCF.merge(dk, "test_key1".getBytes(), "test_value12".getBytes());
+        rocksDBCF.merge(dk, "test_key2".getBytes(), "test_value2".getBytes());
 
-        String dump = rocksDBCF.dumpPrefix("test_key".getBytes(), Integer.MAX_VALUE);
+        String dump = rocksDBCF.dumpPrefix(dk, "test_key".getBytes(), Integer.MAX_VALUE);
         assertEquals(2, dump.split("\n").length);
-        String dumpLimited = rocksDBCF.dumpPrefix("test_key".getBytes(), 1);
+        String dumpLimited = rocksDBCF.dumpPrefix(dk, "test_key".getBytes(), 1);
         assertEquals(1, dumpLimited.split("\n").length);
     }
 }

@@ -79,17 +79,10 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.TableMetrics.Sampler;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.rocksdb.RocksDBEngine;
-import org.apache.cassandra.rocksdb.RocksDBUtils;
 import org.apache.cassandra.engine.StorageEngine;
-import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
-import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReader;
-import org.apache.cassandra.rocksdb.streaming.RocksDBStreamWriter;
-import org.apache.cassandra.rocksdb.tools.SanityCheckUtils;
 import org.apache.cassandra.schema.*;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
-import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.TopKSampler.SamplerResult;
 import org.apache.cassandra.utils.concurrent.OpOrder;
@@ -97,7 +90,6 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.utils.memory.MemtableAllocator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.rocksdb.RocksDBException;
 
 import static org.apache.cassandra.utils.Throwables.maybeFail;
 

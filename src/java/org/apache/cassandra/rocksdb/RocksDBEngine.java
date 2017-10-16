@@ -205,7 +205,7 @@ public class RocksDBEngine implements StorageEngine
         // value colummns
         try
         {
-            rocksDBFamily.get(cfs.metadata.cfId).merge(rocksDBKey, rocksDBValue, writeCommitLog);
+            rocksDBFamily.get(cfs.metadata.cfId).merge(partitionKey, rocksDBKey, rocksDBValue, writeCommitLog);
         }
         catch (RocksDBException e)
         {
@@ -296,7 +296,7 @@ public class RocksDBEngine implements StorageEngine
         DecoratedKey decoratedKey = cfs.metadata.partitioner.decorateKey(keyBytes);
         byte[] rocksKeyPrefix = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
         RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
-        return rocksDBCF.dumpPrefix(rocksKeyPrefix, limit);
+        return rocksDBCF.dumpPrefix(decoratedKey, rocksKeyPrefix, limit);
     }
 
     public void forceMajorCompaction(ColumnFamilyStore cfs)

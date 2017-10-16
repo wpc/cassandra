@@ -74,8 +74,9 @@ public class RocksDBTableMetrics
                          });
     }
 
-    public RocksDBTableMetrics(ColumnFamilyStore cfs, Statistics stats)
+    public RocksDBTableMetrics(ColumnFamilyStore cfs, List<Statistics> statsList)
     {
+        Statistics stats = statsList.get(0);
         MetricNameFactory factory = new RocksMetricNameFactory(cfs);
 
         Metrics.register(factory.createMetricName("GetMicros"),

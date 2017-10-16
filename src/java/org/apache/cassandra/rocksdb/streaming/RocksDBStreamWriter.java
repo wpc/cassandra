@@ -27,6 +27,7 @@ import java.util.Collection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.metrics.StreamingMetrics;
@@ -90,7 +91,8 @@ public class RocksDBStreamWriter
         // Iterate through all possible key-value pairs and send to stream.
         outerloop:
         for (Range<Token> range : ranges) {
-            RocksDBIteratorAdapter iterator = rocksDBCF.newIterator(new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
+            RocksDBIteratorAdapter iterator = rocksDBCF.newIterator(DatabaseDescriptor.getPartitioner().decorateKey(ByteBufferUtil.bytes("")),
+                                                                    new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
             try
             {
                 iterator.seekToFirst();

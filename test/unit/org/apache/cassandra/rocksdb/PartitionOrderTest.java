@@ -103,12 +103,12 @@ public class PartitionOrderTest extends RocksDBTestBase
         }
     }
 
-    private List<Object> scannRocksDBValues(AbstractType valueType) throws IOException
+    private List<Object> scannRocksDBValues(AbstractType valueType)
     {
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
         RocksDBCF rocksDB = RocksDBEngine.getRocksDBCF(cfs);
         List<Object> result = new ArrayList<>();
-        try (RocksDBIteratorAdapter rocksIterator = rocksDB.newIterator())
+        try (RocksDBIteratorAdapter rocksIterator = rocksDB.newIterator(Util.dk("")))
         {
             rocksIterator.seekToFirst();
 
