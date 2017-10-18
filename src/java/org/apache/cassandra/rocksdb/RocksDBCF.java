@@ -164,6 +164,8 @@ public class RocksDBCF implements RocksDBCFMBean
             final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
             tableOptions.setFilter(bloomFilter);
             tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
+            tableOptions.setCacheIndexAndFilterBlocks(true);
+            tableOptions.setPinL0FilterAndIndexBlocksInCache(true);
             columnFamilyOptions.setTableFormatConfig(tableOptions);
             ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
             cfDescs.add(columnFamilyDescriptor);
