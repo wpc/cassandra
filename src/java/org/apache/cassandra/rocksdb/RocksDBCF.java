@@ -85,6 +85,7 @@ import static org.apache.cassandra.rocksdb.RocksDBConfigs.ROCKSDB_DIR;
 public class RocksDBCF implements RocksDBCFMBean
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
+    private static final int SCHEMA_VERSION = 0;
     private final UUID cfID;
     private final ColumnFamilyStore cfs;
     private final IPartitioner partitioner;
@@ -111,7 +112,7 @@ public class RocksDBCF implements RocksDBCFMBean
         partitioner = cfs.getPartitioner();
         engine = (RocksDBEngine) cfs.engine;
 
-        String rocksDBTableDir = Paths.get(ROCKSDB_DIR, cfs.keyspace.getName(), cfs.name).toString();
+        String rocksDBTableDir = Paths.get(ROCKSDB_DIR, "s" + SCHEMA_VERSION, cfs.keyspace.getName(), cfs.name).toString();
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
         
