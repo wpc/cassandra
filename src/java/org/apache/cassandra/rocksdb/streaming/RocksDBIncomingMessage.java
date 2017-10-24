@@ -46,8 +46,8 @@ public class RocksDBIncomingMessage extends StreamMessage
 
             try
             {
-                return new RocksDBIncomingMessage(reader.read(new DataInputPlus.DataInputStreamPlus(new LZFInputStream(Channels.newInputStream(in)))),
-                                                  header);
+                reader.read(new DataInputPlus.DataInputStreamPlus(new LZFInputStream(Channels.newInputStream(in))));
+                return new RocksDBIncomingMessage(header, reader.getTotalIncomingBytes());
             }
             catch (Throwable t)
             {
@@ -63,12 +63,12 @@ public class RocksDBIncomingMessage extends StreamMessage
     };
 
     public final RocksDBMessageHeader header;
-    public final RocksDBSStableWriter sstable;
-    protected RocksDBIncomingMessage(RocksDBSStableWriter sstable, RocksDBMessageHeader header)
+    public final long totalIncomingBytes;
+    protected RocksDBIncomingMessage(RocksDBMessageHeader header, long totalIncomingBytes)
     {
         super(Type.ROCKSFILE);
-        this.sstable = sstable;
         this.header = header;
+        this.totalIncomingBytes = totalIncomingBytes;
     }
 
     @Override

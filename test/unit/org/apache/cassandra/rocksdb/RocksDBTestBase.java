@@ -54,6 +54,7 @@ public class RocksDBTestBase extends CQLTester
     {
         RocksDBConfigs.ROCKSDB_DIR  = "/tmp/rocksdbtest/" + UUID.randomUUID();
         RocksDBConfigs.ROCKSDB_KEYSPACE = CQLTester.KEYSPACE;
+        RocksDBConfigs.NUM_SHARD = 1;
         File rocksdbdir = new File(RocksDBConfigs.ROCKSDB_DIR);
         if (rocksdbdir.exists())
         {

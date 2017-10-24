@@ -36,6 +36,7 @@ public class RocksDBSStableWriter
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBSStableWriter.class);
     private final UUID cfId;
+    private final int shardId;
     private final EnvOptions envOptions;
     private final Options options;
     private File sstable = null;
@@ -46,12 +47,18 @@ public class RocksDBSStableWriter
 
     public RocksDBSStableWriter(UUID cfId) throws IOException, RocksDBException
     {
+        this(cfId, 0);
+    }
+
+    public RocksDBSStableWriter(UUID cfId, int shardId) throws IOException, RocksDBException
+    {
         this.cfId = cfId;
         this.currentSstableSize = 0;
         this.incomingBytes = 0;
         this.sstableIngested = 0;
         this.envOptions = new EnvOptions();
         this.options = new Options();
+        this.shardId = shardId;
         RocksDBThroughputManager.getInstance().registerIncomingStreamWriter(this);
     }
 
@@ -75,7 +82,7 @@ public class RocksDBSStableWriter
             if (sstable != null && sstable.exists())
             {
                 sstableIngested += 1;
-                RocksDBStreamUtils.ingestRocksSstable(cfId, sstable.getAbsolutePath());
+                RocksDBStreamUtils.ingestRocksSstable(cfId, shardId, sstable.getAbsolutePath());
             }
         } finally
         {

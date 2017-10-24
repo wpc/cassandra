@@ -258,6 +258,11 @@ public class RocksDBCF implements RocksDBCFMBean
         return rocksDBLists.get(0);
     }
 
+    public RocksDB getRocksDB(int shardId)
+    {
+        return rocksDBLists.get(shardId);
+    }
+
     public RocksDBTableMetrics getRocksMetrics()
     {
         return rocksMetrics;
@@ -277,6 +282,13 @@ public class RocksDBCF implements RocksDBCFMBean
     {
         rocksMetrics.rocksDBIterNew.inc();
         RocksDB rocksDB = getRocksDBFromKey(partitionKey);
+        return new RocksDBIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
+    }
+
+    public RocksDBIteratorAdapter newShardIterator(int shardId, ReadOptions options)
+    {
+        rocksMetrics.rocksDBIterNew.inc();
+        RocksDB rocksDB = getRocksDB(shardId);
         return new RocksDBIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
     }
 

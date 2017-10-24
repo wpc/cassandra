@@ -31,6 +31,7 @@ import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.service.DigestMismatchException;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamSession;
@@ -60,7 +61,7 @@ public class RocksDBStreamReader
         this.estimatedIncomingKeys = header.estimatedKeys;
     }
 
-    public RocksDBSStableWriter read(DataInputPlus input) throws IOException
+    public void read(DataInputPlus input) throws IOException
     {
         Pair<String, String> kscf = Schema.instance.getCF(header.cfId);
         ColumnFamilyStore cfs = null;
@@ -77,30 +78,40 @@ public class RocksDBStreamReader
                      session.planId(), header.sequenceNumber, session.peer, cfs.keyspace.getName(),
                      cfs.getColumnFamilyName());
         RocksDBSStableWriter writer = null;
-
+        int sstableIngested = 0;
         try
         {
             long incomingBytesDelta = 0;
-            writer = new RocksDBSStableWriter(header.cfId);
-            while(input.readByte() != RocksDBStreamUtils.EOF[0]) {
-                int keyLength = input.readInt();
-                byte[] key = new byte[keyLength];
-                input.readFully(key);
-                int valueLength = input.readInt();
-                byte[] value = new byte[valueLength];
-                input.readFully(value);
-                digest.update(key);
-                digest.update(value);
-                writer.write(key, value);
-                incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
-                totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
-                totalIncomingKeys ++;
-                if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
+            for (int expectedShardId = 0; expectedShardId < RocksDBConfigs.NUM_SHARD; expectedShardId ++)
+            {
+                int shardId = input.readInt();
+                LOGGER.info("Receiving shard: " + shardId);
+                if (shardId != expectedShardId)
+                    throw new StreamingShardMismatchException(header, shardId, expectedShardId);
+                writer = new RocksDBSStableWriter(header.cfId, shardId);
+                while (input.readByte() != RocksDBStreamUtils.EOF[0])
                 {
-                    StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
-                    incomingBytesDelta = 0;
-                    RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, false);
+                    int keyLength = input.readInt();
+                    byte[] key = new byte[keyLength];
+                    input.readFully(key);
+                    int valueLength = input.readInt();
+                    byte[] value = new byte[valueLength];
+                    input.readFully(value);
+                    digest.update(key);
+                    digest.update(value);
+                    writer.write(key, value);
+                    incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+                    totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+                    totalIncomingKeys++;
+                    if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
+                    {
+                        StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
+                        incomingBytesDelta = 0;
+                        RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, false);
+                    }
                 }
+                writer.close();
+                sstableIngested += writer.getSstableIngested();
             }
             byte[] actualDigest = digest.digest();
             int expectedDigestLength = input.readInt();
@@ -124,10 +135,8 @@ public class RocksDBStreamReader
         }
 
         LOGGER.info("[Stream #{}] received {} rocskdb sstables from #{} from {}, ks = '{}', table = '{}'.",
-                    session.planId(), writer.getSstableIngested(), header.sequenceNumber, session.peer, cfs.keyspace.getName(),
+                    session.planId(), sstableIngested, header.sequenceNumber, session.peer, cfs.keyspace.getName(),
                     cfs.getColumnFamilyName());
-        writer.close();
-        return writer;
     }
 
     public long getTotalIncomingBytes()

@@ -24,6 +24,7 @@ import java.util.UUID;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 
 public class RocksDBMessageHeader
 {
@@ -32,6 +33,7 @@ public class RocksDBMessageHeader
     public final int sequenceNumber;
     public final long estimatedBytes;
     public final long estimatedKeys;
+    public final int numShard;
 
     public RocksDBMessageHeader(UUID cfId, int sequenceNumber) {
         this(cfId, sequenceNumber, 0, 0);
@@ -42,6 +44,7 @@ public class RocksDBMessageHeader
         this.sequenceNumber = sequenceNumber;
         this.estimatedBytes = estimatedBytes;
         this.estimatedKeys = estimatedKeys;
+        this.numShard = RocksDBConfigs.NUM_SHARD;
     }
 
     @Override
@@ -81,6 +84,7 @@ public class RocksDBMessageHeader
             out.writeInt(header.sequenceNumber);
             out.writeLong(header.estimatedBytes);
             out.writeLong(header.estimatedKeys);
+            out.writeInt(header.numShard);
         }
 
         public RocksDBMessageHeader deserialize(DataInputPlus in) throws IOException
@@ -89,7 +93,11 @@ public class RocksDBMessageHeader
             int sequenceNumber = in.readInt();
             long estimatedBytes = in.readLong();
             long estimatedKeys = in.readLong();
-            return new RocksDBMessageHeader(cfId, sequenceNumber, estimatedBytes, estimatedKeys);
+            int numShard = in.readInt();
+            RocksDBMessageHeader header = new RocksDBMessageHeader(cfId, sequenceNumber, estimatedBytes, estimatedKeys);
+            if (numShard != RocksDBConfigs.NUM_SHARD)
+                throw new StreamingShardMismatchException(header, numShard, RocksDBConfigs.NUM_SHARD);
+            return header;
         }
 
     }

@@ -55,13 +55,9 @@ public class RocksDBStreamChecksumTest extends RocksDBStreamTestBase
         writer.write(out);
         byte[] array = ByteBufferUtil.getArray(out.buffer());
 
-        // The bytes in array is as follows:
-        // | 0x01 (1 byte, Flag of more data) | 0x00000001 (4 bytes, key length) | 0x70 (1 byte, ascii of p)
-        // | 0x00000001 (4 bytes, value length) | 0x76 (1 byte, ascii of v) | 0x00 (1 byte, EOF) |
-        // | 0x00000020 (4 bytes, digest length) | 0x..... (32 bytes of digest) |
-        //
-        // Thus we could change the byte of array[5] to simulate the data corruption in key.
-        array[5] = 'q';
+        // Flip one bit of the checksum, and checksum is the last 32 bytes of the stream.
+        int length = out.getLength();
+        array[length - 1] = (byte) (array[length - 1] ^ (byte)(1));
 
         // Create second table to read from stream.
         createTable("CREATE TABLE %s (p TEXT, v TEXT, PRIMARY KEY (p))");

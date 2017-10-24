@@ -43,7 +43,7 @@ public class RocksDBConfigs
     public static final int MERGE_OPERANDS_LIMIT = Integer.getInteger("cassandra.rocksdb.merge_operands_limit", 0);
 
     // number of sharded rocksdb instance in one Cassandra table
-    public static final int NUM_SHARD = Integer.getInteger("cassandra.rocksdb.num_shard", 1);
+    public static int NUM_SHARD = Integer.getInteger("cassandra.rocksdb.num_shard", 1);
 
     public static final boolean CACHE_INDEX_AND_FILTER_BLOCKS = Boolean.getBoolean("cassandra.rocksdb.cache_index_and_filter_blocks");
 

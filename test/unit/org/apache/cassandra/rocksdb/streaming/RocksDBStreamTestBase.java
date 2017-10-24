@@ -24,6 +24,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 import org.apache.cassandra.dht.Range;
@@ -33,6 +34,7 @@ import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBTestBase;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
+import org.rocksdb.RocksDB;
 
 public class RocksDBStreamTestBase extends RocksDBTestBase
 {
@@ -41,7 +43,7 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
     public static void classSetUp() throws Exception
     {
         RocksDBTestBase.classSetUp();
-
+        RocksDBConfigs.NUM_SHARD = 8;
         Path streamDir = Paths.get("/tmp/rocksdbstream/", UUID.randomUUID().toString());
         RocksDBConfigs.STREAMING_TMPFILE_PATH = new File(streamDir.toString());
         if (RocksDBConfigs.STREAMING_TMPFILE_PATH.exists())
@@ -49,6 +51,12 @@ public class RocksDBStreamTestBase extends RocksDBTestBase
             FileUtils.deleteRecursive(RocksDBConfigs.STREAMING_TMPFILE_PATH);
         }
         FileUtils.createDirectory(streamDir.toString());
+    }
+
+    @AfterClass
+    public static void tearDownClass() {
+        RocksDBTestBase.tearDownClass();
+        RocksDBConfigs.NUM_SHARD = 1;
     }
 
     public static StreamSession createDummySession()

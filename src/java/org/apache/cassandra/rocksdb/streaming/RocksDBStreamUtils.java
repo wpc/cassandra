@@ -78,12 +78,17 @@ public class RocksDBStreamUtils
 
     public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
     {
+        ingestRocksSstable(cfId, 0, sstFile);
+    }
+
+    public static void ingestRocksSstable(UUID cfId, int shardId, String sstFile) throws RocksDBException
+    {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfId);
         if (cfs == null || rocksDBCF == null)
             return;
 
-        RocksDB db = rocksDBCF.getRocksDB();
+        RocksDB db = rocksDBCF.getRocksDB(shardId);
 
         // There might be multiple streaming sessions (threads) for the same sstable/db at the same time.
         // Adding lock to the db to prevent multiple sstables are ingested at same time and trigger
