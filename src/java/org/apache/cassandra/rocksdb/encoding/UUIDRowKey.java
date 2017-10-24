@@ -52,6 +52,7 @@ public class UUIDRowKey extends RowKey
         int version = uuid.version();
         long msb = uuid.getMostSignificantBits();
         long lsb = uuid.getLeastSignificantBits();
+        lsb = flip(lsb);
         msb = moveVersionBitsLeft(msb);
         if (version == 1)
         {
@@ -80,8 +81,15 @@ public class UUIDRowKey extends RowKey
         }
         msb = recoverVersionBits(msb);
         long lsb = Bytes.toLong(s, offset + 8) ^ order.mask();
+        lsb = flip(lsb);
         RowKeyUtils.seek(w, UUID_BYTE_SIZE);
         return new UUID(msb, lsb);
+    }
+
+    // two's complement format <-> native format
+    public long flip(long lsb)
+    {
+        return lsb ^ 0x0080808080808080L;
     }
 
     // moves 4 version bites (48~52 bit) to left most,
