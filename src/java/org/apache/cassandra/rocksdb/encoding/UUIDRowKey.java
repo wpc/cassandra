@@ -89,7 +89,7 @@ public class UUIDRowKey extends RowKey
     // two's complement format <-> native format
     public long flip(long lsb)
     {
-        return lsb ^ 0x0080808080808080L;
+        return lsb ^ 0x8080808080808080L;
     }
 
     // moves 4 version bites (48~52 bit) to left most,

@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 import org.junit.Test;
@@ -30,6 +32,7 @@ import org.junit.Test;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.TimeUUIDType;
 import org.apache.cassandra.db.marshal.UUIDType;
+import org.apache.cassandra.db.marshal.UUIDTypeTest;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.rocksdb.encoding.orderly.ImmutableBytesWritable;
 import org.apache.cassandra.utils.UUIDGen;
@@ -80,6 +83,62 @@ public class UUIDRowKeyTest
         new UUID(0xfcebe980b8b511e7L, 0xb2e456d40557c4dfL),
         new UUID(0xfcebe980b8b511e7L, 0xb25901d2b16f1157L));
         assertEquals(sortWithCassandra(uuids, TimeUUIDType.instance), sortWithRowKey(uuids));
+
+        uuids = Arrays.asList(
+        UUIDGen.getTimeUUID(),
+        UUIDGen.getTimeUUID(),
+        UUIDGen.getTimeUUID());
+        assertEquals(sortWithCassandra(uuids, TimeUUIDType.instance), sortWithRowKey(uuids));
+    }
+
+    @Test
+    public void orderForRandomGeneratedUUIDs() throws Exception
+    {
+        ByteBuffer[] buffers = UUIDTypeTest.random(1000, (byte) 0x10);
+        ArrayList<UUID> uuids = new ArrayList<>(buffers.length);
+        for (int i = 0; i < buffers.length; i++)
+        {
+            ByteBuffer buffer = buffers[i];
+            assert buffer.position() == 0;
+            uuids.add(new UUID(buffer.getLong(), buffer.getLong(8)));
+        }
+        assertEquals(sortWithCassandra(uuids, TimeUUIDType.instance), sortWithRowKey(uuids));
+    }
+
+    @Test
+    public void orderForRandomGeneratedUUIDsPermutations() throws Exception
+    {
+        Iterable<ByteBuffer[]> buffersCollection = UUIDTypeTest.permutations(1000, (byte) 0x10);
+        for (ByteBuffer[] buffers : buffersCollection)
+        {
+            ArrayList<UUID> uuids = new ArrayList<>(buffers.length);
+            for (int i = 0; i < buffers.length; i++)
+            {
+                ByteBuffer buffer = buffers[i];
+                assert buffer.position() == 0;
+                uuids.add(TimeUUIDType.instance.compose(buffer));
+            }
+            assertEquals(sortWithCassandra(uuids, TimeUUIDType.instance), sortWithRowKey(uuids));
+        }
+    }
+
+    @Test
+    public void orderForRandomGeneratedUUIDsPermutateInLSBs() throws Exception
+    {
+        int rounds = 1000;
+        int randomCount = 10;
+        Random random = new Random();
+        random.setSeed(random.nextLong());
+
+        for (int i = 0; i < rounds; i++)
+        {
+            ArrayList<UUID> uuids = new ArrayList<>(randomCount);
+            for (int j = 0; j < randomCount; j++)
+            {
+                uuids.add(new UUID(0xfcebe980b8b511e7L, random.nextLong()));
+            }
+            assertEquals(sortWithCassandra(uuids, TimeUUIDType.instance), sortWithRowKey(uuids));
+        }
     }
 
     private Object roundTrip(UUID uuid) throws IOException

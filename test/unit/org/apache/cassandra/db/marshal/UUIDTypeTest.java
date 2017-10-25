@@ -250,7 +250,7 @@ public class UUIDTypeTest
 
     // produce randomCount random byte strings, and permute every possible byte within each
     // for all provided types, using permute()
-    static Iterable<ByteBuffer[]> permutations(final int randomCount, final byte ... types)
+    public static Iterable<ByteBuffer[]> permutations(final int randomCount, final byte ... types)
     {
         final Random random = new Random();
         long seed = random.nextLong();
@@ -325,7 +325,7 @@ public class UUIDTypeTest
         return permute;
     }
 
-    static ByteBuffer[] random(int count, byte ... types)
+    public static ByteBuffer[] random(int count, byte ... types)
     {
         Random random = new Random();
         long seed = random.nextLong();
