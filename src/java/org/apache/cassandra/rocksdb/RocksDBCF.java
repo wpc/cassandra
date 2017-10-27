@@ -200,13 +200,6 @@ public class RocksDBCF implements RocksDBCFMBean
             columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
             columnFamilyOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
 
-            final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
-            final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-            tableOptions.setFilter(bloomFilter);
-            tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
-            tableOptions.setCacheIndexAndFilterBlocks(true);
-            tableOptions.setPinL0FilterAndIndexBlocksInCache(true);
-            columnFamilyOptions.setTableFormatConfig(tableOptions);
             ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
             cfDescs.add(columnFamilyDescriptor);
         }
@@ -217,6 +210,14 @@ public class RocksDBCF implements RocksDBCFMBean
         ColumnFamilyOptions cfOptions = cfDescs.get(0).columnFamilyOptions();
         cfOptions.setMergeOperator(mergeOperator);
         cfOptions.setCompactionFilter(compactionFilter);
+
+        final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
+        final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
+        tableOptions.setFilter(bloomFilter);
+        tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
+        tableOptions.setCacheIndexAndFilterBlocks(RocksDBConfigs.CACHE_INDEX_AND_FILTER_BLOCKS);
+        tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
+        cfOptions.setTableFormatConfig(tableOptions);
 
         Statistics stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);

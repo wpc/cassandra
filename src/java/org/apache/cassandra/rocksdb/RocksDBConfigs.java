@@ -45,6 +45,9 @@ public class RocksDBConfigs
     // number of sharded rocksdb instance in one Cassandra table
     public static final int NUM_SHARD = Integer.getInteger("cassandra.rocksdb.num_shard", 1);
 
+    public static final boolean CACHE_INDEX_AND_FILTER_BLOCKS = Boolean.getBoolean("cassandra.rocksdb.cache_index_and_filter_blocks");
+
+    public static final boolean PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE = Boolean.getBoolean("cassandra.rocksdb.pin_l0_filter_and_index_blocks_in_cache");
     /**
      * Streaming configs
      */
