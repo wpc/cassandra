@@ -77,6 +77,7 @@ import org.rocksdb.StatsLevel;
 import org.rocksdb.WriteOptions;
 
 import static org.apache.cassandra.rocksdb.RocksDBConfigs.MERGE_OPERANDS_LIMIT;
+import static org.apache.cassandra.rocksdb.RocksDBConfigs.NUM_SHARD;
 import static org.apache.cassandra.rocksdb.RocksDBConfigs.ROCKSDB_DIR;
 
 /**
@@ -121,11 +122,14 @@ public class RocksDBCF implements RocksDBCFMBean
         compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
         mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds, MERGE_OPERANDS_LIMIT);
 
-        rocksDBLists = new ArrayList<>(RocksDBConfigs.NUM_SHARD);
-        statsLists = new ArrayList<>(RocksDBConfigs.NUM_SHARD);
-        for (int i = 0; i < RocksDBConfigs.NUM_SHARD; i++)
+        assert NUM_SHARD > 0;
+
+        rocksDBLists = new ArrayList<>(NUM_SHARD);
+        statsLists = new ArrayList<>(NUM_SHARD);
+        for (int i = 0; i < NUM_SHARD; i++)
         {
-            String shardedDir = Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
+            String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
+                                Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
             openRocksDB(shardedDir);
         }
 
