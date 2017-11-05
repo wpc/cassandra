@@ -22,13 +22,23 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
+import org.apache.cassandra.concurrent.NamedThreadFactory;
+import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.Terms;
 import org.apache.cassandra.db.Clustering;
@@ -60,6 +70,12 @@ import org.rocksdb.RocksDBException;
 public class RocksDBEngine implements StorageEngine
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBEngine.class);
+    private static final ExecutorService FLUSH_EXECUTOR = new JMXEnabledThreadPoolExecutor(RocksDBConfigs.FLUSH_CONCURRENCY,
+                                                                                           StageManager.KEEPALIVE,
+                                                                                           TimeUnit.SECONDS,
+                                                                                           new LinkedBlockingQueue<Runnable>(),
+                                                                                           new NamedThreadFactory("RocksDBFlush"),
+                                                                                           "internal");
 
     public final ConcurrentMap<UUID, RocksDBCF> rocksDBFamily = new ConcurrentHashMap<>();
 
@@ -115,21 +131,30 @@ public class RocksDBEngine implements StorageEngine
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
     }
 
-    public void forceFlush(ColumnFamilyStore cfs)
+    public Future<Void> forceFlush(ColumnFamilyStore cfs)
     {
-        try
+        FutureTask<Void> task = ListenableFutureTask.create(new Callable<Void>()
         {
-            RocksDBCF rocksDBCF = getRocksDBCF(cfs);
+            public Void call()
+            {
+                try
+                {
+                    RocksDBCF rocksDBCF = getRocksDBCF(cfs);
 
-            if (rocksDBCF != null)
-                rocksDBCF.forceFlush();
-            else
-                logger.info("Can not find rocksdb table: " + cfs.metadata.cfId);
-        }
-        catch (RocksDBException e)
-        {
-            logger.error(e.toString(), e);
-        }
+                    if (rocksDBCF != null)
+                        rocksDBCF.forceFlush();
+                    else
+                        logger.info("Can not find rocksdb table: " + cfs.name);
+                }
+                catch (RocksDBException e)
+                {
+                    logger.error("Failed to flush Rocksdb table: " + cfs.name, e);
+                }
+                return null;
+            }
+        });
+        FLUSH_EXECUTOR.execute(task);
+        return task;
     }
 
     public void truncate(ColumnFamilyStore cfs)

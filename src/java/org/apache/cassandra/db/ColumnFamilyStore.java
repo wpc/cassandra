@@ -905,10 +905,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         synchronized (data)
         {
-            // call the flush in engine first
-            if (engine != null)
-                engine.forceFlush(this);
-
             Memtable current = data.getView().getCurrentMemtable();
             for (ColumnFamilyStore cfs : concatWithIndexes())
                 if (!cfs.data.getView().getCurrentMemtable().isClean())
@@ -943,11 +939,21 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         // we grab the current memtable; once any preceding memtables have flushed, we know its
         // commitLogLowerBound has been set (as this it is set with the upper bound of the preceding memtable)
         final Memtable current = data.getView().getCurrentMemtable();
+        final Future<Void> storageEngineFlush = engine != null ? engine.forceFlush(ColumnFamilyStore.this) : null;
+
         ListenableFutureTask<ReplayPosition> task = ListenableFutureTask.create(new Callable<ReplayPosition>()
         {
             public ReplayPosition call()
             {
                 logger.debug("forceFlush requested but everything is clean in {}", name);
+                try
+                {
+                    if (storageEngineFlush != null)
+                        storageEngineFlush.get();
+                } catch (InterruptedException|ExecutionException e)
+                {
+                    logger.error("Failed to wait storage engine to flush.", e);
+                }
                 return current.getCommitLogLowerBound();
             }
         });

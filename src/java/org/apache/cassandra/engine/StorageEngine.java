@@ -20,6 +20,7 @@ package org.apache.cassandra.engine;
 
 import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
@@ -44,7 +45,7 @@ public interface StorageEngine
     UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs,
                                        SinglePartitionReadCommand readCommand);
 
-    void forceFlush(final ColumnFamilyStore cfs);
+    Future<Void> forceFlush(final ColumnFamilyStore cfs);
 
     void truncate(final ColumnFamilyStore cfs);
 
