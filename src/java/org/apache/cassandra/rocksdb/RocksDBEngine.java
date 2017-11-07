@@ -230,7 +230,7 @@ public class RocksDBEngine implements StorageEngine
         // value colummns
         try
         {
-            rocksDBFamily.get(cfs.metadata.cfId).merge(partitionKey, rocksDBKey, rocksDBValue, writeCommitLog);
+            rocksDBFamily.get(cfs.metadata.cfId).merge(partitionKey, rocksDBKey, rocksDBValue);
         }
         catch (RocksDBException e)
         {

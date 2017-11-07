@@ -294,13 +294,8 @@ public class RocksDBCF implements RocksDBCFMBean
 
     public void merge(DecoratedKey partitionKey, byte[] key, byte[] value) throws RocksDBException
     {
-        merge(partitionKey, key, value, true);
-    }
-
-    public void merge(DecoratedKey partitionKey, byte[] key, byte[] value, boolean writeCommitLog) throws RocksDBException
-    {
         RocksDB rocksDB = getRocksDBFromKey(partitionKey);
-        if ((!writeCommitLog) || RocksDBConfigs.DISABLE_WRITE_TO_COMMITLOG)
+        if (RocksDBConfigs.DISABLE_WRITE_TO_COMMITLOG)
         {
             rocksDB.merge(disableWAL, key, value);
         }
