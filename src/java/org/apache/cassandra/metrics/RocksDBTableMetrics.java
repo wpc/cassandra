@@ -74,14 +74,97 @@ public class RocksDBTableMetrics
                          });
     }
 
-    public RocksDBTableMetrics(ColumnFamilyStore cfs, List<Statistics> statsList)
+    public RocksDBTableMetrics(ColumnFamilyStore cfs, Statistics stats)
     {
         RocksMetricNameFactory factory = new RocksMetricNameFactory(cfs);
 
-        for (int i = 0; i < statsList.size(); i++)
-        {
-            createShardedMetrics(factory, statsList.get(i), i);
-        }
+        Metrics.register(factory.createMetricName("GetMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_GET));
+        Metrics.register(factory.createMetricName("WriteMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_WRITE));
+        Metrics.register(factory.createMetricName("CompactionTimeMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_TIME));
+        Metrics.register(factory.createMetricName("SubcompactionSetupTimeMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.SUBCOMPACTION_SETUP_TIME));
+        Metrics.register(factory.createMetricName("TableSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.TABLE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("CompactionOutfileSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_OUTFILE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("WALFileSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.WAL_FILE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("ManifiestSyncMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.MANIFEST_FILE_SYNC_MICROS));
+        Metrics.register(factory.createMetricName("TableOpenIOMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.TABLE_OPEN_IO_MICROS));
+        Metrics.register(factory.createMetricName("MultiGet"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_MULTIGET));
+        Metrics.register(factory.createMetricName("ReadBlockCompactionMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.READ_BLOCK_COMPACTION_MICROS));
+        Metrics.register(factory.createMetricName("ReadBlockGetMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.READ_BLOCK_GET_MICROS));
+        Metrics.register(factory.createMetricName("WriteRawBlockMicros"),
+                         MetricsFactory.createHistogram(stats, HistogramType.WRITE_RAW_BLOCK_MICROS));
+        Metrics.register(factory.createMetricName("StallL0SlowdownCount"),
+                         MetricsFactory.createHistogram(stats, HistogramType.STALL_L0_SLOWDOWN_COUNT));
+        Metrics.register(factory.createMetricName("MemtableCompactionCount"),
+                         MetricsFactory.createHistogram(stats, HistogramType.STALL_MEMTABLE_COMPACTION_COUNT));
+        Metrics.register(factory.createMetricName("StallL0NumFilesCount"),
+                         MetricsFactory.createHistogram(stats, HistogramType.STALL_L0_NUM_FILES_COUNT));
+        Metrics.register(factory.createMetricName("HardRateLimitDelayCount"),
+                         MetricsFactory.createHistogram(stats, HistogramType.HARD_RATE_LIMIT_DELAY_COUNT));
+        Metrics.register(factory.createMetricName("SoftRateLimitDelayCount"),
+                         MetricsFactory.createHistogram(stats, HistogramType.SOFT_RATE_LIMIT_DELAY_COUNT));
+        Metrics.register(factory.createMetricName("NumFilesInSingleCompaction"),
+                         MetricsFactory.createHistogram(stats, HistogramType.NUM_FILES_IN_SINGLE_COMPACTION));
+        Metrics.register(factory.createMetricName("DbSeek"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DB_SEEK));
+        Metrics.register(factory.createMetricName("WriteStall"),
+                         MetricsFactory.createHistogram(stats, HistogramType.WRITE_STALL));
+        Metrics.register(factory.createMetricName("SstReadMs"),
+                         MetricsFactory.createHistogram(stats, HistogramType.SST_READ_MICROS));
+        Metrics.register(factory.createMetricName("NumSubCompactionsScheduled"),
+                         MetricsFactory.createHistogram(stats, HistogramType.NUM_SUBCOMPACTIONS_SCHEDULED));
+        Metrics.register(factory.createMetricName("BytesPerRead"),
+                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_READ));
+        Metrics.register(factory.createMetricName("BytesPerWrite"),
+                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_WRITE));
+        Metrics.register(factory.createMetricName("BytesPerMultiget"),
+                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_MULTIGET));
+        Metrics.register(factory.createMetricName("BytesCompressed"),
+                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_COMPRESSED));
+        Metrics.register(factory.createMetricName("BytesDecompressed"),
+                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_DECOMPRESSED));
+        Metrics.register(factory.createMetricName("CompressionTimeUs"),
+                         MetricsFactory.createHistogram(stats, HistogramType.COMPRESSION_TIMES_NANOS));
+        Metrics.register(factory.createMetricName("DecompressionTimeUs"),
+                         MetricsFactory.createHistogram(stats, HistogramType.DECOMPRESSION_TIMES_NANOS));
+        Metrics.register(factory.createMetricName("ReadNumMergeOperands"),
+                         MetricsFactory.createHistogram(stats, HistogramType.READ_NUM_MERGE_OPERANDS));
+        Metrics.register(factory.createMetricName("HistogramEnumMaxHistogram"),
+                         MetricsFactory.createHistogram(stats, HistogramType.HISTOGRAM_ENUM_MAX));
+
+        Metrics.register(factory.createMetricName("CompactReadBytes"),
+                         MetricsFactory.createCounter(stats, TickerType.COMPACT_READ_BYTES));
+        Metrics.register(factory.createMetricName("CompactWriteBytes"),
+                         MetricsFactory.createCounter(stats, TickerType.COMPACT_WRITE_BYTES));
+        Metrics.register(factory.createMetricName("CompactionKeyDropUser"),
+                         MetricsFactory.createCounter(stats, TickerType.COMPACTION_KEY_DROP_USER));
+        Metrics.register(factory.createMetricName("NumberKeysWritten"),
+                         MetricsFactory.createCounter(stats, TickerType.NUMBER_KEYS_WRITTEN));
+        Metrics.register(factory.createMetricName("MemtableHit"),
+                         MetricsFactory.createCounter(stats, TickerType.MEMTABLE_HIT));
+        Metrics.register(factory.createMetricName("MemtableMiss"),
+                         MetricsFactory.createCounter(stats, TickerType.MEMTABLE_MISS));
+        Metrics.register(factory.createMetricName("BlockCacheHit"),
+                         MetricsFactory.createCounter(stats, TickerType.BLOCK_CACHE_HIT));
+        Metrics.register(factory.createMetricName("BlockCacheMiss"),
+                         MetricsFactory.createCounter(stats, TickerType.BLOCK_CACHE_MISS));
+        Metrics.register(factory.createMetricName("StallMicros"),
+                         MetricsFactory.createCounter(stats, TickerType.STALL_MICROS));
+        Metrics.register(factory.createMetricName("DBMutexWaitMicros"),
+                         MetricsFactory.createCounter(stats, TickerType.DB_MUTEX_WAIT_MICROS));
+        Metrics.register(factory.createMetricName("MergeOperationTotalTime"),
+                         MetricsFactory.createCounter(stats, TickerType.MERGE_OPERATION_TOTAL_TIME));
 
         rocksDBIngestTimeHistogram = Metrics.histogram(factory.createMetricName("IngestTime"), true);
         rocksDBIngestWaitTimeHistogram = Metrics.histogram(factory.createMetricName("IngestWaitTime"), true);
@@ -145,97 +228,6 @@ public class RocksDBTableMetrics
         rocksDBIterMove = Metrics.counter(factory.createMetricName("RocksIterMove"));
         rocksDBIterSeek = Metrics.counter(factory.createMetricName("RocksIterSeek"));
         rocksDBIterNew = Metrics.counter(factory.createMetricName("RocksIterNew"));
-    }
-
-    private void createShardedMetrics(RocksMetricNameFactory factory, Statistics stats, int shard)
-    {
-        Metrics.register(factory.createShardedMetricName("GetMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.DB_GET));
-        Metrics.register(factory.createShardedMetricName("WriteMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.DB_WRITE));
-        Metrics.register(factory.createShardedMetricName("CompactionTimeMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_TIME));
-        Metrics.register(factory.createShardedMetricName("SubcompactionSetupTimeMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.SUBCOMPACTION_SETUP_TIME));
-        Metrics.register(factory.createShardedMetricName("TableSyncMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.TABLE_SYNC_MICROS));
-        Metrics.register(factory.createShardedMetricName("CompactionOutfileSyncMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.COMPACTION_OUTFILE_SYNC_MICROS));
-        Metrics.register(factory.createShardedMetricName("WALFileSyncMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.WAL_FILE_SYNC_MICROS));
-        Metrics.register(factory.createShardedMetricName("ManifiestSyncMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.MANIFEST_FILE_SYNC_MICROS));
-        Metrics.register(factory.createShardedMetricName("TableOpenIOMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.TABLE_OPEN_IO_MICROS));
-        Metrics.register(factory.createShardedMetricName("MultiGet", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.DB_MULTIGET));
-        Metrics.register(factory.createShardedMetricName("ReadBlockCompactionMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.READ_BLOCK_COMPACTION_MICROS));
-        Metrics.register(factory.createShardedMetricName("ReadBlockGetMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.READ_BLOCK_GET_MICROS));
-        Metrics.register(factory.createShardedMetricName("WriteRawBlockMicros", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.WRITE_RAW_BLOCK_MICROS));
-        Metrics.register(factory.createShardedMetricName("StallL0SlowdownCount", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.STALL_L0_SLOWDOWN_COUNT));
-        Metrics.register(factory.createShardedMetricName("MemtableCompactionCount", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.STALL_MEMTABLE_COMPACTION_COUNT));
-        Metrics.register(factory.createShardedMetricName("StallL0NumFilesCount", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.STALL_L0_NUM_FILES_COUNT));
-        Metrics.register(factory.createShardedMetricName("HardRateLimitDelayCount", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.HARD_RATE_LIMIT_DELAY_COUNT));
-        Metrics.register(factory.createShardedMetricName("SoftRateLimitDelayCount", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.SOFT_RATE_LIMIT_DELAY_COUNT));
-        Metrics.register(factory.createShardedMetricName("NumFilesInSingleCompaction", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.NUM_FILES_IN_SINGLE_COMPACTION));
-        Metrics.register(factory.createShardedMetricName("DbSeek", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.DB_SEEK));
-        Metrics.register(factory.createShardedMetricName("WriteStall", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.WRITE_STALL));
-        Metrics.register(factory.createShardedMetricName("SstReadMs", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.SST_READ_MICROS));
-        Metrics.register(factory.createShardedMetricName("NumSubCompactionsScheduled", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.NUM_SUBCOMPACTIONS_SCHEDULED));
-        Metrics.register(factory.createShardedMetricName("BytesPerRead", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_READ));
-        Metrics.register(factory.createShardedMetricName("BytesPerWrite", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_WRITE));
-        Metrics.register(factory.createShardedMetricName("BytesPerMultiget", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_PER_MULTIGET));
-        Metrics.register(factory.createShardedMetricName("BytesCompressed", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_COMPRESSED));
-        Metrics.register(factory.createShardedMetricName("BytesDecompressed", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.BYTES_DECOMPRESSED));
-        Metrics.register(factory.createShardedMetricName("CompressionTimeUs", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.COMPRESSION_TIMES_NANOS));
-        Metrics.register(factory.createShardedMetricName("DecompressionTimeUs", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.DECOMPRESSION_TIMES_NANOS));
-        Metrics.register(factory.createShardedMetricName("ReadNumMergeOperands", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.READ_NUM_MERGE_OPERANDS));
-        Metrics.register(factory.createShardedMetricName("HistogramEnumMaxHistogram", shard),
-                         MetricsFactory.createHistogram(stats, HistogramType.HISTOGRAM_ENUM_MAX));
-
-        Metrics.register(factory.createShardedMetricName("CompactReadBytes", shard),
-                         MetricsFactory.createCounter(stats, TickerType.COMPACT_READ_BYTES));
-        Metrics.register(factory.createShardedMetricName("CompactWriteBytes", shard),
-                         MetricsFactory.createCounter(stats, TickerType.COMPACT_WRITE_BYTES));
-        Metrics.register(factory.createShardedMetricName("CompactionKeyDropUser", shard),
-                         MetricsFactory.createCounter(stats, TickerType.COMPACTION_KEY_DROP_USER));
-        Metrics.register(factory.createShardedMetricName("NumberKeysWritten", shard),
-                         MetricsFactory.createCounter(stats, TickerType.NUMBER_KEYS_WRITTEN));
-        Metrics.register(factory.createShardedMetricName("MemtableHit", shard),
-                         MetricsFactory.createCounter(stats, TickerType.MEMTABLE_HIT));
-        Metrics.register(factory.createShardedMetricName("MemtableMiss", shard),
-                         MetricsFactory.createCounter(stats, TickerType.MEMTABLE_MISS));
-        Metrics.register(factory.createShardedMetricName("BlockCacheHit", shard),
-                         MetricsFactory.createCounter(stats, TickerType.BLOCK_CACHE_HIT));
-        Metrics.register(factory.createShardedMetricName("BlockCacheMiss", shard),
-                         MetricsFactory.createCounter(stats, TickerType.BLOCK_CACHE_MISS));
-        Metrics.register(factory.createShardedMetricName("StallMicros", shard),
-                         MetricsFactory.createCounter(stats, TickerType.STALL_MICROS));
-        Metrics.register(factory.createShardedMetricName("DBMutexWaitMicros", shard),
-                         MetricsFactory.createCounter(stats, TickerType.DB_MUTEX_WAIT_MICROS));
-        Metrics.register(factory.createShardedMetricName("MergeOperationTotalTime", shard),
-                         MetricsFactory.createCounter(stats, TickerType.MERGE_OPERATION_TOTAL_TIME));
     }
 
     public static class RocksMetricNameFactory implements MetricNameFactory

@@ -19,7 +19,6 @@
 package org.apache.cassandra.rocksdb;
 
 import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -30,7 +29,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
@@ -104,7 +102,7 @@ public class RocksDBCF implements RocksDBCFMBean
     private final boolean purgeTtlOnExpiration;
 
     private final List<RocksDB> rocksDBLists;
-    private final List<Statistics> statsLists;
+    private final Statistics stats;
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -124,8 +122,10 @@ public class RocksDBCF implements RocksDBCFMBean
 
         assert NUM_SHARD > 0;
 
+        stats = new Statistics();
+        stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
+        
         rocksDBLists = new ArrayList<>(NUM_SHARD);
-        statsLists = new ArrayList<>(NUM_SHARD);
         for (int i = 0; i < NUM_SHARD; i++)
         {
             String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
@@ -133,7 +133,7 @@ public class RocksDBCF implements RocksDBCFMBean
             openRocksDB(shardedDir);
         }
 
-        rocksMetrics = new RocksDBTableMetrics(cfs, statsLists);
+        rocksMetrics = new RocksDBTableMetrics(cfs, stats);
 
         // Set `ignore_range_deletion` to speed up read, with the cost of read the stale(range deleted) keys
         // until compaction happens. However in our case, range deletion is only used to remove ranges
@@ -223,9 +223,6 @@ public class RocksDBCF implements RocksDBCFMBean
         tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
         cfOptions.setTableFormatConfig(tableOptions);
 
-        Statistics stats = new Statistics();
-        stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
-
         dbOptions.setStatistics(stats);
         dbOptions.setRateLimiter(engine.rateLimiter);
 
@@ -235,7 +232,6 @@ public class RocksDBCF implements RocksDBCFMBean
                     gcGraceSeconds, purgeTtlOnExpiration);
 
         rocksDBLists.add(rocksDB);
-        statsLists.add(stats);
     }
 
     private RocksDB getRocksDBFromKey(DecoratedKey key)
