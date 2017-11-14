@@ -2,8 +2,11 @@ package org.apache.cassandra.rocksdb;
 
 import java.io.File;
 
+import org.rocksdb.CompressionType;
+
 public class RocksDBConfigs
 {
+    public static final CompressionType COMPRESSION_TYPE = CompressionType.LZ4_COMPRESSION;
     // Paths for storing RocksDB files.
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
     public static File STREAMING_TMPFILE_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));

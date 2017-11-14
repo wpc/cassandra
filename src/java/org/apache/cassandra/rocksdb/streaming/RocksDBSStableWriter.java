@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.rocksdb.CompressionType;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
@@ -50,7 +51,7 @@ public class RocksDBSStableWriter
         this(cfId, 0);
     }
 
-    public RocksDBSStableWriter(UUID cfId, int shardId) throws IOException, RocksDBException
+    public RocksDBSStableWriter(UUID cfId, int shardId)
     {
         this.cfId = cfId;
         this.currentSstableSize = 0;
@@ -58,6 +59,7 @@ public class RocksDBSStableWriter
         this.sstableIngested = 0;
         this.envOptions = new EnvOptions();
         this.options = new Options();
+        this.options.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
         this.shardId = shardId;
         RocksDBThroughputManager.getInstance().registerIncomingStreamWriter(this);
     }

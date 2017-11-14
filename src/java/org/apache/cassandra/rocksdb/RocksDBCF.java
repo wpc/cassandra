@@ -114,7 +114,7 @@ public class RocksDBCF implements RocksDBCFMBean
         String rocksDBTableDir = Paths.get(ROCKSDB_DIR, "s" + SCHEMA_VERSION, cfs.keyspace.getName(), cfs.name).toString();
         FileUtils.createDirectory(ROCKSDB_DIR);
         FileUtils.createDirectory(rocksDBTableDir);
-        
+
         gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
         purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
         compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
@@ -124,7 +124,7 @@ public class RocksDBCF implements RocksDBCFMBean
 
         stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
-        
+
         rocksDBLists = new ArrayList<>(NUM_SHARD);
         for (int i = 0; i < NUM_SHARD; i++)
         {
@@ -193,7 +193,7 @@ public class RocksDBCF implements RocksDBCFMBean
 
             ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
             columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
-            columnFamilyOptions.setCompressionType(CompressionType.LZ4_COMPRESSION);
+            columnFamilyOptions.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
             columnFamilyOptions.setWriteBufferSize(writeBufferSize);
             columnFamilyOptions.setMaxWriteBufferNumber(4);
             columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
