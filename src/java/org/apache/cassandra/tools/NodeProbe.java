@@ -1480,7 +1480,7 @@ public class NodeProbe implements AutoCloseable
         return getRocksDBCFProxy(keyspace, cf).ingestRocksDBStream(input);
     }
 
-    public String getRocksDBProperty(String keyspace, String table, String property)
+    public List<String> getRocksDBProperty(String keyspace, String table, String property)
     {
         return getRocksDBCFProxy(keyspace, table).getRocksDBProperty(property);
     }

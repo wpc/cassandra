@@ -17,6 +17,7 @@ package org.apache.cassandra.rocksdb;/*
  */
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.cassandra.rocksdb.tools.StreamingConsistencyCheckUtils;
 import org.rocksdb.RocksDBException;
@@ -32,7 +33,7 @@ public interface RocksDBCFMBean
 
     public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException;
 
-    public String getRocksDBProperty(String property);
+    public List<String> getRocksDBProperty(String property);
 
     String dumpPartition(String partitionKey, int limit);
 

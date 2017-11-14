@@ -320,9 +320,13 @@ public class RocksDBCF implements RocksDBCFMBean
             rocksDB.flush(flushOptions);
     }
 
-    public String getProperty(String property) throws RocksDBException
+    public List<String> getProperty(String property) throws RocksDBException
     {
-        return rocksDBLists.get(0).getProperty(property);
+        List<String> properties = new ArrayList<>(rocksDBLists.size());
+        for (RocksDB rocksDB : rocksDBLists)
+            properties.add(rocksDB.getProperty(property));
+
+        return properties;
     }
 
     public void truncate() throws RocksDBException
@@ -423,14 +427,14 @@ public class RocksDBCF implements RocksDBCFMBean
     }
 
     @Override
-    public String getRocksDBProperty(String property)
+    public List<String> getRocksDBProperty(String property)
     {
         try
         {
             return getProperty(property);
         } catch (Throwable e) {
             logger.warn("Failed to get rocksBD property " + property, e);
-            return "Failed to get property:" + property + ", reason:" + e.toString();
+            return Arrays.asList("Failed to get property:" + property + ", reason:" + e.toString());
         }
     }
 

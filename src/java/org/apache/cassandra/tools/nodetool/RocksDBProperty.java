@@ -109,7 +109,8 @@ public class RocksDBProperty extends NodeToolCmd
 
         if (args.size() == 3)
         {
-            System.out.println(probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property));
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property);
+            printRocksDBProperties(rocksDBProperties);
             return;
         }
 
@@ -126,7 +127,18 @@ public class RocksDBProperty extends NodeToolCmd
             if (keyspace != null && !keyspaceName.equals(keyspace))
                 continue;
             System.out.println("Table: " + keyspaceName + "." + tableName);
-            System.out.println(probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property));
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property);
+            printRocksDBProperties(rocksDBProperties);
+        }
+    }
+
+    private void printRocksDBProperties(List<String> rocksDBProperties)
+    {
+        int shardNumber = 0;
+        for (String rocksDBProperty : rocksDBProperties)
+        {
+            System.out.println("Shard: " + shardNumber++);
+            System.out.println(rocksDBProperty);
         }
     }
 }
