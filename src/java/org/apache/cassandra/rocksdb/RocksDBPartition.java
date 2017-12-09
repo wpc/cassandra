@@ -20,13 +20,11 @@ package org.apache.cassandra.rocksdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang.NotImplementedException;
 
 import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.db.BufferClustering;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.DeletionTime;
@@ -46,7 +44,6 @@ import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
-import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.SearchIterator;
 import org.apache.cassandra.utils.btree.BTree;
 import org.apache.cassandra.utils.btree.UpdateFunction;
@@ -161,15 +158,7 @@ public class RocksDBPartition implements Partition
 
         RocksDBIteratorAdapter rocksIterator = db.newIterator(partitionKey);
 
-        byte[] minKey = slice.start() == Slice.Bound.BOTTOM ? null :
-                             RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metadata);
-
-        byte[] maxKey = slice.end() == Slice.Bound.TOP ? null :
-                             RowKeyEncoder.encode(partitionKey, slice.end().clustering(), metadata);
-
-        iterOrder.seekToStart(rocksIterator, partitionKeyBytes, minKey, maxKey,
-                              slice.start().isExclusive(), slice.end().isExclusive());
-
+        iterOrder.seekToStart(rocksIterator, partitionKey, partitionKeyBytes, slice, metadata);
 
         return new AbstractUnfilteredRowIterator(metadata, partitionKey, DeletionTime.LIVE, metadata.partitionColumns(),
                                                  null, iterOrder == PartitionIterOrder.REVERSED, EncodingStats.NO_STATS)
@@ -193,17 +182,39 @@ public class RocksDBPartition implements Partition
                     }
 
                     byte[] key = rocksIterator.key();
-
-                    if (!Bytes.startsWith(key, partitionKeyBytes) ||
-                        exceedLowerBound(key, minKey, slice.start().isInclusive()) ||
-                        exceedUpperBound(key, maxKey, slice.end().isInclusive()))
+                    if (!Bytes.startsWith(key, partitionKeyBytes))
                     {
                         return endOfData();
                     }
 
+                    Clustering clustering = RowKeyEncoder.decodeClustering(key, metadata);
 
-                    byte[] value = rocksIterator.value();
-                    row = makeRow(key, value, columnFilter);
+                    if (exceedLowerBound(clustering, slice))
+                    {
+                        if (iterOrder == PartitionIterOrder.REVERSED)
+                        {
+                            return endOfData();
+                        }
+                        else
+                        {
+                            iterOrder.moveForward(rocksIterator);
+                            continue;
+                        }
+                    }
+
+                    if (exceedUpperBound(clustering, slice))
+                    {
+                        if (iterOrder == PartitionIterOrder.REVERSED)
+                        {
+                            iterOrder.moveForward(rocksIterator);
+                            continue;
+                        } else
+                        {
+                            return endOfData();
+                        }
+                    }
+
+                    row = makeRow(rocksIterator.value(), columnFilter, clustering);
                     iterOrder.moveForward(rocksIterator);
                 }
                 return row;
@@ -211,46 +222,14 @@ public class RocksDBPartition implements Partition
         };
     }
 
-    private boolean exceedLowerBound(byte[] key, byte[] lowerKey, boolean inclusive)
+    private boolean exceedLowerBound(Clustering clustering, Slice slice)
     {
-        if (lowerKey == null)
-        {
-            return false;
-        }
-
-        if (inclusive)
-        {
-            return FBUtilities.compareUnsigned(key, lowerKey) < 0;
-        }
-        else
-        {
-            return FBUtilities.compareUnsigned(key, lowerKey) <= 0;
-        }
+        return metadata.comparator.compare(clustering, slice.start().clustering()) < 0;
     }
 
-    private boolean exceedUpperBound(byte[] key, byte[] upperKey, boolean inclusive)
+    private boolean exceedUpperBound(Clustering clustering, Slice slice)
     {
-        if (upperKey == null)
-        {
-            return false;
-        }
-
-        if (inclusive)
-        {
-            return FBUtilities.compareUnsigned(key, upperKey) > 0;
-        }
-        else
-        {
-            return FBUtilities.compareUnsigned(key, upperKey) >= 0;
-        }
-    }
-
-
-    private Row makeRow(byte[] key, byte[] value, ColumnFilter columnFilter)
-    {
-        ByteBuffer[] decoded = RowKeyEncoder.decode(key, metadata);
-        ByteBuffer[] clusteringKeys = Arrays.copyOfRange(decoded, metadata.partitionKeyColumns().size(), decoded.length);
-        return makeRow(value, columnFilter, new BufferClustering(clusteringKeys));
+        return metadata.comparator.compare(clustering, slice.end().clustering()) > 0;
     }
 
     private Row makeRow(byte[] value, ColumnFilter columnFilter, Clustering clustering)
@@ -262,11 +241,19 @@ public class RocksDBPartition implements Partition
 
         List<ColumnData> dataBuffer = new ArrayList<>();
 
+
+        //todo: decode header infor for pk liveness and row tombstone
         RowValueEncoder.decode(metadata(), columnFilter, ByteBuffer.wrap(value), dataBuffer);
 
         if (dataBuffer.isEmpty())
         {
-            //TODO: we need return tombstone instead of skipping the row for the case like quorum read
+            if (metadata.partitionColumns().size() == 0)
+            {
+                return BTreeRow.emptyRow(clustering);
+            }
+            // No column present the intermediate state that all tombstone exceed gc grace period
+            // but the row haven't been deleted in cassandra compaction filter yet. In this case
+            // should skip this row.
             return null;
         }
 

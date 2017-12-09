@@ -18,8 +18,12 @@
 
 package org.apache.cassandra.rocksdb;
 
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.db.Clustering;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.Slice;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
-import org.apache.cassandra.utils.FBUtilities;
 
 enum PartitionIterOrder
 {
@@ -30,21 +34,17 @@ enum PartitionIterOrder
             rocksIterator.next();
         }
 
-        public void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
-                                boolean lowerExclusive, boolean upperExclusive)
+        public void seekToStart(RocksDBIteratorAdapter rocksIterator, DecoratedKey partitionKey, byte[] partitionKeyBytes, Slice slice, CFMetaData metaData)
         {
-            if (minKey == null)
+            // if start clustering condition is not specified, seek to partition start
+            if (slice.start() == Slice.Bound.BOTTOM)
             {
-                rocksIterator.seek(partitionKey);
+                rocksIterator.seek(partitionKeyBytes);
                 return;
             }
 
+            byte[] minKey = RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metaData);
             rocksIterator.seek(minKey);
-            if (lowerExclusive &&
-                rocksIterator.isValid() && FBUtilities.compareUnsigned(rocksIterator.key(), minKey) <= 0)
-            {
-                rocksIterator.next();
-            }
         }
     },
 
@@ -55,60 +55,70 @@ enum PartitionIterOrder
             rocksIterator.prev();
         }
 
-        public void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
-                                boolean lowerExclusive, boolean upperExclusive)
+        // For finding a start point for reverse scan we need choose a most close forward scan starting point and then
+        // scan forward to figure out the last key within the end bound.
+        public void seekToStart(RocksDBIteratorAdapter rocksIterator, DecoratedKey partitionKey, byte[] partitionKeyBytes, Slice slice, CFMetaData metaData)
         {
-            if (maxKey == null)
+            rocksIterator.seek(findForwardScanStartingPoint(partitionKey, partitionKeyBytes, slice, metaData));
+            // if data is not valid right after seek, we likely hit end of database, reset iterator to the partition start
+            if (!rocksIterator.isValid())
             {
-                rocksIterator.seek(minKey == null ? partitionKey : minKey);
-                moveToPartitionEnd(rocksIterator, partitionKey);
-                return;
+                rocksIterator.seek(partitionKeyBytes);
             }
 
-            rocksIterator.seek(maxKey);
+            byte[] lastKeyWithinEndBound = findLastKeyWithinEndBound(rocksIterator, partitionKeyBytes, slice, metaData);
 
-            if (rocksIterator.isValid())
+            if (lastKeyWithinEndBound != null)
             {
-                // we seeked to a valid key that closest to upper bound
-                // next we make sure we are on the lower side of upper bound
-                int compareResult = FBUtilities.compareUnsigned(rocksIterator.key(), maxKey);
-                if ((upperExclusive && compareResult == 0) || compareResult > 0)
-                {
-                    rocksIterator.prev();
-                }
-            }
-            else
-            {
-                // we are likely reach the end of the database
-                // in this case we just reset to partition end
-                rocksIterator.seek(minKey == null ? partitionKey : minKey);
-                moveToPartitionEnd(rocksIterator, partitionKey);
+                rocksIterator.seek(lastKeyWithinEndBound);
             }
         }
 
-        private void moveToPartitionEnd(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey)
+        private byte[] findLastKeyWithinEndBound(RocksDBIteratorAdapter rocksIterator, byte[] partitionKeyBytes, Slice slice, CFMetaData metaData)
         {
-            byte[] maxKey = null;
+            byte[] lastKeyWithinEndBound = null;
             while (rocksIterator.isValid())
             {
                 byte[] key = rocksIterator.key();
-                if (!Bytes.startsWith(key, partitionKey))
+                if (!Bytes.startsWith(key, partitionKeyBytes))
                 {
                     break;
                 }
-                maxKey = key;
+
+                Clustering clustering = RowKeyEncoder.decodeClustering(key, metaData);
+                if (metaData.comparator.compare(clustering, slice.end().clustering()) > 0)
+                {
+                    break;
+                }
+                lastKeyWithinEndBound = key;
                 rocksIterator.next();
             }
-            if (maxKey != null)
+            return lastKeyWithinEndBound;
+        }
+
+        private byte[] findForwardScanStartingPoint(DecoratedKey partitionKey, byte[] partitionKeyBytes, Slice slice, CFMetaData metaData)
+        {
+            // if end clustering condition is specified, start scan forward from it
+            if (slice.end() != Slice.Bound.TOP)
             {
-                rocksIterator.seek(maxKey);
+                return RowKeyEncoder.encode(partitionKey, slice.end().clustering(), metaData);
             }
+
+            // if there is start clustering condition, start forward scan from start clustering condition
+            if (slice.start() != Slice.Bound.BOTTOM)
+            {
+                return RowKeyEncoder.encode(partitionKey, slice.start().clustering(), metaData);
+            }
+
+            // if there is no start or end clustering condition, the best we can do is start from partition start
+            return partitionKeyBytes;
         }
     };
 
     public abstract void moveForward(RocksDBIteratorAdapter rocksIterator);
 
-    public abstract void seekToStart(RocksDBIteratorAdapter rocksIterator, byte[] partitionKey, byte[] minKey, byte[] maxKey,
-                                     boolean lowerExclusive, boolean upperExclusive);
-
+    // seekToStart is responsible move rocksdb iterator to a starting place that can make following scan cover all
+    // potential data. It does not need to be where the upper or lower boundary exactly started, since the following scan
+    // will filter out data fall out of the upper or lower boundary.
+    public abstract void seekToStart(RocksDBIteratorAdapter rocksIterator, DecoratedKey partitionKey, byte[] partitionKeyBytes, Slice slice, CFMetaData metaData);
 }

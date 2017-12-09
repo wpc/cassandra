@@ -26,6 +26,8 @@ import java.util.List;
 
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.db.BufferClustering;
+import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringPrefix;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
@@ -43,7 +45,7 @@ public class RowKeyEncoder
 
     public static byte[] encode(DecoratedKey partitionKey, ClusteringPrefix clustering, CFMetaData metadata)
     {
-        int keyPartsSize = metadata.partitionKeyColumns().size() + metadata.clusteringColumns().size() + 1;
+        int keyPartsSize = metadata.partitionKeyColumns().size() + clustering.size() + 1;
         List<Pair<AbstractType, ByteBuffer>> keyParts = new ArrayList<>(keyPartsSize);
         appendTokenKeyPart(keyParts, partitionKey);
         appendPartitionKeyParts(keyParts, metadata.partitionKeyColumns(), partitionKey);
@@ -87,10 +89,17 @@ public class RowKeyEncoder
         return Arrays.copyOfRange(decoded, 1, decoded.length);
     }
 
+    public static Clustering decodeClustering(byte[] key, CFMetaData metadata)
+    {
+        ByteBuffer[] decoded = RowKeyEncoder.decode(key, metadata);
+        ByteBuffer[] clusteringKeys = Arrays.copyOfRange(decoded, metadata.partitionKeyColumns().size(), decoded.length);
+        return new BufferClustering(clusteringKeys);
+    }
+
 
     private static void appendClusteringKeyParts(List<Pair<AbstractType, ByteBuffer>> keyParts, List<ColumnDefinition> clusteringColumns, ClusteringPrefix clustering)
     {
-        for (int i = 0; i < clusteringColumns.size(); i++)
+        for (int i = 0; i < clustering.size(); i++)
         {
             ColumnDefinition clusteringColumn = clusteringColumns.get(i);
             keyParts.add(Pair.create(clusteringColumn.type, clustering.get(i).duplicate()));
