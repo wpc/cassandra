@@ -39,6 +39,7 @@ import org.rocksdb.RocksDBException;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 
 public class RocksDBCFTest extends RocksDBTestBase
@@ -106,6 +107,19 @@ public class RocksDBCFTest extends RocksDBTestBase
         assertArrayEquals(value, rocksDBCF.get(dk, key));
 
         cfs.engine.close(cfs);
+    }
+
+    @Test
+    public void testGetPropertyAfterClose() throws RocksDBException
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+
+        cfs.engine.close(cfs);
+
+        // after close() is called, getProperty should return empty ArrayList
+        assertTrue(rocksDBCF.getProperty("rocksdb.estimate-pending-compaction-bytes").isEmpty());
     }
 
     @Test

@@ -29,6 +29,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
@@ -103,6 +105,8 @@ public class RocksDBCF implements RocksDBCFMBean
 
     private final List<RocksDB> rocksDBLists;
     private final Statistics stats;
+    private boolean closed = false; // indicate whether close() function is called or not.
+    private final ReentrantReadWriteLock lockForClosedFlag = new ReentrantReadWriteLock(true); // protect 'closed' field
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -322,11 +326,23 @@ public class RocksDBCF implements RocksDBCFMBean
 
     public List<String> getProperty(String property) throws RocksDBException
     {
-        List<String> properties = new ArrayList<>(rocksDBLists.size());
-        for (RocksDB rocksDB : rocksDBLists)
-            properties.add(rocksDB.getProperty(property));
-
-        return properties;
+        // synchronize with close() function which modifies 'closed' field
+        try
+        {
+            lockForClosedFlag.readLock().lock();
+            // if close() function is called already, calling rocksDB.getProperty() will crash the process.
+            // So return empty ArrayList instead.
+            if (closed)
+                return new ArrayList<>();
+            List<String> properties = new ArrayList<>(rocksDBLists.size());
+            for (RocksDB rocksDB : rocksDBLists)
+                properties.add(rocksDB.getProperty(property));
+            return properties;
+        }
+        finally
+        {
+            lockForClosedFlag.readLock().unlock();
+        }
     }
 
     public void truncate() throws RocksDBException
@@ -340,13 +356,18 @@ public class RocksDBCF implements RocksDBCFMBean
     protected void close() throws RocksDBException
     {
         logger.info("Closing rocksdb table: " + cfs.name);
-        synchronized (engine.rocksDBFamily)
+        try
         {
+            lockForClosedFlag.writeLock().lock();
+            closed = true;
             for (RocksDB rocksDB : rocksDBLists)
                 rocksDB.close();
-
             // remove the rocksdb instance, since it's not usable
             engine.rocksDBFamily.remove(cfID);
+        }
+        finally
+        {
+            lockForClosedFlag.writeLock().unlock();
         }
     }
 

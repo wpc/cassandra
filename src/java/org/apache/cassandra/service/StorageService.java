@@ -4161,6 +4161,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             }
             FBUtilities.waitOnFutures(flushes);
 
+            for (Keyspace keyspace : Keyspace.nonSystem())
+            {
+                keyspace.close();
+            }
+
             HintsService.instance.shutdownBlocking();
 
             // Interrupt ongoing compactions and shutdown CM to prevent further compactions.
