@@ -255,6 +255,10 @@ public class NodeProbe implements AutoCloseable
         return ssProxy.forceKeyspaceCleanup(jobs, keyspaceName, tables);
     }
 
+    public MBeanServerConnection getMBeanServerConnection() {
+        return mbeanServerConn;
+    }
+
     public int scrub(boolean disableSnapshot, boolean skipCorrupted, boolean checkData, int jobs, String keyspaceName, String... tables) throws IOException, ExecutionException, InterruptedException
     {
         return ssProxy.scrub(disableSnapshot, skipCorrupted, checkData, jobs, keyspaceName, tables);
