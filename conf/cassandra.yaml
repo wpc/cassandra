@@ -887,6 +887,8 @@ request_scheduler: org.apache.cassandra.scheduler.NoScheduler
 # http://download.oracle.com/javase/6/docs/technotes/guides/security/jsse/JSSERefGuide.html#CreateKeystore
 #
 server_encryption_options:
+    enabled: false
+    optional: false
     internode_encryption: none
     keystore: conf/.keystore
     keystore_password: cassandra

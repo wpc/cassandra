@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
+import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
@@ -33,11 +34,13 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import org.apache.cassandra.config.EncryptionOptions;
 import org.apache.cassandra.io.util.FileUtils;
+import org.conscrypt.OpenSSLProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,11 +56,12 @@ import com.google.common.collect.Sets;
 public final class SSLFactory
 {
     private static final Logger logger = LoggerFactory.getLogger(SSLFactory.class);
-    public static final String[] ACCEPTED_PROTOCOLS = new String[] {"SSLv2Hello", "TLSv1", "TLSv1.1", "TLSv1.2"};
+    public static final String[] ACCEPTED_PROTOCOLS = new String[] {"TLSv1", "TLSv1.1", "TLSv1.2"};
     private static boolean checkedExpiry = false;
 
     public static SSLServerSocket getServerSocket(EncryptionOptions options, InetAddress address, int port) throws IOException
     {
+        Security.addProvider(new OpenSSLProvider());
         SSLContext ctx = createSSLContext(options, true);
         SSLServerSocket serverSocket = (SSLServerSocket) ctx.getServerSocketFactory().createServerSocket();
         try
@@ -142,7 +146,7 @@ public final class SSLFactory
         SSLContext ctx;
         try
         {
-            ctx = SSLContext.getInstance(options.protocol);
+            ctx = SSLContext.getInstance(options.protocol, "Conscrypt");
             TrustManager[] trustManagers = null;
 
             if(buildTruststore)

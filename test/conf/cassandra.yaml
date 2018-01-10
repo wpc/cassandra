@@ -30,6 +30,8 @@ dynamic_snitch: true
 request_scheduler: org.apache.cassandra.scheduler.RoundRobinScheduler
 request_scheduler_id: keyspace
 server_encryption_options:
+    enabled: false
+    optional: false
     internode_encryption: none
     keystore: conf/.keystore
     keystore_password: cassandra
