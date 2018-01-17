@@ -34,6 +34,7 @@ import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.ColumnEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.utils.Hex;
+import org.rocksdb.IndexType;
 import org.rocksdb.RocksDBException;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -137,5 +138,19 @@ public class RocksDBCFTest extends RocksDBTestBase
         assertEquals(2, dump.split("\n").length);
         String dumpLimited = rocksDBCF.dumpPrefix(dk, "test_key".getBytes(), 1);
         assertEquals(1, dumpLimited.split("\n").length);
+    }
+
+    @Test
+    public void testTableIndexConfig() throws Exception
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+
+        IndexType properIndexType = rocksDBCF.getTableIndexType(IndexType.kHashSearch.toString());
+        assertEquals(IndexType.kHashSearch, properIndexType);
+        IndexType improperIndexType = rocksDBCF.getTableIndexType("notARealIndexType");
+        // An improper index type will revert to the default which is kBinarySearch
+        assertEquals(IndexType.kBinarySearch, improperIndexType);
     }
 }

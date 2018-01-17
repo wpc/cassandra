@@ -68,6 +68,7 @@ import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
 import org.rocksdb.Env;
 import org.rocksdb.FlushOptions;
+import org.rocksdb.IndexType;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
@@ -225,6 +226,7 @@ public class RocksDBCF implements RocksDBCFMBean
         tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
         tableOptions.setCacheIndexAndFilterBlocks(RocksDBConfigs.CACHE_INDEX_AND_FILTER_BLOCKS);
         tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
+        tableOptions.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
         cfOptions.setTableFormatConfig(tableOptions);
 
         dbOptions.setStatistics(stats);
@@ -271,6 +273,20 @@ public class RocksDBCF implements RocksDBCFMBean
     public byte[] get(DecoratedKey partitionKey, byte[] key) throws RocksDBException
     {
         return getRocksDBFromKey(partitionKey).get(readOptions, key);
+    }
+
+    public IndexType getTableIndexType(String indexType)
+    {
+        try
+        {
+            return IndexType.valueOf(indexType);
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Failed to set table index type " + indexType, e);
+            logger.warn("Setting table index type to default: " + IndexType.kBinarySearch.toString());
+            return IndexType.kBinarySearch;
+        }
     }
 
     public RocksDBIteratorAdapter newIterator(DecoratedKey partitionKey)

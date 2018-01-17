@@ -3,6 +3,7 @@ package org.apache.cassandra.rocksdb;
 import java.io.File;
 
 import org.rocksdb.CompressionType;
+import org.rocksdb.IndexType;
 
 public class RocksDBConfigs
 {
@@ -51,6 +52,9 @@ public class RocksDBConfigs
     public static final boolean CACHE_INDEX_AND_FILTER_BLOCKS = Boolean.getBoolean("cassandra.rocksdb.cache_index_and_filter_blocks");
 
     public static final boolean PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE = Boolean.getBoolean("cassandra.rocksdb.pin_l0_filter_and_index_blocks_in_cache");
+
+    // The indexing type that rocksdb will use
+    public static final String TABLE_INDEX_TYPE = System.getProperty("cassandra.rocksdb.table_index_type", IndexType.kBinarySearch.toString());
 
     // Number of cuncurrent flushing tasks when flush/drain is called.
     public static final int FLUSH_CONCURRENCY = Integer.getInteger("cassandra.rocksdb.flush_concurrency", 8);
