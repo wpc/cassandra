@@ -130,12 +130,20 @@ public class RocksDBCF implements RocksDBCFMBean
         stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
 
+        final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
+        final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
+        tableOptions.setFilter(bloomFilter);
+        tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
+        tableOptions.setCacheIndexAndFilterBlocks(RocksDBConfigs.CACHE_INDEX_AND_FILTER_BLOCKS);
+        tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
+        tableOptions.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
+
         rocksDBLists = new ArrayList<>(NUM_SHARD);
         for (int i = 0; i < NUM_SHARD; i++)
         {
             String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
                                 Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
-            openRocksDB(shardedDir);
+            openRocksDB(shardedDir, tableOptions);
         }
 
         rocksMetrics = new RocksDBTableMetrics(cfs, stats);
@@ -160,7 +168,7 @@ public class RocksDBCF implements RocksDBCFMBean
         }
     }
 
-    private void openRocksDB(String rocksDBTableDir) throws RocksDBException
+    private void openRocksDB(String rocksDBTableDir, BlockBasedTableConfig tableOptions) throws RocksDBException
     {
         DBOptions dbOptions = new DBOptions();
         List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
@@ -219,14 +227,6 @@ public class RocksDBCF implements RocksDBCFMBean
         ColumnFamilyOptions cfOptions = cfDescs.get(0).columnFamilyOptions();
         cfOptions.setMergeOperator(mergeOperator);
         cfOptions.setCompactionFilter(compactionFilter);
-
-        final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
-        final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-        tableOptions.setFilter(bloomFilter);
-        tableOptions.setBlockCacheSize(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
-        tableOptions.setCacheIndexAndFilterBlocks(RocksDBConfigs.CACHE_INDEX_AND_FILTER_BLOCKS);
-        tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
-        tableOptions.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
         cfOptions.setTableFormatConfig(tableOptions);
 
         dbOptions.setStatistics(stats);
