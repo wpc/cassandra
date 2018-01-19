@@ -57,7 +57,7 @@ import org.apache.cassandra.rocksdb.encoding.orderly.VariableLengthByteArrayRowK
 import org.apache.cassandra.utils.Pair;
 
 import static org.apache.cassandra.rocksdb.encoding.RowKeyInputAdapter.bytesAdapter;
-import static org.apache.cassandra.rocksdb.encoding.RowKeyInputAdapter.defalutAdapter;
+import static org.apache.cassandra.rocksdb.encoding.RowKeyInputAdapter.defaultAdapter;
 import static org.apache.cassandra.rocksdb.encoding.RowKeyInputAdapter.timestampAdapter;
 
 public class KeyPartsEncoder
@@ -71,37 +71,37 @@ public class KeyPartsEncoder
         KeyPartsEncoder.rowKeyEncodingPolicies.put(BytesType.instance,
                                                    new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(BooleanType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new BooleanRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new BooleanRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(ByteType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new ByteRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new ByteRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(DecimalType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new BigDecimalRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new BigDecimalRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(DoubleType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new DoubleRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new DoubleRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(FloatType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new FloatRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new FloatRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(InetAddressType.instance,
                                                    new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(Int32Type.instance,
-                                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(IntegerType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new BigIntegerRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new BigIntegerRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(LongType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(ShortType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new ShortRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new ShortRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(SimpleDateType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new FixedIntegerRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(TimeType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(TimestampType.instance,
                                                    new RowKeyEncodingPolicy(() -> new FixedLongRowKey(), timestampAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(TimeUUIDType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(UTF8Type.instance,
                                                    new RowKeyEncodingPolicy(() -> new UTF8RowKey(), bytesAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(UUIDType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defalutAdapter));
+                                                   new RowKeyEncodingPolicy(() -> new UUIDRowKey(), defaultAdapter));
     }
 
     public static byte[] encode(List<Pair<AbstractType, ByteBuffer>> keyParts)

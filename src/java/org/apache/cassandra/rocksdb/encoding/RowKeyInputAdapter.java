@@ -28,7 +28,7 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 public interface RowKeyInputAdapter
 {
 
-    public static final RowKeyInputAdapter defalutAdapter = new RowKeyInputAdapter()
+    public static final RowKeyInputAdapter defaultAdapter = new RowKeyInputAdapter()
     {
         public Object compose(AbstractType type, ByteBuffer input)
         {
