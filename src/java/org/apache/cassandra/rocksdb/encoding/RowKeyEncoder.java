@@ -31,10 +31,12 @@ import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringPrefix;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.ByteType;
 import org.apache.cassandra.db.marshal.CompositeType;
 import org.apache.cassandra.db.marshal.IntegerType;
 import org.apache.cassandra.db.marshal.LongType;
 import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.LocalPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Token;
@@ -136,7 +138,9 @@ public class RowKeyEncoder
     private static Pair<AbstractType, ByteBuffer> createTokenKeyPart(Token token)
     {
         AbstractType type = getTokenDataType(token.getPartitioner());
-        return Pair.create(type, type.decompose(token.getTokenValue()));
+        boolean useTokenValue = !(token.getPartitioner() instanceof  LocalPartitioner);
+        // Byte.MAX_BALUE is a arbitrary byte value for use in LocalPartitioner
+        return Pair.create(type, type.decompose(useTokenValue ? token.getTokenValue() : Byte.MAX_VALUE));
     }
 
     private static AbstractType getTokenDataType(IPartitioner partitioner)
@@ -149,6 +153,11 @@ public class RowKeyEncoder
         if (partitioner == RandomPartitioner.instance)
         {
             return IntegerType.instance;
+        }
+
+        if (partitioner instanceof LocalPartitioner)
+        {
+            return ByteType.instance;
         }
 
         throw new RuntimeException("Partitioner: " + partitioner.getClass().getName() + " is not supported yet");
