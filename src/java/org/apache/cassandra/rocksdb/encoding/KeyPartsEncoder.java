@@ -68,12 +68,12 @@ public class KeyPartsEncoder
     {
         KeyPartsEncoder.rowKeyEncodingPolicies.put(AsciiType.instance,
                                                    new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
-        KeyPartsEncoder.rowKeyEncodingPolicies.put(BytesType.instance,
-                                                   new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(BooleanType.instance,
                                                    new RowKeyEncodingPolicy(() -> new BooleanRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(ByteType.instance,
                                                    new RowKeyEncodingPolicy(() -> new ByteRowKey(), defaultAdapter));
+        KeyPartsEncoder.rowKeyEncodingPolicies.put(BytesType.instance,
+                                                   new RowKeyEncodingPolicy(() -> new VariableLengthByteArrayRowKey(), bytesAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(DecimalType.instance,
                                                    new RowKeyEncodingPolicy(() -> new BigDecimalRowKey(), defaultAdapter));
         KeyPartsEncoder.rowKeyEncodingPolicies.put(DoubleType.instance,

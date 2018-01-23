@@ -105,7 +105,7 @@ public class AtomicBTreePartition extends AbstractBTreePartition
      * Adds a given update to this in-memtable partition.
      *
      * @return an array containing first the difference in size seen after merging the updates, and second the minimum
-     * time detla between updates.
+     * time delta between updates.
      */
     public long[] addAllWithSizeDelta(final PartitionUpdate update, OpOrder.Group writeOp, UpdateTransaction indexer)
     {
