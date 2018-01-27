@@ -570,7 +570,13 @@ public class Keyspace
                 if (engine != null)
                 {
                     long start = System.nanoTime();
-                    engine.apply(cfs, upd, writeCommitLog);
+
+                    UpdateTransaction indexTransaction = updateIndexes
+                                                         ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
+                                                         : UpdateTransaction.NO_OP;
+
+                    engineApply(cfs, upd, indexTransaction, opGroup, replayPosition, writeCommitLog);
+
                     cfs.metric.samplers.get(TableMetrics.Sampler.WRITES).addSample(upd.partitionKey().getKey(), upd.partitionKey().hashCode(), 1);
                     cfs.metric.writeLatency.addNano(System.nanoTime() - start);
                 }
@@ -618,6 +624,25 @@ public class Keyspace
         {
             if (lock != null)
                 lock.unlock();
+        }
+    }
+
+    // TODO: refactor this to clean the code up
+    public void engineApply (final ColumnFamilyStore cfs,
+                             final PartitionUpdate partitionUpdate,
+                             UpdateTransaction indexTransaction,
+                             OpOrder.Group opGroup,
+                             ReplayPosition replayPosition,
+                             final boolean writeCommitLog)
+    {
+        if (engine != null)
+        {
+            engine.apply(cfs, partitionUpdate, indexTransaction, writeCommitLog);
+        }
+
+        if (engine == null || engine.doubleWrite())
+        {
+            cfs.apply(partitionUpdate, indexTransaction, opGroup, replayPosition);
         }
     }
 

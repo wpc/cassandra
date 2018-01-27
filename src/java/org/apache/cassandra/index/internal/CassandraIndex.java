@@ -536,7 +536,7 @@ public abstract class CassandraIndex implements Index
                                                                cell));
         Row row = BTreeRow.noCellLiveRow(buildIndexClustering(rowKey, clustering, cell), info);
         PartitionUpdate upd = partitionUpdate(valueKey, row);
-        indexCfs.apply(upd, UpdateTransaction.NO_OP, opGroup, null);
+        indexCfs.keyspace.engineApply(indexCfs, upd, UpdateTransaction.NO_OP, opGroup, null, false);
         logger.trace("Inserted entry into index for value {}", valueKey);
     }
 

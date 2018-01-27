@@ -36,6 +36,7 @@ import org.apache.cassandra.db.marshal.InetAddressType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.IntegerType;
 import org.apache.cassandra.db.marshal.LongType;
+import org.apache.cassandra.db.marshal.PartitionerDefinedOrder;
 import org.apache.cassandra.db.marshal.ReversedType;
 import org.apache.cassandra.db.marshal.ShortType;
 import org.apache.cassandra.db.marshal.SimpleDateType;
@@ -164,6 +165,11 @@ public class KeyPartsEncoder
         {
             type = ((ReversedType) type).baseType;
         }
+        if (type instanceof PartitionerDefinedOrder)
+        {
+            // TODO: This type is specific to CassandraIndex and needs to be supported when cross-partition queries are supported
+            type = BytesType.instance;
+        }
         return rowKeyEncodingPolicies.get(type).decompose(type, orderlyValue);
     }
 
@@ -174,6 +180,11 @@ public class KeyPartsEncoder
         if (type instanceof ReversedType)
         {
             type = ((ReversedType) type).baseType;
+        }
+        if (type instanceof PartitionerDefinedOrder)
+        {
+            // TODO: This type is specific to CassandraIndex and needs to be supported when cross-partition queries are supported
+            type = BytesType.instance;
         }
         return rowKeyEncodingPolicies.get(type).compose(type, keyPart.right);
     }
@@ -190,6 +201,11 @@ public class KeyPartsEncoder
             RowKey rowKey = getOrderlyRowKey(((ReversedType) type).baseType);
             rowKey.setOrder(Order.DESCENDING);
             return rowKey;
+        }
+        if (type instanceof PartitionerDefinedOrder)
+        {
+            // TODO: This type is specific to CassandraIndex and needs to be supported when cross-partition queries are supported
+            return getOrderlyRowKey(BytesType.instance);
         }
         if (!rowKeyEncodingPolicies.containsKey(type))
         {

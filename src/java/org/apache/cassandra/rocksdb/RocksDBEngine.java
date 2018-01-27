@@ -55,6 +55,7 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
+import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
@@ -107,19 +108,19 @@ public class RocksDBEngine implements StorageEngine
         }
     }
 
-    public void apply(ColumnFamilyStore cfs, PartitionUpdate update, boolean writeCommitLog)
+    public void apply(ColumnFamilyStore cfs, PartitionUpdate update, UpdateTransaction indexer, boolean writeCommitLog)
     {
         DecoratedKey partitionKey = update.partitionKey();
 
         for (Row row : update)
         {
-            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, row);
+            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, indexer, row);
         }
 
         Row staticRow = update.staticRow();
         if (!staticRow.isEmpty())
         {
-            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, staticRow);
+            applyRowToRocksDB(cfs, writeCommitLog, partitionKey, indexer, staticRow);
         }
     }
 
@@ -219,6 +220,7 @@ public class RocksDBEngine implements StorageEngine
     private void applyRowToRocksDB(ColumnFamilyStore cfs,
                                    boolean writeCommitLog,
                                    DecoratedKey partitionKey,
+                                   UpdateTransaction indexer,
                                    Row row)
     {
 
@@ -227,14 +229,20 @@ public class RocksDBEngine implements StorageEngine
         byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, clustering, cfs.metadata);
         byte[] rocksDBValue = RowValueEncoder.encode(cfs.metadata, row);
 
-        // value colummns
         try
         {
+            indexer.start();
             rocksDBFamily.get(cfs.metadata.cfId).merge(partitionKey, rocksDBKey, rocksDBValue);
+            if (indexer != UpdateTransaction.NO_OP)
+                indexer.onInserted(row);
         }
         catch (RocksDBException e)
         {
             logger.error(e.toString(), e);
+        }
+        finally
+        {
+            indexer.commit();
         }
     }
 
@@ -293,14 +301,16 @@ public class RocksDBEngine implements StorageEngine
     }
 
     @Override
-    public long load() {
+    public long load()
+    {
         long result = 0;
         for (RocksDBCF cf : rocksDBFamily.values())
         {
             try
             {
                 result += RocksDBProperty.getEstimatedLiveDataSize(cf);
-            } catch (RocksDBException e)
+            }
+            catch (RocksDBException e)
             {
                 logger.warn("Failed to query live data size.", e);
             }

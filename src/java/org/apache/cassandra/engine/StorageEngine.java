@@ -30,6 +30,7 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
+import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
 
@@ -40,6 +41,7 @@ public interface StorageEngine
 
     void apply(final ColumnFamilyStore cfs,
                final PartitionUpdate partitionUpdate,
+               UpdateTransaction indexTransaction,
                final boolean writeCommitLog);
 
     UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs,
