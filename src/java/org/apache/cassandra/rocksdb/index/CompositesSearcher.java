@@ -1,0 +1,173 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.cassandra.rocksdb.index;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.db.Clustering;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.ReadOrderGroup;
+import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.db.filter.ClusteringIndexNamesFilter;
+import org.apache.cassandra.db.filter.DataLimits;
+import org.apache.cassandra.db.filter.RowFilter;
+import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
+import org.apache.cassandra.db.rows.RowIterator;
+import org.apache.cassandra.db.rows.Rows;
+import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.index.internal.IndexEntry;
+import org.apache.cassandra.utils.btree.BTreeSet;
+
+
+public class CompositesSearcher extends RocksandraIndexSearcher
+{
+    public CompositesSearcher(ReadCommand command,
+                              RowFilter.Expression expression,
+                              RocksandraClusteringColumnIndex index)
+    {
+        super(command, expression, index);
+    }
+
+    private boolean isMatchingEntry(DecoratedKey partitionKey, IndexEntry entry, ReadCommand command)
+    {
+        return command.selectsKey(partitionKey) && command.selectsClustering(partitionKey, entry.indexedEntryClustering);
+    }
+
+    protected UnfilteredPartitionIterator queryDataFromIndex(final DecoratedKey indexKey,
+                                                             final RowIterator indexHits,
+                                                             final ReadCommand command,
+                                                             final ReadOrderGroup orderGroup)
+    {
+        assert indexHits.staticRow() == Rows.EMPTY_STATIC_ROW;
+
+        return new UnfilteredPartitionIterator()
+        {
+            private IndexEntry nextEntry;
+
+            private UnfilteredRowIterator next;
+
+            public boolean isForThrift()
+            {
+                return command.isForThrift();
+            }
+
+            public CFMetaData metadata()
+            {
+                return command.metadata();
+            }
+
+            public boolean hasNext()
+            {
+                return prepareNext();
+            }
+
+            public UnfilteredRowIterator next()
+            {
+                if (next == null)
+                    prepareNext();
+
+                UnfilteredRowIterator toReturn = next;
+                next = null;
+                return toReturn;
+            }
+
+            private boolean prepareNext()
+            {
+                while (true)
+                {
+                    if (next != null)
+                        return true;
+
+                    if (nextEntry == null)
+                    {
+                        if (!indexHits.hasNext())
+                            return false;
+
+                        nextEntry = index.decodeEntry(indexKey, indexHits.next());
+                    }
+
+                    // Gather all index hits belonging to the same partition and query the data for those hits.
+                    // TODO: it's much more efficient to do 1 read for all hits to the same partition than doing
+                    // 1 read per index hit. However, this basically mean materializing all hits for a partition
+                    // in memory so we should consider adding some paging mechanism. However, index hits should
+                    // be relatively small so it's much better than the previous code that was materializing all
+                    // *data* for a given partition.
+                    BTreeSet.Builder<Clustering> clusterings = BTreeSet.builder(index.baseCfs.getComparator());
+                    List<IndexEntry> entries = new ArrayList<>();
+                    DecoratedKey partitionKey = index.baseCfs.decorateKey(nextEntry.indexedKey);
+
+                    while (nextEntry != null && partitionKey.getKey().equals(nextEntry.indexedKey))
+                    {
+                        // We're queried a slice of the index, but some hits may not match some of the clustering column constraints
+                        if (isMatchingEntry(partitionKey, nextEntry, command))
+                        {
+                            clusterings.add(nextEntry.indexedEntryClustering);
+                            entries.add(nextEntry);
+                        }
+
+                        nextEntry = indexHits.hasNext() ? index.decodeEntry(indexKey, indexHits.next()) : null;
+                    }
+
+                    // Because we've eliminated entries that don't match the clustering columns, it's possible we added nothing
+                    if (clusterings.isEmpty())
+                        continue;
+
+                    // Query the gathered index hits. We still need to filter stale hits from the resulting query.
+                    ClusteringIndexNamesFilter filter = new ClusteringIndexNamesFilter(clusterings.build(), false);
+                    SinglePartitionReadCommand dataCmd = SinglePartitionReadCommand.create(isForThrift(),
+                                                                                           index.baseCfs.metadata,
+                                                                                           command.nowInSec(),
+                                                                                           command.columnFilter(),
+                                                                                           command.rowFilter(),
+                                                                                           DataLimits.NONE,
+                                                                                           partitionKey,
+                                                                                           filter,
+                                                                                           null);
+                    @SuppressWarnings("resource") // We close right away if empty, and if it's assign to next it will be called either
+                    // by the next caller of next, or through closing this iterator is this come before.
+                    UnfilteredRowIterator dataIter = dataCmd.queryMemtableAndDisk(index.baseCfs,
+                                                                        orderGroup.baseReadOpOrderGroup());
+
+                    if (dataIter == null)
+                    {
+                        dataIter.close();
+                        continue;
+                    }
+
+                    next = dataIter;
+                    return true;
+                }
+            }
+
+            public void remove()
+            {
+                throw new UnsupportedOperationException();
+            }
+
+            public void close()
+            {
+                indexHits.close();
+                if (next != null)
+                    next.close();
+            }
+        };
+    }
+}
