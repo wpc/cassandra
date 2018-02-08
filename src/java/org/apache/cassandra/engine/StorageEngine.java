@@ -39,6 +39,7 @@ public interface StorageEngine
 
     void openColumnFamilyStore(ColumnFamilyStore cfs);
 
+    // Throws StorageEngineException on failure
     void apply(final ColumnFamilyStore cfs,
                final PartitionUpdate partitionUpdate,
                UpdateTransaction indexTransaction,

@@ -62,7 +62,9 @@ public interface UpdateTransaction extends IndexTransaction
 {
     void onPartitionDeletion(DeletionTime deletionTime);
     void onRangeTombstone(RangeTombstone rangeTombstone);
+    // throws StorageEngineException on failure
     void onInserted(Row row);
+    // throws StorageEngineException on failure
     void onUpdated(Row existing, Row updated);
 
     UpdateTransaction NO_OP = new UpdateTransaction()

@@ -55,6 +55,7 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
+import org.apache.cassandra.exceptions.StorageEngineException;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
@@ -236,9 +237,10 @@ public class RocksDBEngine implements StorageEngine
             if (indexer != UpdateTransaction.NO_OP)
                 indexer.onInserted(row);
         }
-        catch (RocksDBException e)
+        catch (RocksDBException | RuntimeException e)
         {
             logger.error(e.toString(), e);
+            throw new StorageEngineException("Row merge failed", e);
         }
         finally
         {

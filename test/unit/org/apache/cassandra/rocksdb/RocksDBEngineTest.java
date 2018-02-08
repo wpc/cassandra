@@ -19,11 +19,15 @@
 package org.apache.cassandra.rocksdb;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMUnitRunner;
 
 import static org.junit.Assert.*;
 
+@RunWith(BMUnitRunner.class)
 public class RocksDBEngineTest extends RocksDBTestBase
 {
 
@@ -60,5 +64,35 @@ public class RocksDBEngineTest extends RocksDBTestBase
         cfs.engine.forceMajorCompaction(cfs);
 
         assertTrue(RocksDBProperty.getEstimatedLiveDataSize(cf) > 0);
+    }
+
+    @Test
+    @BMRule(name = "throw exception when merging rows",
+    targetClass = "RocksDBCF",
+    targetMethod = "merge",
+    targetLocation = "AT ENTRY",
+    action = "throw new RocksDBException(\"test exception\");")
+    public void testShouldThrowStorageEngineExceptionWhenRowMergeFails() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+
+        assertInvalidMessage("Row merge failed: test exception",
+                             "INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
+    }
+
+    @Test
+    @BMRule(name = "throw exception when merging index rows",
+    targetClass = "RocksandraClusteringColumnIndex",
+    targetMethod = "insert",
+    targetLocation = "AT ENTRY",
+    action = "throw new RuntimeException(\"test exception\");")
+    public void testShouldThrowStorageEngineExceptionWhenIndexInsertionFails() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+
+        assertInvalidMessage("Row merge failed: test exception",
+                             "INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
     }
 }
