@@ -57,6 +57,7 @@ import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.exceptions.StorageEngineException;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
+import org.apache.cassandra.metrics.SecondaryIndexMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
@@ -88,6 +89,8 @@ public class RocksDBEngine implements StorageEngine
 
     protected int compactionthroughputMbPerSec = RocksDBConfigs.RATE_MBYTES_PER_SECOND;
     public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L * compactionthroughputMbPerSec);
+
+    public static SecondaryIndexMetrics secondaryIndexMetrics = new SecondaryIndexMetrics();
 
     private final Keyspace keyspace;
 
@@ -235,9 +238,22 @@ public class RocksDBEngine implements StorageEngine
             indexer.start();
             rocksDBFamily.get(cfs.metadata.cfId).merge(partitionKey, rocksDBKey, rocksDBValue);
             if (indexer != UpdateTransaction.NO_OP)
-                indexer.onInserted(row);
+            {
+                try
+                {
+                    secondaryIndexMetrics.rsiTotalInsertions.inc();
+                    indexer.onInserted(row);
+                }
+                catch (RuntimeException e)
+                {
+                    secondaryIndexMetrics.rsiInsertionFailures.inc();
+                    logger.error(e.toString(), e);
+                    throw new StorageEngineException("Index update failed", e);
+                }
+
+            }
         }
-        catch (RocksDBException | RuntimeException e)
+        catch (RocksDBException e)
         {
             logger.error(e.toString(), e);
             throw new StorageEngineException("Row merge failed", e);

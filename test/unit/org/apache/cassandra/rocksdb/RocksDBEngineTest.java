@@ -92,7 +92,7 @@ public class RocksDBEngineTest extends RocksDBTestBase
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
         createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
 
-        assertInvalidMessage("Row merge failed: test exception",
+        assertInvalidMessage("Index update failed: test exception",
                              "INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
     }
 }
