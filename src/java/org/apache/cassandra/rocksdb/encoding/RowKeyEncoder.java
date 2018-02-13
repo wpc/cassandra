@@ -91,6 +91,19 @@ public class RowKeyEncoder
         return Arrays.copyOfRange(decoded, 1, decoded.length);
     }
 
+    public static ByteBuffer decodeNonCompositePartitionKey(byte[] key, CFMetaData metadata)
+    {
+        assert metadata.partitionKeyColumns().size() == 1 : "currently only support non-composite partitioning key";
+
+        List<AbstractType> types = new ArrayList<>(2);
+        types.add(getTokenDataType(metadata.partitioner));
+        types.add(metadata.partitionKeyColumns().get(0).type);
+
+        ByteBuffer[] decoded = KeyPartsEncoder.decode(key, types);
+        assert decoded.length > 1;
+        return decoded[1];
+    }
+
     public static Clustering decodeClustering(byte[] key, CFMetaData metadata)
     {
         ByteBuffer[] decoded = RowKeyEncoder.decode(key, metadata);

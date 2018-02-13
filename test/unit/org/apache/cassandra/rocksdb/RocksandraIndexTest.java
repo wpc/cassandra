@@ -150,4 +150,82 @@ public class RocksandraIndexTest extends RocksDBTestBase
                    row("p1", "k5", "v2", "j7"));
     }
 
+    @Test
+    public void testIndexTableCreatedAfterDataAlreadyInserted() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k3", "v1", "j3");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k4", "v2", "j4");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k5", "v2", "j5");
+
+        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k1", "v1", "j1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p2", "v2"),
+                   row("p2", "k4", "v2", "j4"),
+                   row("p2", "k5", "v2", "j5"));
+    }
+
+    @Test
+    public void testIndexTableCreatedAfterDataAlreadyInsertedWithDeletionsAndUpdates() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k3", "v1", "j3");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k4", "v2", "j4");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k5", "v2", "j5");
+
+        execute("DELETE FROM %s WHERE p=? AND c=? AND v=?", "p1", "k1", "v1");
+        execute("UPDATE %s SET j='j6' WHERE p=? AND c=? AND v=?", "p2", "k5", "v2");
+
+        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p2", "v2"),
+                   row("p2", "k4", "v2", "j4"),
+                   row("p2", "k5", "v2", "j6"));
+    }
+
+    @Test
+    public void testIndexTableValidityWhenDataIsUpdatedAfterCreation() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k3", "v1", "j3");
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k4", "v2", "j4");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k5", "v2", "j5");
+
+        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
+
+        execute("DELETE FROM %s WHERE p=? AND c=? AND v=?", "p1", "k1", "v1");
+        execute("UPDATE %s SET j='j6' WHERE p=? AND c=? AND v=?", "p2", "k5", "v2");
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p2", "v2"),
+                   row("p2", "k4", "v2", "j4"),
+                   row("p2", "k5", "v2", "j6"));
+    }
 }

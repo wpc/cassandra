@@ -178,7 +178,12 @@ public class RocksandraClusteringColumnIndex implements Index
 
     public Callable<?> getInitializationTask()
     {
-        return null;
+        return () -> {
+            RocksandraSecondaryIndexBuilder builder = new RocksandraSecondaryIndexBuilder(baseCfs);
+            builder.build();
+            baseCfs.indexManager.markIndexBuilt(metadata.name);
+            return null;
+        };
     }
 
     public IndexMetadata getIndexMetadata()
