@@ -26,6 +26,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.Keyspace;
@@ -38,6 +39,7 @@ import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
+import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.*;
@@ -79,10 +81,23 @@ public class BootStrapper extends ProgressEventNotifierSupport
                                                    stateStore);
         streamer.addSourceFilter(new RangeStreamer.FailureDetectorSourceFilter(FailureDetector.instance));
         streamer.addSourceFilter(new RangeStreamer.ExcludeLocalNodeFilter());
+        Set<String> configuredSourceDCs = DatabaseDescriptor.getBootStrapSourceDCs();
+        if (!configuredSourceDCs.isEmpty())
+        {
+            logger.info("Source data centers specified by user: ", configuredSourceDCs);
+            streamer.addSourceFilter(new RangeStreamer.MultiDatacenterFilter(DatabaseDescriptor.getEndpointSnitch(),
+                                                                             tokenMetadata.getTopology().getDatacenterRacks().keySet(),
+                                                                             configuredSourceDCs));
+        }
 
         for (String keyspaceName : Schema.instance.getNonLocalStrategyKeyspaces())
         {
             AbstractReplicationStrategy strategy = Keyspace.open(keyspaceName).getReplicationStrategy();
+            if (!configuredSourceDCs.isEmpty() && !(strategy instanceof NetworkTopologyStrategy))
+            {
+                throw new IllegalStateException("User specified source datacenters to stream from, but keyspace "
+                                                + keyspaceName + "(" + strategy + ") is not using NetWorkTopologyStrategy.");
+            }
             streamer.addRanges(keyspaceName, strategy.getPendingAddressRanges(tokenMetadata, tokens, address));
         }
 

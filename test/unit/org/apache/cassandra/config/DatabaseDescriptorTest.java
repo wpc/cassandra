@@ -42,6 +42,7 @@ import org.apache.cassandra.thrift.ThriftConversion;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(OrderedJUnit4ClassRunner.class)
 public class DatabaseDescriptorTest
@@ -270,5 +271,24 @@ public class DatabaseDescriptorTest
         testConfig.rpc_interface = null;
         DatabaseDescriptor.applyAddressConfig(testConfig);
 
+    }
+
+    @Test
+    public void testGetSourceDCs() throws Exception
+    {
+        // case 0: no config can be loaded
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().isEmpty());
+
+        // case 1: single source DC
+        System.setProperty("cassandra.bootstrap_source_dc","DC1");
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().size()==1);
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().contains("DC1"));
+
+        // case 2: multi source DC's
+        System.setProperty("cassandra.bootstrap_source_dc","DC1 DC2 DC3");
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().size()==3);
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().contains("DC1"));
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().contains("DC2"));
+        assertTrue(DatabaseDescriptor.getBootStrapSourceDCs().contains("DC3"));
     }
 }

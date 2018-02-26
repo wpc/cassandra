@@ -26,6 +26,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +109,41 @@ public class RangeStreamer
         public boolean shouldInclude(InetAddress endpoint)
         {
             return snitch.getDatacenter(endpoint).equals(sourceDc);
+        }
+    }
+
+    /**
+     * Source filter which excludes any endpoints that are not in specified data centers.
+     */
+    public static class MultiDatacenterFilter implements ISourceFilter
+    {
+        private final Set<String> desiredSourceDCs;
+        private final Set<String> realSourceDCs;
+        private final IEndpointSnitch snitch;
+
+        /**
+         * @param snitch
+         * @param realSourceDCs current data centers according to {@link org.apache.cassandra.locator.TokenMetadata.Topology}
+         * @param desiredSourceDCs user configured source data centers
+         * @throws IllegalArgumentException if desiredSourceDCs is not a subset of realSourceDCs
+         *
+         */
+        public MultiDatacenterFilter(IEndpointSnitch snitch, Set<String> realSourceDCs, Set<String> desiredSourceDCs)
+        {
+            this.desiredSourceDCs = Validate.notNull(desiredSourceDCs);
+            this.realSourceDCs = Validate.notNull(realSourceDCs);
+            if (!realSourceDCs.containsAll(desiredSourceDCs))
+            {
+                throw new IllegalArgumentException("some of desired DCs " + desiredSourceDCs +
+                                                " are not part of running DCs " + realSourceDCs + ".");
+            }
+            this.snitch = snitch;
+        }
+
+        public boolean shouldInclude(InetAddress endpoint)
+        {
+            String dc = snitch.getDatacenter(endpoint);
+            return desiredSourceDCs.contains(dc);
         }
     }
 

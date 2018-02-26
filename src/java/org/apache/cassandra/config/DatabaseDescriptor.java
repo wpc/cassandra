@@ -27,6 +27,8 @@ import java.nio.file.Paths;
 import java.security.Key;
 import java.util.*;
 
+import javax.validation.constraints.NotNull;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
@@ -2064,4 +2066,21 @@ public class DatabaseDescriptor
         return conf.gc_warn_threshold_in_ms;
     }
 
+    /**
+     * Get a {@link Set} of source datacenters
+     * @return a {@link Set} of source datacenters if specified; an empty set if none has been specified
+     */
+    @NotNull
+    public static Set<String> getBootStrapSourceDCs(){
+        Set<String> sourceDCs = new HashSet<>();
+        // assume DC's are space delimitted. and keep current name instead of make it cassandra.bootstrap_source_dcs
+        String dataCenters = System.getProperty("cassandra.bootstrap_source_dc");
+        if(dataCenters==null)
+        {
+            logger.debug("No source DC has been configured.");
+            return sourceDCs;
+        }
+        sourceDCs.addAll(Arrays.asList(dataCenters.split("\\s+")));
+        return sourceDCs;
+    }
 }
