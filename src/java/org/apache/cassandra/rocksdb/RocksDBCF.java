@@ -207,6 +207,7 @@ public class RocksDBCF implements RocksDBCFMBean
             ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
             columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
             columnFamilyOptions.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
+            columnFamilyOptions.setBottommostCompressionType(RocksDBConfigs.BOTTOMMOST_COMPRESSION);
             columnFamilyOptions.setWriteBufferSize(writeBufferSize);
             columnFamilyOptions.setMaxWriteBufferNumber(4);
             columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);

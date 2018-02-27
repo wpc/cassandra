@@ -60,6 +60,7 @@ public class RocksDBSStableWriter
         this.envOptions = new EnvOptions();
         this.options = new Options();
         this.options.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
+        this.options.setBottommostCompressionType(RocksDBConfigs.BOTTOMMOST_COMPRESSION);
         this.shardId = shardId;
         RocksDBThroughputManager.getInstance().registerIncomingStreamWriter(this);
     }

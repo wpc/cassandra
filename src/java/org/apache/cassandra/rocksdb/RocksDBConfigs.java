@@ -8,6 +8,10 @@ import org.rocksdb.IndexType;
 public class RocksDBConfigs
 {
     public static final CompressionType COMPRESSION_TYPE = CompressionType.LZ4_COMPRESSION;
+    // RocksDB lowest level compression type
+    public static CompressionType BOTTOMMOST_COMPRESSION =
+        CompressionType.getCompressionType(System.getProperty("cassandra.rocksdb.bottommost_compression"));
+
     // Paths for storing RocksDB files.
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
     public static File STREAMING_TMPFILE_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
@@ -74,4 +78,12 @@ public class RocksDBConfigs
     // Once enabled, the writes are written to both Cassandra and RocksDB which is future used to caclulate
     // the consistency and correctness of RocksDB.
     public static boolean ROCKSDB_DOUBLE_WRITE = Boolean.getBoolean("cassandra.rocksdb.double_write");
+
+    static
+    {
+        if (BOTTOMMOST_COMPRESSION == CompressionType.NO_COMPRESSION)
+        {
+            BOTTOMMOST_COMPRESSION = COMPRESSION_TYPE;
+        }
+    }
 }
