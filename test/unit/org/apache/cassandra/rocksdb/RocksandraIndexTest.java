@@ -20,6 +20,8 @@ package org.apache.cassandra.rocksdb;
 
 import org.junit.Test;
 
+import org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex;
+
 import static org.junit.Assert.assertTrue;
 
 public class RocksandraIndexTest extends RocksDBTestBase
@@ -28,7 +30,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
     public void testSetTextIndex() throws Throwable
     {
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                    RocksandraClusteringColumnIndex.class.getName()));
 
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
@@ -53,7 +56,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
     public void testSetDoubleIndex() throws Throwable
     {
         createTable("CREATE TABLE %s (p double, c double, v double, j double, PRIMARY KEY (p, c, v))");
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
 
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
@@ -78,7 +82,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
     public void testSetInt32Index() throws Throwable
     {
         createTable("CREATE TABLE %s (p int, c double, v double, j double, PRIMARY KEY (p, c, v))");
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
 
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
@@ -102,7 +107,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
     public void deleteRowsIndexTest() throws Throwable
     {
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
 
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
@@ -127,7 +133,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
     public void updateRowsIndexTest() throws Throwable
     {
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
 
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
@@ -162,7 +169,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k4", "v2", "j4");
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k5", "v2", "j5");
 
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
         assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
@@ -190,7 +198,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
         execute("DELETE FROM %s WHERE p=? AND c=? AND v=?", "p1", "k1", "v1");
         execute("UPDATE %s SET j='j6' WHERE p=? AND c=? AND v=?", "p2", "k5", "v2");
 
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
         assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
@@ -214,7 +223,8 @@ public class RocksandraIndexTest extends RocksDBTestBase
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k4", "v2", "j4");
         execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p2", "k5", "v2", "j5");
 
-        createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
         assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
 
         execute("DELETE FROM %s WHERE p=? AND c=? AND v=?", "p1", "k1", "v1");
