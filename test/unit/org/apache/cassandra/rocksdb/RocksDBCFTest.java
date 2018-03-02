@@ -71,6 +71,33 @@ public class RocksDBCFTest extends RocksDBTestBase
     }
 
     @Test
+    public void testDeleteRange() throws RocksDBException
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+
+        byte[] a = "a".getBytes();
+        byte[] b = "b".getBytes();
+        byte[] c = "c".getBytes();
+        byte[] d = "d".getBytes();
+        byte[] value = encodeValue(cfs, "test_value");
+
+        rocksDBCF.merge(dk, a, value);
+        rocksDBCF.merge(dk, b, value);
+        rocksDBCF.merge(dk, c, value);
+        rocksDBCF.merge(dk, d, value);
+
+        rocksDBCF.deleteRange(b, d);
+        rocksDBCF.compactRange();
+        assertArrayEquals(value, rocksDBCF.get(dk, a));
+        assertNull(rocksDBCF.get(dk, b));
+        assertNull(rocksDBCF.get(dk, c));
+        assertArrayEquals(value, rocksDBCF.get(dk, d));
+    }
+
+    @Test
     public void testTruncate() throws RocksDBException
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");

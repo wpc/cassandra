@@ -325,7 +325,10 @@ public class RocksDBCF implements RocksDBCFMBean
     public void deleteRange(byte[] start, byte[] end) throws RocksDBException
     {
         for (RocksDB rocksDB : rocksDBLists)
+        {
+            rocksDB.deleteFilesInRange(start, end);
             rocksDB.deleteRange(start, end);
+        }
     }
 
     public void compactRange() throws RocksDBException
