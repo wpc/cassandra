@@ -47,6 +47,16 @@ public class BasicSelectTest extends RocksDBTestBase
         assertRowCount(execute("SELECT firstname FROM %s WHERE userid=?", id1), 1);
     }
 
+
+    @Test
+    public void testClusteringEndWithZero() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p int, c varint, v text, PRIMARY KEY (p, c))");
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", 1, new BigInteger("1500"), "foo");
+        assertRows(execute("SELECT p, c, v FROM %s WHERE p=?" , 1),
+                   row(1, new BigInteger("1500"), "foo"));
+    }
+
     @Test
     public void testSelectWithOneClusteringKey() throws Throwable
     {
