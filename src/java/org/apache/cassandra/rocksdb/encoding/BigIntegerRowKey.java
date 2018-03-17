@@ -59,6 +59,6 @@ public class BigIntegerRowKey extends BigDecimalRowKey
     public Object deserialize(ImmutableBytesWritable w) throws IOException
     {
         Object bd = super.deserialize(w);
-        return bd == null ? null : ((BigDecimal) bd).unscaledValue();
+        return bd == null ? null : ((BigDecimal) bd).toBigInteger();
     }
 }

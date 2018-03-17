@@ -20,6 +20,7 @@ package org.apache.cassandra.rocksdb.encoding;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Random;
 
 import org.junit.Test;
 
@@ -28,17 +29,39 @@ import static org.junit.Assert.assertEquals;
 public class BigIntegerRowKeyTest
 {
 
-    public static final BigInteger ZERO = new BigInteger("0");
-    public static final BigInteger LARG_POSITIVE = new BigInteger("232343243242342342");
-    public static final BigInteger LARGE_NEGTIVE = new BigInteger("-232343243242342342");
-
     @Test
     public void roundtripSerialization() throws Exception
     {
-        assertEquals(ZERO, roundtrip(ZERO));
-        assertEquals(LARG_POSITIVE, roundtrip(LARG_POSITIVE));
-        assertEquals(LARGE_NEGTIVE, roundtrip(LARGE_NEGTIVE));
+        assertRoundTrip("0");
+        assertRoundTrip("232343243242342342");
+        assertRoundTrip("-232343243242342342");
+        assertRoundTrip("1");
+        assertRoundTrip("-1");
+        assertRoundTrip("10");
+        assertRoundTrip("42");
+        assertRoundTrip("10000000000000000000000000000000000000000000");
+        assertRoundTrip("-10000000000000000000000000000000000000000000");
+
+        Random random = new Random(System.currentTimeMillis());
+        for (int i = 0; i < 1024; i++)
+        {
+            for (int j = 0; j < i; j++)
+            {
+                assertRoundTrip(new BigInteger(j, random));
+            }
+        }
     }
+
+    private void assertRoundTrip(String val) throws IOException
+    {
+        assertRoundTrip(new BigInteger(val));
+    }
+
+    private void assertRoundTrip(BigInteger val) throws IOException
+    {
+        assertEquals(val, roundtrip(val));
+    }
+
 
     private BigInteger roundtrip(BigInteger bi) throws IOException
     {

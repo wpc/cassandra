@@ -24,7 +24,9 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 
@@ -52,6 +54,7 @@ import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class KeyPartsEncoderTest
@@ -157,7 +160,7 @@ public class KeyPartsEncoderTest
     {
         assertKeysAreInOrder(DecimalType.instance,
                              new BigDecimal("-1.000001"),
-                             new BigDecimal("0.0"),
+                             new BigDecimal("0"),
                              new BigDecimal("12.34"),
                              new BigDecimal("34.5678"));
     }
@@ -215,6 +218,14 @@ public class KeyPartsEncoderTest
         Pair<AbstractType, ByteBuffer> smallTimedUUID = createKeyPart(UUIDGen.getTimeUUID(0L), TimeUUIDType.instance);
         Pair<AbstractType, ByteBuffer> largeTimedUUID = createKeyPart(UUIDGen.getTimeUUID(System.currentTimeMillis()), TimeUUIDType.instance);
 
+        assertRoundTripMulti(smallVarInt, smallBigInt, smallTimedUUID);
+        assertRoundTripMulti(smallVarInt, smallBigInt, largeTimedUUID);
+        assertRoundTripMulti(smallVarInt, largeBigInt, smallTimedUUID);
+        assertRoundTripMulti(smallVarInt, largeBigInt, largeTimedUUID);
+        assertRoundTripMulti(largeVarInt, smallBigInt, smallTimedUUID);
+        assertRoundTripMulti(largeVarInt, smallBigInt, largeTimedUUID);
+        assertRoundTripMulti(largeVarInt, largeBigInt, smallTimedUUID);
+        assertRoundTripMulti(largeVarInt, largeBigInt, largeTimedUUID);
         assertKeysAreInOrder(encode(smallVarInt, smallBigInt, smallTimedUUID),
                              encode(smallVarInt, smallBigInt, largeTimedUUID),
                              encode(smallVarInt, largeBigInt, smallTimedUUID),
@@ -225,6 +236,7 @@ public class KeyPartsEncoderTest
                              encode(largeVarInt, largeBigInt, largeTimedUUID));
     }
 
+
     private Pair<AbstractType, ByteBuffer> createKeyPart(Object value, AbstractType type)
     {
         return Pair.create(type, type.getSerializer().serialize(value));
@@ -232,12 +244,31 @@ public class KeyPartsEncoderTest
 
     private void assertKeysAreInOrder(AbstractType type, Object... keyVals)
     {
+        for (int i = 0; i < keyVals.length; i++)
+        {
+            assertRoundtripSingle(keyVals[i], type);
+        }
         byte[][] keys = new byte[keyVals.length][];
         for (int i = 0; i < keyVals.length; i++)
         {
             keys[i] = encode(createKeyPart(keyVals[i], type));
         }
         assertKeysAreInOrder(keys);
+    }
+
+    private void assertRoundtripSingle(Object value, AbstractType type)
+    {
+        byte[] encoded = encode(createKeyPart(value, type));
+        assertEquals(value, type.compose(KeyPartsEncoder.decode(encoded, Arrays.asList(type))[0]));
+    }
+
+    private void assertRoundTripMulti(Pair<AbstractType, ByteBuffer>... keyParts)
+    {
+        byte[] encoded = encode(keyParts);
+        List<AbstractType> types = Arrays.stream(keyParts).map(kp -> kp.left).collect(Collectors.toList());
+        ByteBuffer[] decoded = KeyPartsEncoder.decode(encoded, types);
+        List<ByteBuffer> expected = Arrays.stream(keyParts).map(kp -> kp.right).collect(Collectors.toList());
+        assertEquals(expected, Arrays.asList(decoded));
     }
 
     private byte[] encode(Pair<AbstractType, ByteBuffer>... keyParts)
