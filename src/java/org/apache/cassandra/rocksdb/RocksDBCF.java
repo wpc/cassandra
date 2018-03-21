@@ -181,7 +181,7 @@ public class RocksDBCF implements RocksDBCFMBean
         }
         catch (RocksDBException ex)
         {
-            logger.warn("Failed to load lastest RocksDB options for cf {}.{}",
+            logger.warn("Failed to load latest RocksDB options for cf {}.{}",
                         cfs.keyspace.getName(), cfs.name);
         }
 
@@ -474,7 +474,7 @@ public class RocksDBCF implements RocksDBCFMBean
         {
             return getProperty(property);
         } catch (Throwable e) {
-            logger.warn("Failed to get rocksBD property " + property, e);
+            logger.warn("Failed to get RocksDB property " + property, e);
             return Arrays.asList("Failed to get property:" + property + ", reason:" + e.toString());
         }
     }
@@ -488,7 +488,7 @@ public class RocksDBCF implements RocksDBCFMBean
         }
         catch (Throwable e)
         {
-            logger.warn("Failed to dump parition " + partitionKey, e);
+            logger.warn("Failed to dump partition " + partitionKey, e);
             return "Failed to dump:" + partitionKey + ", reason:" + e.toString();
         }
     }
