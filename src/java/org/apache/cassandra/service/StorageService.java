@@ -65,11 +65,11 @@ import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token.TokenFactory;
-import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.exceptions.*;
 import org.apache.cassandra.gms.*;
 import org.apache.cassandra.hints.HintVerbHandler;
 import org.apache.cassandra.hints.HintsService;
+import org.apache.cassandra.index.Index;
 import org.apache.cassandra.io.sstable.SSTableLoader;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.locator.*;
@@ -1224,6 +1224,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         try
         {
             bootstrapStream.get();
+            buildIndex();
             return true;
         }
         catch (Throwable e)
@@ -1250,6 +1251,45 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     private void bootstrapFinished() {
         markViewsAsBuilt();
         isBootstrapMode = false;
+    }
+
+    /**
+     * Called after bootstrap succeeds. Naively builds index table after data has all been streamed in.
+     */
+    private void buildIndex()
+    {
+        for (String keyspaceName : Schema.instance.getUserKeyspaces())
+        {
+            Keyspace keyspace = null;
+            try
+            {
+                keyspace = getValidKeyspace(keyspaceName);
+            }
+            catch (Throwable e)
+            {
+                logger.error("Failed to get keyspace when creating index.");
+                throw new RuntimeException(e.getMessage());
+            }
+
+            for (ColumnFamilyStore cfs : keyspace.getColumnFamilyStores())
+            {
+                if (cfs.indexManager.hasIndexes() && cfs.isRocksDBBacked())
+                {
+                    for (Index idx : cfs.indexManager.listIndexes())
+                    {
+                        try
+                        {
+                            idx.getInitializationTask().call();
+                        }
+                        catch (Throwable e)
+                        {
+                            logger.error("Failed to build Index");
+                            throw new RuntimeException(e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public boolean resumeBootstrap()
