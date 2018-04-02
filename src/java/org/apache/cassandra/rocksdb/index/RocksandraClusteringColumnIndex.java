@@ -441,7 +441,7 @@ public class RocksandraClusteringColumnIndex implements Index
     {
         Row row = BTreeRow.emptyDeletedRow(indexClustering, Row.Deletion.regular(deletion));
         PartitionUpdate upd = partitionUpdate(indexKey, row);
-        indexCfs.apply(upd, UpdateTransaction.NO_OP, opGroup, null);
+        indexCfs.keyspace.engineApply(indexCfs, upd, UpdateTransaction.NO_OP, opGroup, null, false);
         logger.trace("Removed index entry for value {}", indexKey);
     }
 
