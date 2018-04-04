@@ -2163,6 +2163,10 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             logger.debug("Node {} state left, tokens {}", endpoint, tokens);
 
         excise(tokens, endpoint, extractExpireTime(pieces));
+
+        // TODO: Make more efficient
+        // Currently, the entire index table is naively rebuilt, upserting existing data
+        buildIndex();
     }
 
     /**
