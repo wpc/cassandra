@@ -19,17 +19,20 @@
 package org.apache.cassandra.rocksdb.index;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.SinglePartitionReadCommand;
+import org.apache.cassandra.db.LivenessInfo;
+import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
+import org.apache.cassandra.db.rows.BTreeRow;
+import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.Row;
-import org.apache.cassandra.db.rows.RowIterator;
-import org.apache.cassandra.db.rows.UnfilteredRowIterator;
-import org.apache.cassandra.db.rows.UnfilteredRowIterators;
 import org.apache.cassandra.exceptions.StorageEngineException;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.rocksdb.RocksDBCF;
@@ -37,6 +40,7 @@ import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBIteratorAdapter;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 import org.rocksdb.ReadOptions;
@@ -54,7 +58,9 @@ public class RocksandraSecondaryIndexBuilder
 
     public void build()
     {
-        ByteBuffer lastFoundPartitionKey = null;
+        OpOrder writeOrder = new OpOrder();
+        OpOrder.Group opGroup = writeOrder.start();
+        Row.Builder rowBuilder = BTreeRow.sortedBuilder();
 
         for (int shardId = 0; shardId < RocksDBConfigs.NUM_SHARD; shardId++)
         {
@@ -65,52 +71,41 @@ public class RocksandraSecondaryIndexBuilder
             while (iterator.isValid())
             {
                 byte[] key = iterator.key();
+                byte[] value = iterator.value();
                 ByteBuffer partitionKey = RowKeyEncoder.decodeNonCompositePartitionKey(key, cfs.metadata);
 
-                // TODO: with this implementation, we perform 2 reads and 1 write.
-                // This will be used as a baseline for future optimizations.
-                if (!partitionKey.equals(lastFoundPartitionKey))
+                List<ColumnData> dataBuffer = new ArrayList<>();
+                RowValueEncoder.decode(cfs.metadata, ColumnFilter.all(cfs.metadata), ByteBuffer.wrap(value), dataBuffer);
+
+                rowBuilder.newRow(RowKeyEncoder.decodeClustering(key, cfs.metadata));
+                rowBuilder.addPrimaryKeyLivenessInfo(LivenessInfo.EMPTY);
+
+                for (ColumnData columnData : dataBuffer)
+                    rowBuilder.addCell((Cell) columnData);
+
+                Row row = rowBuilder.build();
+
+                PartitionUpdate upd = PartitionUpdate.singleRowUpdate(cfs.metadata, partitionKey, row);
+                UpdateTransaction indexTransaction = cfs.indexManager.newUpdateTransaction(upd,
+                                                                                           opGroup,
+                                                                                           FBUtilities.nowInSeconds());
+
+                try
                 {
-                    lastFoundPartitionKey = partitionKey;
-                    buildSinglePartition(lastFoundPartitionKey);
+                    indexTransaction.start();
+                    indexTransaction.onInserted(row);
+                }
+                catch (RuntimeException e)
+                {
+                    logger.error(e.toString(), e);
+                    throw new StorageEngineException("Index update failed", e);
+                }
+                finally
+                {
+                    indexTransaction.commit();
                 }
 
                 iterator.next();
-            }
-        }
-    }
-
-    private void buildSinglePartition(ByteBuffer partitionKey)
-    {
-        SinglePartitionReadCommand readCommand = SinglePartitionReadCommand.fullPartitionRead(cfs.metadata,
-                                                                                              FBUtilities.nowInSeconds(),
-                                                                                              partitionKey);
-
-        UnfilteredRowIterator unfilteredRowIterator = cfs.engine.queryStorage(cfs, readCommand);
-        RowIterator rowIterator = UnfilteredRowIterators.filter(unfilteredRowIterator, readCommand.nowInSec());
-
-        OpOrder writeOrder = new OpOrder();
-        OpOrder.Group opGroup = writeOrder.start();
-        PartitionUpdate upd = PartitionUpdate.fromIterator(rowIterator);
-        UpdateTransaction indexTransaction = cfs.indexManager.newUpdateTransaction(upd,
-                                                                                   opGroup,
-                                                                                   FBUtilities.nowInSeconds());
-
-        for (Row row : upd)
-        {
-            try
-            {
-                indexTransaction.start();
-                indexTransaction.onInserted(row);
-            }
-            catch (RuntimeException e)
-            {
-                logger.error(e.toString(), e);
-                throw new StorageEngineException("Index update failed", e);
-            }
-            finally
-            {
-                indexTransaction.commit();
             }
         }
     }
