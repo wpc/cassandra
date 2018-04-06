@@ -21,6 +21,7 @@ package org.apache.cassandra.rocksdb;
 import org.apache.commons.lang.NotImplementedException;
 
 import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.LocalPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Token;
@@ -35,8 +36,14 @@ public class RocksDBUtils
         if (partitioner instanceof Murmur3Partitioner)
         {
             return new Murmur3Partitioner.LongToken(Murmur3Partitioner.MAXIMUM);
-        } else if (partitioner instanceof RandomPartitioner)
+        }
+        else if (partitioner instanceof RandomPartitioner)
         {
+            return new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM);
+        }
+        else if (partitioner instanceof LocalPartitioner)
+        {
+            // Arbitrary token value used for LocalPartitioner
             return new RandomPartitioner.BigIntegerToken(RandomPartitioner.MAXIMUM);
         }
         throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");
@@ -47,8 +54,14 @@ public class RocksDBUtils
         if (partitioner instanceof Murmur3Partitioner)
         {
             return Murmur3Partitioner.MINIMUM;
-        } else if (partitioner instanceof RandomPartitioner)
+        }
+        else if (partitioner instanceof RandomPartitioner)
         {
+            return RandomPartitioner.MINIMUM;
+        }
+        else if (partitioner instanceof LocalPartitioner)
+        {
+            // Arbitrary token value used for LocalPartitioner
             return RandomPartitioner.MINIMUM;
         }
         throw new NotImplementedException(partitioner.getClass().getName() + "is not supported");

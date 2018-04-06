@@ -18,6 +18,8 @@
 package org.apache.cassandra.rocksdb.index;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -41,10 +43,12 @@ import org.apache.cassandra.db.ClusteringPrefix;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.DeletionTime;
+import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.PartitionColumns;
 import org.apache.cassandra.db.RangeTombstone;
 import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.partitions.PartitionIterator;
@@ -203,7 +207,10 @@ public class RocksandraClusteringColumnIndex implements Index
 
     public Callable<?> getInvalidateTask()
     {
-        return null;
+        return () -> {
+            invalidate();
+            return null;
+        };
     }
 
     public Callable<?> getMetadataReloadTask(IndexMetadata indexDef)
@@ -493,6 +500,15 @@ public class RocksandraClusteringColumnIndex implements Index
     private PartitionUpdate partitionUpdate(DecoratedKey valueKey, Row row)
     {
         return PartitionUpdate.singleRowUpdate(indexCfs.metadata, valueKey, row);
+    }
+
+    private void invalidate()
+    {
+        Keyspace.writeOrder.awaitNewBarrier();
+        indexCfs.forceBlockingFlush();
+        indexCfs.readOrdering.awaitNewBarrier();
+        indexCfs.engine.truncate(indexCfs);
+        indexCfs.invalidate();
     }
 
     private boolean isPrimaryKeyIndex()

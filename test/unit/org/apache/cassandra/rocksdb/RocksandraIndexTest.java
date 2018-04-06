@@ -238,4 +238,33 @@ public class RocksandraIndexTest extends RocksDBTestBase
                    row("p2", "k4", "v2", "j4"),
                    row("p2", "k5", "v2", "j6"));
     }
+
+    @Test
+    public void testDropIndex() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
+        assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
+
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k1", "v1", "j1");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k2", "v1", "j2");
+        execute("INSERT INTO %s(p, c, v, j) values (?, ?, ?, ?)", "p1", "k3", "v1", "j3");
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k1", "v1", "j1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
+
+        dropIndex("DROP INDEX %s.test_index");
+
+        execute("DELETE FROM %s WHERE p=? AND c=? AND v=?", "p1", "k1", "v1");
+
+        createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
+                                  RocksandraClusteringColumnIndex.class.getName()));
+
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
+    }
 }
