@@ -118,7 +118,7 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             List<Range<Token>> ranges = new ArrayList<>();
             ranges.add(
                       new Range<Token>(RocksDBUtils.getMinToken(inCfs.getPartitioner()),
@@ -170,7 +170,7 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             transferRanges(inCfs, ranges);
         } finally
         {
@@ -221,7 +221,7 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
         StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
         try
         {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerailizer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
+            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
             List<Range<Token>> ranges = new ArrayList<>();
 
             IPartitioner partitioner = inCfs.getPartitioner();
@@ -277,11 +277,11 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
      * Cassandra only support stream between same Column Families, which prevent us from doing integration test.
      * Here we customize the RocksDBOutgoingMessageSerializer so that we could stream from another cfs.
      */
-    static class CustomRocksDBOutgoingMessageSerailizer implements StreamMessage.Serializer<RocksDBOutgoingMessage> {
+    static class CustomRocksDBOutgoingMessageSerializer implements StreamMessage.Serializer<RocksDBOutgoingMessage> {
 
         private final RocksDBCF alternativeDBToStreamFrom;
 
-        public CustomRocksDBOutgoingMessageSerailizer(RocksDBCF readFromDB)
+        public CustomRocksDBOutgoingMessageSerializer(RocksDBCF readFromDB)
         {
             this.alternativeDBToStreamFrom = readFromDB;
         }
