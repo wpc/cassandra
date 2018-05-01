@@ -86,7 +86,7 @@ public class BootStrapper extends ProgressEventNotifierSupport
         {
             logger.info("Source data centers specified by user: ", configuredSourceDCs);
             streamer.addSourceFilter(new RangeStreamer.MultiDatacenterFilter(DatabaseDescriptor.getEndpointSnitch(),
-                                                                             tokenMetadata.getTopology().getDatacenterRacks().keySet(),
+                                                                             tokenMetadata.cloneOnlyTokenMap().getTopology().getDatacenterRacks().keySet(),
                                                                              configuredSourceDCs));
         }
 
