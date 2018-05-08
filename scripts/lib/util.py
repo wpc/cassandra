@@ -54,7 +54,7 @@ def rpmbuild(artifact_file, version):
     rpmbuild_dir = os.path.join(PROJECT_ROOT, 'scripts/rpmbuild')
     shutil.copyfile(artifact_file,
                     os.path.join(rpmbuild_dir, 'SOURCES', os.path.basename(artifact_file)))
-    subprocess.check_call(['rpmbuild',
+    subprocess.check_call(['/usr/bin/rpmbuild',
                            '-ba',
                            '--define', '_topdir %s' % rpmbuild_dir,
                            '--define', '_instagram_version %s' % version,
