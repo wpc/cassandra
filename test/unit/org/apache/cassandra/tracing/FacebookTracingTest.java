@@ -71,7 +71,7 @@ public final class FacebookTracingTest
 
         assertEquals(outEdgeCount, 1);
         assertEquals(inEdgeCount, 0);
-        assertEquals(pointCount, 3);
+        assertEquals(pointCount, 4);
         assertEquals(blockCount, 1);
         assertEquals(unitCount, 1);
         assertEquals(addFilterCount, 1);

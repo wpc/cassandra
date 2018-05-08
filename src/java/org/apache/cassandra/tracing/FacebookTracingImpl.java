@@ -78,6 +78,7 @@ public class FacebookTracingImpl extends Tracing
     public TraceState begin(final String request, final InetAddress client, final Map<String, String> parameters)
     {
         assert isTracing();
+        instance.get().trace("Begin FB tracing request:'{}' parameters:'{}'", request, parameters.toString());
         return instance.get();
     }
 
