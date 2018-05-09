@@ -34,7 +34,7 @@ public abstract class AbstractPaxosCallback<T> implements IAsyncCallback<T>
 {
     protected final CountDownLatch latch;
     protected final int targets;
-    private final ConsistencyLevel consistency;
+    protected final ConsistencyLevel consistency;
 
     public AbstractPaxosCallback(int targets, ConsistencyLevel consistency)
     {

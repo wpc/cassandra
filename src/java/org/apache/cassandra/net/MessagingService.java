@@ -72,7 +72,10 @@ import org.apache.cassandra.metrics.MessagingMetrics;
 import org.apache.cassandra.repair.messages.RepairMessage;
 import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.service.*;
+import org.apache.cassandra.service.paxos.PrepareAndReadCommand;
+import org.apache.cassandra.service.paxos.PrepareAndReadResponse;
 import org.apache.cassandra.service.paxos.Commit;
+import org.apache.cassandra.service.paxos.PaxosState;
 import org.apache.cassandra.service.paxos.PrepareResponse;
 import org.apache.cassandra.tracing.TraceState;
 import org.apache.cassandra.tracing.Tracing;
@@ -151,7 +154,7 @@ public final class MessagingService implements MessagingServiceMBean
         PAXOS_COMMIT,
         @Deprecated PAGED_RANGE,
         // remember to add new verbs at the end, since we serialize by ordinal
-        UNUSED_1,
+        PAXOS_PREPARE_AND_READ,
         UNUSED_2,
         UNUSED_3,
         UNUSED_4,
@@ -215,7 +218,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.SNAPSHOT, Stage.MISC);
         put(Verb.ECHO, Stage.GOSSIP);
 
-        put(Verb.UNUSED_1, Stage.INTERNAL_RESPONSE);
+        put(Verb.PAXOS_PREPARE_AND_READ, Stage.MUTATION);
         put(Verb.UNUSED_2, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_3, Stage.INTERNAL_RESPONSE);
     }};
@@ -253,6 +256,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.PAXOS_PREPARE, Commit.serializer);
         put(Verb.PAXOS_PROPOSE, Commit.serializer);
         put(Verb.PAXOS_COMMIT, Commit.serializer);
+        put(Verb.PAXOS_PREPARE_AND_READ, PrepareAndReadCommand.serializer);
         put(Verb.HINT, HintMessage.serializer);
         put(Verb.BATCH_STORE, Batch.serializer);
         put(Verb.BATCH_REMOVE, UUIDSerializer.serializer);
@@ -280,6 +284,7 @@ public final class MessagingService implements MessagingServiceMBean
 
         put(Verb.PAXOS_PREPARE, PrepareResponse.serializer);
         put(Verb.PAXOS_PROPOSE, BooleanSerializer.serializer);
+        put(Verb.PAXOS_PREPARE_AND_READ, PrepareAndReadResponse.serializer);
 
         put(Verb.BATCH_STORE, WriteResponse.serializer);
         put(Verb.BATCH_REMOVE, WriteResponse.serializer);
