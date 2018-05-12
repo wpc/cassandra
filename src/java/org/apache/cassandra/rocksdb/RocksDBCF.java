@@ -247,7 +247,7 @@ public class RocksDBCF implements RocksDBCFMBean
 
     private RocksDB getRocksDBFromToken(Token token)
     {
-        return rocksDBLists.get(Math.abs(token.hashCode()) % RocksDBConfigs.NUM_SHARD);
+        return rocksDBLists.get(Math.abs(token.hashCode() % RocksDBConfigs.NUM_SHARD));
     }
 
     public static String getMbeanName(String keyspace, String table)
