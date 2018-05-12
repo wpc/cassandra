@@ -20,17 +20,22 @@ package org.apache.cassandra.rocksdb;
 
 import java.nio.ByteBuffer;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.cassandra.Util;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.ColumnIdentifier;
+import org.apache.cassandra.db.BufferDecoratedKey;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.openjdk.jmh.annotations.TearDown;
 import org.rocksdb.IndexType;
 import org.rocksdb.RocksDBException;
 
@@ -44,13 +49,23 @@ public class RocksDBCFTest extends RocksDBTestBase
 {
     final DecoratedKey dk = Util.dk("test_key");
 
+    @Before
+    public void setUp() {
+        RocksDBConfigs.NUM_SHARD = 10;
+    }
+
+    @TearDown
+    public void tearDown() {
+        RocksDBConfigs.NUM_SHARD = 1;
+    }
+
     @Test
     public void testMerge() throws RocksDBException
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
 
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        
+
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
         byte[] key = "test_key".getBytes();
         byte[] value = encodeValue(cfs, "test_value");
@@ -151,8 +166,7 @@ public class RocksDBCFTest extends RocksDBTestBase
     public void testDumpPrefix() throws Exception
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
-        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+        RocksDBCF rocksDBCF = getCurrentRocksDBCF();
 
         rocksDBCF.merge(dk, "test_key1".getBytes(), "test_value11".getBytes());
         rocksDBCF.merge(dk, "test_key1".getBytes(), "test_value12".getBytes());
@@ -168,13 +182,25 @@ public class RocksDBCFTest extends RocksDBTestBase
     public void testTableIndexConfig() throws Exception
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
-        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
-
+        RocksDBCF rocksDBCF = getCurrentRocksDBCF();
         IndexType properIndexType = rocksDBCF.getTableIndexType(IndexType.kHashSearch.toString());
         assertEquals(IndexType.kHashSearch, properIndexType);
         IndexType improperIndexType = rocksDBCF.getTableIndexType("notARealIndexType");
         // An improper index type will revert to the default which is kBinarySearch
         assertEquals(IndexType.kBinarySearch, improperIndexType);
+    }
+
+    @Test
+    public void testGetCorrectRocksdbInstanceWithBoundaryHashValue() throws Exception
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF rocksDBCF = getCurrentRocksDBCF();
+        //token 2147483648L is hand picked to make Longs.hashCode(token) == Integer.MIN_VALUE
+        BufferDecoratedKey decoratedKey = new BufferDecoratedKey(new Murmur3Partitioner.LongToken(2147483648L), ByteBufferUtil.bytes(0));
+        assertEquals(Integer.MIN_VALUE, decoratedKey.getToken().hashCode());
+        byte[] value = encodeValue(cfs, "test_value");
+        rocksDBCF.merge(decoratedKey, "a".getBytes(), value);
+        assertArrayEquals(value, rocksDBCF.get(decoratedKey, "a".getBytes()));
     }
 }
