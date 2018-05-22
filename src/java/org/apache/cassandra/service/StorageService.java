@@ -2839,6 +2839,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             throw new IOException("Snapshot " + tag + " already exists.");
 
         columnFamilyStore.snapshot(tag);
+        if (columnFamilyStore.engine != null) {
+            columnFamilyStore.engine.snapshot(columnFamilyStore, tag);
+        }
     }
 
     /**

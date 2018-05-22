@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -466,5 +467,13 @@ public class RocksDBEngine implements StorageEngine
             logger.error(e.toString(), e);
             throw new RuntimeException(e);
         }
+    }
+
+    public void snapshot(ColumnFamilyStore cfs, String snapshotName) throws IOException {
+        getRocksDBCF(cfs).createSnapshot(snapshotName);
+    }
+
+    public void clearSnapshot(ColumnFamilyStore cfs, String snapshotName) throws IOException {
+        getRocksDBCF(cfs).clearSnapshot(snapshotName);
     }
 }

@@ -19,6 +19,7 @@
 package org.apache.cassandra.rocksdb;
 
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -67,6 +68,14 @@ import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
+import org.rocksdb.CassandraCompactionFilter;
+import org.rocksdb.CassandraValueMergeOperator;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.CompactionPriority;
+import org.rocksdb.DBOptions;
+import org.rocksdb.Env;
+import org.rocksdb.FlushOptions;
 import org.rocksdb.IndexType;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
@@ -85,6 +94,7 @@ public class RocksDBCF implements RocksDBCFMBean
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBCF.class);
     private static final int SCHEMA_VERSION = 0;
+    private final String dataDir;
     private final UUID cfID;
     private final ColumnFamilyStore cfs;
     private final IPartitioner partitioner;
@@ -116,9 +126,9 @@ public class RocksDBCF implements RocksDBCFMBean
         partitioner = cfs.getPartitioner();
         engine = (RocksDBEngine) cfs.engine;
 
-        String rocksDBTableDir = Paths.get(ROCKSDB_DIR, "s" + SCHEMA_VERSION, cfs.keyspace.getName(), cfs.name).toString();
+        dataDir = Paths.get(ROCKSDB_DIR, "s" + SCHEMA_VERSION, cfs.keyspace.getName(), cfs.name).toString();
         FileUtils.createDirectory(ROCKSDB_DIR);
-        FileUtils.createDirectory(rocksDBTableDir);
+        FileUtils.createDirectory(dataDir);
 
         assert NUM_SHARD > 0;
 
@@ -137,10 +147,9 @@ public class RocksDBCF implements RocksDBCFMBean
         metaTableOption.setBlockCache(engine.metaCache);
         metaTableOption.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
 
-
         rocksDBHandles = new ArrayList<>(NUM_SHARD);
 
-        openAllDBShards(rocksDBTableDir, tableOptions, metaTableOption);
+        openAllDBShards(dataDir, tableOptions, metaTableOption);
 
         rocksMetrics = new RocksDBTableMetrics(cfs, stats);
 
@@ -187,6 +196,11 @@ public class RocksDBCF implements RocksDBCFMBean
                                            e);
             }
         }
+    }
+
+    private String getRocksDBDataDirFromShard(Integer shardId)
+    {
+        return NUM_SHARD == 1 ? this.dataDir : Paths.get(this.dataDir, String.valueOf(shardId)).toString();
     }
 
     private int shardIDForToken(Token token)
@@ -519,12 +533,12 @@ public class RocksDBCF implements RocksDBCFMBean
                 }
             }
             rocksMetrics.rocksDBIngestWaitTimeHistogram.update(System.currentTimeMillis() - startTime);
-            logger.info("Time spend waiting for compaction:" + (System.currentTimeMillis() - startTime));
+            logger.info("Time spent waiting for compaction:" + (System.currentTimeMillis() - startTime));
 
             long ingestStartTime = System.currentTimeMillis();
             dbhandle.ingestRocksSstable(rocksCFName, sstFile);
 
-            logger.info("Time spend on ingestion:" + (System.currentTimeMillis() - ingestStartTime));
+            logger.info("Time spent on ingestion:" + (System.currentTimeMillis() - ingestStartTime));
             rocksMetrics.rocksDBIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
         }
 
@@ -534,6 +548,25 @@ public class RocksDBCF implements RocksDBCFMBean
     {
         RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
         return dbhandle.beginTransaction(writeOptions);
+    }
+
+    @Override
+    public void createSnapshot(String tag) throws IOException
+    {
+        FileUtils.createDirectory(ROCKSDB_DIR);
+        for (RocksDBInstanceHandle dbhandle : rocksDBHandles)
+        {
+            dbhandle.createSnapshot(tag);
+        }
+    }
+
+    @Override
+    public void clearSnapshot(String tag)
+    {
+        for (RocksDBInstanceHandle dbhandle : rocksDBHandles)
+        {
+            dbhandle.clearSnapshot(tag);
+        }
     }
 }
 

@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.engine;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -79,4 +80,8 @@ public interface StorageEngine
      * used by 'nodetool dumppartition'.
      */
     String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit);
+
+    public void snapshot(ColumnFamilyStore cfs, String snapshotName) throws IOException;
+
+    public void clearSnapshot(ColumnFamilyStore cfs, String snapshotName) throws IOException;
 }

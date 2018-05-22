@@ -235,7 +235,10 @@ public class Keyspace
             if (columnFamilyName == null || cfStore.name.equals(columnFamilyName))
             {
                 tookSnapShot = true;
-                cfStore.snapshot(snapshotName);
+                if (engine != null)
+                    engine.snapshot(cfStore, snapshotName);
+                else
+                    cfStore.snapshot(snapshotName);
             }
         }
 
@@ -284,6 +287,20 @@ public class Keyspace
     {
         List<File> snapshotDirs = Directories.getKSChildDirectories(keyspace, ColumnFamilyStore.getInitialDirectories());
         Directories.clearSnapshot(snapshotName, snapshotDirs);
+
+        Keyspace ks = Keyspace.open(keyspace);
+        if (ks.engine != null) {
+            for (ColumnFamilyStore cfStore : ks.columnFamilyStores.values())
+            {
+                try
+                {
+                    ks.engine.clearSnapshot(cfStore, snapshotName);
+                } catch (IOException e) {
+                    logger.error("Failed to clear snapshot %s: %s", snapshotName, e);
+                }
+            }
+        }
+
     }
 
     /**

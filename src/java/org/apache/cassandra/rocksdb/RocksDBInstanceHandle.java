@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.rocksdb;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,12 +29,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.CassandraCompactionFilter;
 import org.rocksdb.CassandraPartitionMetaMergeOperator;
 import org.rocksdb.CassandraValueMergeOperator;
+import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -64,6 +69,8 @@ public class RocksDBInstanceHandle
     private final ColumnFamilyHandle dataCfHandle;
     private final ColumnFamilyHandle indexCfHandle;
     private final CassandraCompactionFilter compactionFilter;
+    private final String rocksDBPath;
+    private final ColumnFamilyStore cfs;
 
     private FlushOptions flushOptions = new FlushOptions().setWaitForFlush(true);
 
@@ -80,6 +87,8 @@ public class RocksDBInstanceHandle
         boolean purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
         mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds, MERGE_OPERANDS_LIMIT);
         partitionMetaMergeOperator = new CassandraPartitionMetaMergeOperator();
+        rocksDBPath = rocksDBTableDir;
+        this.cfs = cfs;
 
         // holding reference avoid compaction filter instance get gc
         this.compactionFilter = createCassandraCompactionFilter(cfs, purgeTtlOnExpiration, gcGraceSeconds);
@@ -299,6 +308,54 @@ public class RocksDBInstanceHandle
     public void close()
     {
         rocksDB.close();
+    }
+
+    public void createSnapshot(String tag) throws IOException {
+        String snapshotDir = getSnapshotPath();
+        String path = Paths.get(snapshotDir, tag).toString();
+
+        FileUtils.createDirectory(snapshotDir);
+
+        String cfsKey = cfs.keyspace.getName() + "." + cfs.getTableName();
+
+        logger.info("Requesting checkpoint for " + cfsKey + " in " + path);
+        try
+        {
+            createCheckpoint(path);
+        }
+        catch (RocksDBException e)
+        {
+            logger.error("Failed to create checkpoint for " + cfsKey + ":", e);
+            throw new IOException(e.getMessage());
+        }
+        logger.info("Created checkpoint for " + cfsKey + " in " + path);
+    }
+
+    public void clearSnapshot(String tag) {
+        String snapshotDir = getSnapshotPath();
+        if (tag == null || tag.equals("")) {
+            logger.info("Clearing all checkpoints for " + cfs.keyspace.getName());
+            FileUtils.deleteRecursive(new File(snapshotDir));
+        } else {
+            String checkpointPath = Paths.get(snapshotDir, tag).toString();
+            File checkpoint = new File(checkpointPath);
+            if(FileUtils.isContained(new File(snapshotDir), checkpoint) && checkpoint.isDirectory())
+            {
+                FileUtils.deleteRecursive(checkpoint);
+                logger.info("Clearing checkpoint [" + tag + "] for " + cfs.keyspace.getName() + " in " + checkpointPath);
+            }
+
+        }
+    }
+
+    private String getSnapshotPath(){
+        return Paths.get(rocksDBPath, "snapshots").toString();
+    }
+
+    private void createCheckpoint(String path) throws RocksDBException
+    {
+        Checkpoint c =  Checkpoint.create(rocksDB);
+        c.createCheckpoint(path);
     }
 
     public void ingestRocksSstable(RocksCFName rocksCFName, String sstFile) throws RocksDBException

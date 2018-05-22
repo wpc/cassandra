@@ -34,6 +34,10 @@ public interface RocksDBCFMBean
 
     public List<String> getRocksDBProperty(String property, RocksCFName cf);
 
+    public void createSnapshot(String tag) throws IOException;
+
+    public void clearSnapshot(String tag);
+
     String dumpPartition(String partitionKey, int limit);
     String dumpPartitionMetaData(String partitionKey);
 
