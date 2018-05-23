@@ -72,6 +72,7 @@ import org.rocksdb.OptionsUtil;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.SstFileManager;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.rocksdb.WriteOptions;
@@ -171,6 +172,7 @@ public class RocksDBCF implements RocksDBCFMBean
     {
         DBOptions dbOptions = new DBOptions();
         List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
+        SstFileManager sstFileManager = new SstFileManager(Env.getDefault());
 
         boolean loadedLatestOptions = false;
         try
@@ -189,6 +191,9 @@ public class RocksDBCF implements RocksDBCFMBean
 
         // create options
         if (!loadedLatestOptions) {
+            // sstFilemanager options
+            sstFileManager.setDeleteRateBytesPerSecond(RocksDBConfigs.DELETE_RATE_BYTES_PER_SECOND);
+
             // db options
             dbOptions.setCreateIfMissing(true);
             dbOptions.setAllowConcurrentMemtableWrite(true);
@@ -199,6 +204,7 @@ public class RocksDBCF implements RocksDBCFMBean
             dbOptions.setBaseBackgroundCompactions(RocksDBConfigs.BACKGROUD_COMPACTIONS);
             dbOptions.setMaxBackgroundFlushes(4);
             dbOptions.setMaxSubcompactions(8);
+            dbOptions.setSstFileManager(sstFileManager);
 
             // column family options
             cfDescs.clear();
