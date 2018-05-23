@@ -33,6 +33,9 @@ public class RocksDBConfigs
     // It's per keyspace, and shared across all RocksDB instances within the same keyspace.
     public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
 
+    // deleteRateBytesPerSecond for RocksDB's delete rate limiter, which is used to control the delete rate.
+    public static final long DELETE_RATE_BYTES_PER_SECOND = Long.getLong("cassandra.rocksdb.delete_rate_bytes_per_second", 100 * 1024 * 1024);
+
     // rocksdb block cache size, default to be 1G per rocksdb instance
     public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 128);
 
