@@ -7,10 +7,14 @@ import org.rocksdb.IndexType;
 
 public class RocksDBConfigs
 {
-    public static final CompressionType COMPRESSION_TYPE = CompressionType.LZ4_COMPRESSION;
+    public static final CompressionType COMPRESSION_TYPE = CompressionType.getCompressionType(
+    System.getProperty("cassandra.rocksdb.compression_type", "lz4")
+    );
     // RocksDB lowest level compression type
-    public static CompressionType BOTTOMMOST_COMPRESSION =
-        CompressionType.getCompressionType(System.getProperty("cassandra.rocksdb.bottommost_compression"));
+    public static final CompressionType BOTTOMMOST_COMPRESSION =
+        CompressionType.getCompressionType(
+            System.getProperty("cassandra.rocksdb.bottommost_compression", COMPRESSION_TYPE.getLibraryName())
+        );
 
     // Paths for storing RocksDB files.
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
@@ -82,11 +86,4 @@ public class RocksDBConfigs
     // the consistency and correctness of RocksDB.
     public static boolean ROCKSDB_DOUBLE_WRITE = Boolean.getBoolean("cassandra.rocksdb.double_write");
 
-    static
-    {
-        if (BOTTOMMOST_COMPRESSION == CompressionType.NO_COMPRESSION)
-        {
-            BOTTOMMOST_COMPRESSION = COMPRESSION_TYPE;
-        }
-    }
 }
