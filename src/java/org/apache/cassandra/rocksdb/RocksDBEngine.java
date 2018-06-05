@@ -40,6 +40,7 @@ import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.Terms;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -90,8 +91,9 @@ public class RocksDBEngine implements StorageEngine
         RocksDB.loadLibrary();
     }
 
-    protected int compactionthroughputMbPerSec = RocksDBConfigs.RATE_MBYTES_PER_SECOND;
-    public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L * compactionthroughputMbPerSec);
+    public final RateLimiter rateLimiter = new RateLimiter(1024L * 1024L *
+                                                           verifyCompactionThroughputInBounds(
+                                                           DatabaseDescriptor.getCompactionThroughputMbPerSec()));
     public final Cache cache = new LRUCache(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
 
     public static SecondaryIndexMetrics secondaryIndexMetrics = new SecondaryIndexMetrics();
@@ -103,6 +105,14 @@ public class RocksDBEngine implements StorageEngine
         this.keyspace = keyspace;
     }
 
+    public static int verifyCompactionThroughputInBounds(int value)
+    {
+        if (value == 0)
+        {
+            return Integer.MAX_VALUE;
+        }
+        return value;
+    }
 
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {
@@ -196,10 +206,10 @@ public class RocksDBEngine implements StorageEngine
 
     public void setCompactionThroughputMbPerSec(int throughputMbPerSec)
     {
-        compactionthroughputMbPerSec = throughputMbPerSec;
-        rateLimiter.setBytesPerSecond(1024L * 1024L * compactionthroughputMbPerSec);
+        throughputMbPerSec = verifyCompactionThroughputInBounds(throughputMbPerSec);
+        rateLimiter.setBytesPerSecond(1024L * 1024L * throughputMbPerSec);
         logger.info("Change keyspace " + keyspace.getName() +
-                    " compaction throughput MB per sec to " + compactionthroughputMbPerSec);
+                    " compaction throughput MB per sec to " + throughputMbPerSec);
     }
 
     public AbstractStreamTransferTask getStreamTransferTask(StreamSession session,

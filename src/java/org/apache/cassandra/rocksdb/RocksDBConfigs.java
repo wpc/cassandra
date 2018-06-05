@@ -33,10 +33,6 @@ public class RocksDBConfigs
     // Number of rocksdb concurrent background compactions
     public static final int BACKGROUD_COMPACTIONS = Integer.getInteger("cassandra.rocksdb.background_compactions", 4);
 
-    // rateBytesPerSecond for RocksDB's rate limiter, which is used to control write rate of flush and compaction.
-    // It's per keyspace, and shared across all RocksDB instances within the same keyspace.
-    public static final int RATE_MBYTES_PER_SECOND = Integer.getInteger("cassandra.rocksdb.rate_mbytes_per_second", 150);
-
     // deleteRateBytesPerSecond for RocksDB's delete rate limiter, which is used to control the delete rate.
     public static final long DELETE_RATE_BYTES_PER_SECOND = Long.getLong("cassandra.rocksdb.delete_rate_bytes_per_second", 100 * 1024 * 1024);
 

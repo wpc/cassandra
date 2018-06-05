@@ -21,6 +21,7 @@ package org.apache.cassandra.rocksdb;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex;
 import org.jboss.byteman.contrib.bmunit.BMRule;
@@ -71,7 +72,7 @@ public class RocksDBEngineTest extends RocksDBTestBase
     }
 
     @Test
-    public void testSetCompactionThroughput() throws Throwable
+    public void testSetCompactionThroughputNonZero() throws Throwable
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
 
@@ -83,7 +84,26 @@ public class RocksDBEngineTest extends RocksDBTestBase
         cf.forceFlush();
 
         cfs.engine.setCompactionThroughputMbPerSec(1);
-        assertEquals(1, ((RocksDBEngine)cfs.engine).compactionthroughputMbPerSec);
+        assertEquals(1 * 1024L * 1024L, ((RocksDBEngine)cfs.engine).rateLimiter.getBytesPerSecond());
+        cfs.engine.forceMajorCompaction(cfs);
+
+        assertTrue(RocksDBProperty.getEstimatedLiveDataSize(cf) > 0);
+    }
+
+    @Test
+    public void testSetCompactionThroughputZero() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k1", "v1");
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k2", "v2");
+
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+        RocksDBCF cf = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+        cf.forceFlush();
+
+        cfs.engine.setCompactionThroughputMbPerSec(0);
+        assertEquals(Integer.MAX_VALUE * 1024L * 1024L, ((RocksDBEngine)cfs.engine).rateLimiter.getBytesPerSecond());
         cfs.engine.forceMajorCompaction(cfs);
 
         assertTrue(RocksDBProperty.getEstimatedLiveDataSize(cf) > 0);
