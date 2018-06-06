@@ -120,9 +120,14 @@ public class RocksDBEngine implements StorageEngine
 
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {
+        Pair<UUID, String> key = new Pair<>(cfs.metadata.cfId, cfs.name);
+        if(rocksDBFamily.containsKey(key)) {
+            return;
+        }
         try
         {
-            rocksDBFamily.putIfAbsent(new Pair<>(cfs.metadata.cfId, cfs.name), new RocksDBCF(cfs));
+
+            rocksDBFamily.put(key, new RocksDBCF(cfs)); // putIfAbsent
         }
         catch (RocksDBException e)
         {

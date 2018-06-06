@@ -20,6 +20,7 @@ package org.apache.cassandra.rocksdb;
 
 import org.junit.Test;
 
+import org.apache.cassandra.index.IndexNotAvailableException;
 import org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex;
 
 import static org.junit.Assert.assertTrue;
@@ -263,8 +264,19 @@ public class RocksandraIndexTest extends RocksDBTestBase
         createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
                                   RocksandraClusteringColumnIndex.class.getName()));
 
-        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
-                   row("p1", "k2", "v1", "j2"),
-                   row("p1", "k3", "v1", "j3"));
+        while (true)
+        {
+            try
+            {
+                assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                           row("p1", "k2", "v1", "j2"),
+                           row("p1", "k3", "v1", "j3"));
+            }
+            catch (IndexNotAvailableException e) {
+                Thread.sleep(100);
+                continue;
+            }
+            break;
+        }
     }
 }
