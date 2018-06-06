@@ -1,7 +1,6 @@
 package org.apache.cassandra.tools.nodetool;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -93,6 +92,10 @@ public class RocksDBProperty extends NodeToolCmd
     @Option(title = "list", name = {"-l", "--list"}, description = "List all avaliable properties")
     private boolean listProperites = false;
 
+    @Option(title = "meta", name = {"-m", "--meta"}, description = "Show partition meta data properties")
+    private boolean meta = false;
+
+
     @Override
     public void execute(NodeProbe probe)
     {
@@ -109,7 +112,7 @@ public class RocksDBProperty extends NodeToolCmd
 
         if (args.size() == 3)
         {
-            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property);
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property, meta);
             printRocksDBProperties(rocksDBProperties);
             return;
         }
@@ -127,7 +130,7 @@ public class RocksDBProperty extends NodeToolCmd
             if (keyspace != null && !keyspaceName.equals(keyspace))
                 continue;
             System.out.println("Table: " + keyspaceName + "." + tableName);
-            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property);
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property, meta);
             printRocksDBProperties(rocksDBProperties);
         }
     }

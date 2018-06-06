@@ -60,8 +60,10 @@ import org.apache.cassandra.utils.Pair;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.CassandraCompactionFilter;
+import org.rocksdb.CassandraPartitionMetaMergeOperator;
 import org.rocksdb.CassandraValueMergeOperator;
 import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionPriority;
 import org.rocksdb.DBOptions;
@@ -94,7 +96,6 @@ public class RocksDBCF implements RocksDBCFMBean
     private final RocksDBEngine engine;
     private final RocksDBTableMetrics rocksMetrics;
     private final String mbeanName;
-    private final CassandraCompactionFilter compactionFilter;
     private final CassandraValueMergeOperator mergeOperator;
 
     private final ReadOptions readOptions;
@@ -105,7 +106,11 @@ public class RocksDBCF implements RocksDBCFMBean
     private final boolean purgeTtlOnExpiration;
 
     private final List<RocksDB> rocksDBLists;
+    private final List<ColumnFamilyHandle> metaCfHandles;
+    private final List<ColumnFamilyHandle> dataCfHandles;
+    private final List<CassandraCompactionFilter> compactionFilters;
     private final Statistics stats;
+    private final CassandraPartitionMetaMergeOperator partitionMetaMergeOperator;
     private boolean closed = false; // indicate whether close() function is called or not.
     private final ReentrantReadWriteLock lockForClosedFlag = new ReentrantReadWriteLock(true); // protect 'closed' field
 
@@ -122,28 +127,37 @@ public class RocksDBCF implements RocksDBCFMBean
 
         gcGraceSeconds = cfs.metadata.params.gcGraceSeconds;
         purgeTtlOnExpiration = cfs.metadata.params.purgeTtlOnExpiration;
-        compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, gcGraceSeconds);
         mergeOperator = new CassandraValueMergeOperator(gcGraceSeconds, MERGE_OPERANDS_LIMIT);
+        partitionMetaMergeOperator = new CassandraPartitionMetaMergeOperator();
 
         assert NUM_SHARD > 0;
 
         stats = new Statistics();
         stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS);
 
-        final org.rocksdb.BloomFilter bloomFilter = new BloomFilter(10, false);
         final BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-        tableOptions.setFilter(bloomFilter);
+        tableOptions.setFilter(new BloomFilter(10, false));
         tableOptions.setBlockCache(engine.cache);
         tableOptions.setCacheIndexAndFilterBlocks(RocksDBConfigs.CACHE_INDEX_AND_FILTER_BLOCKS);
         tableOptions.setPinL0FilterAndIndexBlocksInCache(RocksDBConfigs.PIN_L0_FILTER_AND_INDEX_BLOCKS_IN_CACHE);
         tableOptions.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
 
+        final BlockBasedTableConfig metaTableOption = new BlockBasedTableConfig();
+        metaTableOption.setFilter(new BloomFilter(10, false));
+        metaTableOption.setBlockCache(engine.metaCache);
+        metaTableOption.setIndexType(getTableIndexType(RocksDBConfigs.TABLE_INDEX_TYPE));
+
+
         rocksDBLists = new ArrayList<>(NUM_SHARD);
+        metaCfHandles = new ArrayList<>(NUM_SHARD);
+        dataCfHandles = new ArrayList<>(NUM_SHARD);
+        compactionFilters = new ArrayList<>(NUM_SHARD);
+
         for (int i = 0; i < NUM_SHARD; i++)
         {
             String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
                                 Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
-            openRocksDB(shardedDir, tableOptions);
+            openRocksDB(shardedDir, tableOptions, metaTableOption);
         }
 
         rocksMetrics = new RocksDBTableMetrics(cfs, stats);
@@ -168,10 +182,9 @@ public class RocksDBCF implements RocksDBCFMBean
         }
     }
 
-    private void openRocksDB(String rocksDBTableDir, BlockBasedTableConfig tableOptions) throws RocksDBException
+    private void openRocksDB(String rocksDBTableDir, BlockBasedTableConfig tableOptions, BlockBasedTableConfig metaTableOptions) throws RocksDBException
     {
         DBOptions dbOptions = new DBOptions();
-        List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>();
         SstFileManager sstFileManager = new SstFileManager(Env.getDefault());
 
         final long writeBufferSize = RocksDBConfigs.WRITE_BUFFER_SIZE_MBYTES * 1024 * 1024L;
@@ -193,42 +206,70 @@ public class RocksDBCF implements RocksDBCFMBean
         dbOptions.setStatistics(stats);
         dbOptions.setRateLimiter(engine.rateLimiter);
         dbOptions.setSstFileManager(sstFileManager);
+        dbOptions.setMaxTotalWalSize(RocksDBConfigs.MAX_TOTAL_WAL_SIZE_MBYTES * 1024 * 1024L);
 
-        // column family options
         ColumnFamilyOptions metaCfOptions = new ColumnFamilyOptions();
+        metaCfOptions.setNumLevels(RocksDBConfigs.META_CF_MAX_LEVELS);
+        metaCfOptions.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
+        metaCfOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+        metaCfOptions.setMergeOperator(partitionMetaMergeOperator);
+        metaCfOptions.setMaxWriteBufferNumber(2);
+        metaCfOptions.setWriteBufferSize(RocksDBConfigs.META_WRITE_BUFFER_SIZE_MBYTES * 1024 * 1024L);
+        metaCfOptions.setTableFormatConfig(metaTableOptions);
         ColumnFamilyDescriptor metaCfDescriptor = new ColumnFamilyDescriptor("meta".getBytes(), metaCfOptions);
-        boolean metaCfExists = rocksdbCfExists(dbOptions, rocksDBTableDir, metaCfDescriptor.getName());
 
-        ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
-        columnFamilyOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
-        columnFamilyOptions.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
-        columnFamilyOptions.setBottommostCompressionType(RocksDBConfigs.BOTTOMMOST_COMPRESSION);
-        columnFamilyOptions.setWriteBufferSize(writeBufferSize);
-        columnFamilyOptions.setMaxWriteBufferNumber(4);
-        columnFamilyOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
-        columnFamilyOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
-        columnFamilyOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
-        columnFamilyOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
-        columnFamilyOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
-        columnFamilyOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
-        columnFamilyOptions.setMergeOperator(mergeOperator);
-        columnFamilyOptions.setCompactionFilter(compactionFilter);
-        columnFamilyOptions.setTableFormatConfig(tableOptions);
+        boolean metaCfExists = rocksdbCfExists(dbOptions, rocksDBTableDir, metaCfDescriptor.columnFamilyName());
 
-        ColumnFamilyDescriptor columnFamilyDescriptor = new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions);
-        cfDescs.add(columnFamilyDescriptor);
+        List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>(2);
+        CassandraCompactionFilter compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
+        compactionFilters.add(compactionFilter); // holding reference avoid compaction filter instance get gc
+        ArrayList<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>(2);
+        // config default column family for holding data
+        ColumnFamilyOptions dataCfOptions = new ColumnFamilyOptions();
+        dataCfOptions.setNumLevels(RocksDBConfigs.MAX_LEVELS);
+        dataCfOptions.setCompressionType(RocksDBConfigs.COMPRESSION_TYPE);
+        dataCfOptions.setBottommostCompressionType(RocksDBConfigs.BOTTOMMOST_COMPRESSION);
+        dataCfOptions.setWriteBufferSize(writeBufferSize);
+        dataCfOptions.setMaxWriteBufferNumber(4);
+        dataCfOptions.setMaxBytesForLevelBase(RocksDBConfigs.MAX_MBYTES_FOR_LEVEL_BASE * 1024 * 1024L);
+        dataCfOptions.setSoftPendingCompactionBytesLimit(softPendingCompactionBytesLimit);
+        dataCfOptions.setHardPendingCompactionBytesLimit(8 * softPendingCompactionBytesLimit);
+        dataCfOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
+        dataCfOptions.setLevel0SlowdownWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+        dataCfOptions.setLevel0StopWritesTrigger(RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER);
+        dataCfOptions.setLevelCompactionDynamicLevelBytes(!RocksDBConfigs.DYNAMIC_LEVEL_BYTES_DISABLED);
+        dataCfOptions.setMergeOperator(mergeOperator);
+        dataCfOptions.setCompactionFilter(compactionFilter);
+        dataCfOptions.setTableFormatConfig(tableOptions);
+        cfDescs.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, dataCfOptions));
         if (metaCfExists)
         {
             cfDescs.add(metaCfDescriptor);
         }
 
-        RocksDB rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, new ArrayList<>());
+        ColumnFamilyHandle metaCfHandle;
+        RocksDB rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
+
+        assert columnFamilyHandles.size() > 0;
+        dataCfHandles.add(columnFamilyHandles.get(0));
+
+        if (metaCfExists)
+        {
+            assert columnFamilyHandles.size() == 2;
+            metaCfHandle = columnFamilyHandles.get(1);
+        }
+        else
+        {
+            assert columnFamilyHandles.size() == 1;
+            metaCfHandle = rocksDB.createColumnFamily(metaCfDescriptor);
+        }
+        compactionFilter.setMetaCfHandle(rocksDB, metaCfHandle);
+        metaCfHandles.add(metaCfHandle);
+        rocksDBLists.add(rocksDB);
+
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
-
-        rocksDBLists.add(rocksDB);
     }
 
     private boolean rocksdbCfExists(DBOptions dbOptions, String rocksDBTableDir, byte[] columnFamilyName) throws RocksDBException
@@ -244,17 +285,22 @@ public class RocksDBCF implements RocksDBCFMBean
 
     private RocksDB getRocksDBFromToken(Token token)
     {
-        return rocksDBLists.get(Math.abs(token.hashCode() % RocksDBConfigs.NUM_SHARD));
+        return rocksDBLists.get(shardIDForToken(token));
+    }
+
+    private ColumnFamilyHandle getMetaCfHandleFromToken(Token token)
+    {
+        return metaCfHandles.get(shardIDForToken(token));
+    }
+
+    private int shardIDForToken(Token token)
+    {
+        return Math.abs(token.hashCode() % RocksDBConfigs.NUM_SHARD);
     }
 
     public static String getMbeanName(String keyspace, String table)
     {
         return String.format("org.apache.cassandra.rocksdbcf:keyspace=%s,table=%s", keyspace, table);
-    }
-
-    public RocksDB getRocksDB()
-    {
-        return rocksDBLists.get(0);
     }
 
     public RocksDB getRocksDB(int shardId)
@@ -270,6 +316,18 @@ public class RocksDBCF implements RocksDBCFMBean
     public byte[] get(DecoratedKey partitionKey, byte[] key) throws RocksDBException
     {
         return getRocksDBFromKey(partitionKey).get(readOptions, key);
+    }
+
+    public byte[] getMeta(DecoratedKey decoratedKey, byte[] key) throws RocksDBException
+    {
+        ColumnFamilyHandle metaCfHandle = getMetaCfHandleFromToken(decoratedKey.getToken());
+        return getRocksDBFromKey(decoratedKey).get(metaCfHandle, key);
+    }
+
+    public void mergeMeta(DecoratedKey partitionKey, byte[] key, byte[] value) throws RocksDBException
+    {
+        ColumnFamilyHandle metaCfHandle = getMetaCfHandleFromToken(partitionKey.getToken());
+        getRocksDBFromKey(partitionKey).merge(metaCfHandle, key, value);
     }
 
     public IndexType getTableIndexType(String indexType)
@@ -320,27 +378,40 @@ public class RocksDBCF implements RocksDBCFMBean
 
     public void deleteRange(byte[] start, byte[] end) throws RocksDBException
     {
-        for (RocksDB rocksDB : rocksDBLists)
+        for (int i = 0; i < rocksDBLists.size(); i++)
         {
-            rocksDB.deleteFilesInRange(start, end);
-            rocksDB.deleteRange(start, end);
+            rocksDBLists.get(i).deleteFilesInRange(start, end); //todo: make deleteFilesInRange API support cf_handles
+            rocksDBLists.get(i).deleteRange(dataCfHandles.get(i), start, end);
+            rocksDBLists.get(i).deleteRange(metaCfHandles.get(i), start, end);
         }
     }
 
     public void compactRange() throws RocksDBException
     {
-        for (RocksDB rocksDB : rocksDBLists)
-            rocksDB.compactRange();
+
+        for (int i = 0; i < rocksDBLists.size(); i++)
+        {
+            rocksDBLists.get(i).compactRange(metaCfHandles.get(i));
+            rocksDBLists.get(i).compactRange(dataCfHandles.get(i));
+        }
     }
 
     public void forceFlush() throws RocksDBException
     {
         logger.info("Flushing rocksdb table: " + cfs.name);
-        for (RocksDB rocksDB : rocksDBLists)
-            rocksDB.flush(flushOptions);
+        for (int i = 0; i < rocksDBLists.size(); i++)
+        {
+            rocksDBLists.get(i).flush(flushOptions, metaCfHandles.get(i));
+            rocksDBLists.get(i).flush(flushOptions, dataCfHandles.get(i));
+        }
     }
 
     public List<String> getProperty(String property) throws RocksDBException
+    {
+        return this.getProperty(property, false);
+    }
+
+    public List<String> getProperty(String property, boolean meta) throws RocksDBException
     {
         // synchronize with close() function which modifies 'closed' field
         try
@@ -351,8 +422,12 @@ public class RocksDBCF implements RocksDBCFMBean
             if (closed)
                 return new ArrayList<>();
             List<String> properties = new ArrayList<>(rocksDBLists.size());
-            for (RocksDB rocksDB : rocksDBLists)
-                properties.add(rocksDB.getProperty(property));
+            for (int i = 0; i < rocksDBLists.size(); i++)
+            {
+                RocksDB rocksDB = rocksDBLists.get(i);
+                ColumnFamilyHandle cf = meta ? metaCfHandles.get(i) : dataCfHandles.get(i);
+                properties.add(rocksDB.getProperty(cf, property));
+            }
             return properties;
         }
         finally
@@ -476,11 +551,11 @@ public class RocksDBCF implements RocksDBCFMBean
     }
 
     @Override
-    public List<String> getRocksDBProperty(String property)
+    public List<String> getRocksDBProperty(String property, boolean meta)
     {
         try
         {
-            return getProperty(property);
+            return getProperty(property, meta);
         }
         catch (Throwable e)
         {
@@ -500,6 +575,20 @@ public class RocksDBCF implements RocksDBCFMBean
         {
             logger.warn("Failed to dump partition " + partitionKey, e);
             return "Failed to dump:" + partitionKey + ", reason:" + e.toString();
+        }
+    }
+
+    @Override
+    public String dumpPartitionMetaData(String partitionKey)
+    {
+        try
+        {
+            return engine.dumpPartitionMetaData(cfs, partitionKey);
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Failed to dump partition meta data " + partitionKey, e);
+            return "Failed to dump meta data:" + partitionKey + ", reason:" + e.toString();
         }
     }
 

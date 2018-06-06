@@ -46,6 +46,9 @@ public class DumpPartition extends NodeTool.NodeToolCmd
         String keyspace = args.get(0);
         String table = args.get(1);
         String partitionKey = args.get(2);
+        System.out.println("--- metadata:");
+        System.out.println(probe.dumpPartitionMetaData(keyspace, table, partitionKey));
+        System.out.println("--- rows:");
         System.out.println(probe.dumpPartition(keyspace, table, partitionKey, limit));
     }
 }

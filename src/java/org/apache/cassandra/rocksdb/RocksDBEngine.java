@@ -45,6 +45,7 @@ import org.apache.cassandra.cql3.Terms;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.partitions.Partition;
@@ -59,6 +60,7 @@ import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.exceptions.StorageEngineException;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.metrics.SecondaryIndexMetrics;
+import org.apache.cassandra.rocksdb.encoding.PartitionMetaEncoder;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
@@ -67,6 +69,7 @@ import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.StreamSummary;
+import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
 import org.rocksdb.Cache;
 import org.rocksdb.LRUCache;
@@ -95,6 +98,7 @@ public class RocksDBEngine implements StorageEngine
                                                            verifyCompactionThroughputInBounds(
                                                            DatabaseDescriptor.getCompactionThroughputMbPerSec()));
     public final Cache cache = new LRUCache(RocksDBConfigs.BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
+    public final Cache metaCache = new LRUCache(RocksDBConfigs.META_BLOCK_CACHE_SIZE_MBYTES * 1024 * 1024L);
 
     public static SecondaryIndexMetrics secondaryIndexMetrics = new SecondaryIndexMetrics();
 
@@ -130,6 +134,12 @@ public class RocksDBEngine implements StorageEngine
     {
         DecoratedKey partitionKey = update.partitionKey();
 
+        DeletionTime partitionLevelDeletion = update.partitionLevelDeletion();
+        if (!partitionLevelDeletion.isLive())
+        {
+            applyPartitionLevelDeletionToRocksdb(cfs, partitionKey, partitionLevelDeletion);
+        }
+
         for (Row row : update)
         {
             applyRowToRocksDB(cfs, writeCommitLog, partitionKey, indexer, row);
@@ -139,6 +149,22 @@ public class RocksDBEngine implements StorageEngine
         if (!staticRow.isEmpty())
         {
             applyRowToRocksDB(cfs, writeCommitLog, partitionKey, indexer, staticRow);
+        }
+    }
+
+    private void applyPartitionLevelDeletionToRocksdb(ColumnFamilyStore cfs, DecoratedKey partitionKey, DeletionTime partitionLevelDeletion)
+    {
+        byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, cfs.metadata);
+        byte[] rocksDBValue = PartitionMetaEncoder.encodePartitionLevelDeletion(partitionLevelDeletion);
+
+        try
+        {
+            rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)).mergeMeta(partitionKey, rocksDBKey, rocksDBValue);
+        }
+        catch (RocksDBException e)
+        {
+            logger.error(e.toString(), e);
+            throw new StorageEngineException("Row merge failed", e);
         }
     }
 
@@ -257,7 +283,6 @@ public class RocksDBEngine implements StorageEngine
                     logger.error(e.toString(), e);
                     throw new StorageEngineException("Index update failed", e);
                 }
-
             }
         }
         catch (RocksDBException e)
@@ -346,6 +371,14 @@ public class RocksDBEngine implements StorageEngine
     @Override
     public String dumpPartition(ColumnFamilyStore cfs, String partitionKey, int limit)
     {
+        DecoratedKey decoratedKey = parseStringPartitionKey(cfs, partitionKey);
+        byte[] rocksKeyPrefix = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
+        RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
+        return rocksDBCF.dumpPrefix(decoratedKey, rocksKeyPrefix, limit);
+    }
+
+    private DecoratedKey parseStringPartitionKey(ColumnFamilyStore cfs, String partitionKey)
+    {
         List<ColumnDefinition> keyColumns = cfs.metadata.partitionKeyColumns();
         if (keyColumns.size() > 1)
         {
@@ -353,10 +386,19 @@ public class RocksDBEngine implements StorageEngine
         }
 
         ByteBuffer keyBytes = Terms.asBytes(cfs.keyspace.getName(), partitionKey, keyColumns.get(0).type);
-        DecoratedKey decoratedKey = cfs.metadata.partitioner.decorateKey(keyBytes);
-        byte[] rocksKeyPrefix = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
+        return cfs.metadata.partitioner.decorateKey(keyBytes);
+    }
+
+    public String dumpPartitionMetaData(ColumnFamilyStore cfs, String partitionKey) throws RocksDBException
+    {
+        DecoratedKey decoratedKey = parseStringPartitionKey(cfs, partitionKey);
+        byte[] rocksKey = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
         RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
-        return rocksDBCF.dumpPrefix(decoratedKey, rocksKeyPrefix, limit);
+        byte[] meta = rocksDBCF.getMeta(decoratedKey, rocksKey);
+        if (meta == null) {
+            return "";
+        }
+        return "0x" + Hex.bytesToHex(rocksKey) + "\t0x" + Hex.bytesToHex(meta);
     }
 
     public void forceMajorCompaction(ColumnFamilyStore cfs)
