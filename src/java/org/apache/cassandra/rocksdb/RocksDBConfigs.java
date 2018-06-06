@@ -16,12 +16,15 @@ public class RocksDBConfigs
             System.getProperty("cassandra.rocksdb.bottommost_compression", COMPRESSION_TYPE.getLibraryName())
         );
 
+
     // Paths for storing RocksDB files.
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
     public static File STREAMING_TMPFILE_PATH = new File(System.getProperty("cassandra.rocksdb.stream.dir", "/data/rocksdbstream/"));
 
     // Max levels for RocksDB. 7 is the default value.
     public static final int MAX_LEVELS = Integer.getInteger("cassandra.rocksdb.max_levels", 7);
+    // Max levels for meta column family
+    public static final int META_CF_MAX_LEVELS = Integer.getInteger("cassandra.rocksdb.meta_max_levels", MAX_LEVELS);
 
     // Tables created in this keyspace is backed by RocksDB.
     public static String ROCKSDB_KEYSPACE = System.getProperty("cassandra.rocksdb.keyspace", "rocksdb");
@@ -37,13 +40,23 @@ public class RocksDBConfigs
     public static final long DELETE_RATE_BYTES_PER_SECOND = Long.getLong("cassandra.rocksdb.delete_rate_bytes_per_second", 100 * 1024 * 1024);
 
     // rocksdb block cache size, default to be 1G per rocksdb instance
-    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 128);
+    public static final int BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.block_cache_size_mbytes", 1024*10);
+
+    // block cache for partition meta data, bigger cache size help improve compaction cpu cost
+    public static final int META_BLOCK_CACHE_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.meta_block_cache_size_mbytes", 1024 * 5);
 
     // disable level_compaction_dynamic_level_bytes or not, defaut is false
     public static final boolean DYNAMIC_LEVEL_BYTES_DISABLED = Boolean.getBoolean("cassandra.rocksdb.disable_dynamic_level_bytes");
 
     // rocksdb write buffer size, default to be 4G per rocksdb instance
     public static final int WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.write_buffer_size_mbytes", 512);
+
+    // memtable size for meta cf, default 16M. Need make it small enough for flushing frequently to avoid holding off too much WAL files deletion
+    public static final int META_WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.meta_write_buffer_size_mbytes", 16);
+
+    // MAX_TOTAL_WAL_SIZE_MBYTES once reached, rocksdb will flush cfs that hold off WAL deletion. Without this one stale cf make us spend
+    // a lot disk space on commit logs. By default we make it 1.5 times of data cf memtable likely we will at most keep 2~3 log file.
+    public static final int MAX_TOTAL_WAL_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.max_total_wal_size_mbytes", WRITE_BUFFER_SIZE_MBYTES + WRITE_BUFFER_SIZE_MBYTES / 2);
 
     public static final int MAX_MBYTES_FOR_LEVEL_BASE = Integer.getInteger("cassandra.rocksdb.max_mbytes_for_level_base", 1024);
 

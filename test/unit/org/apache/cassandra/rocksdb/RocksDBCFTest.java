@@ -29,10 +29,12 @@ import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.db.BufferDecoratedKey;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.rocksdb.encoding.PartitionMetaEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.openjdk.jmh.annotations.TearDown;
@@ -50,12 +52,14 @@ public class RocksDBCFTest extends RocksDBTestBase
     final DecoratedKey dk = Util.dk("test_key");
 
     @Before
-    public void setUp() {
+    public void setUp()
+    {
         RocksDBConfigs.NUM_SHARD = 10;
     }
 
     @TearDown
-    public void tearDown() {
+    public void tearDown()
+    {
         RocksDBConfigs.NUM_SHARD = 1;
     }
 
@@ -202,5 +206,22 @@ public class RocksDBCFTest extends RocksDBTestBase
         byte[] value = encodeValue(cfs, "test_value");
         rocksDBCF.merge(decoratedKey, "a".getBytes(), value);
         assertArrayEquals(value, rocksDBCF.get(decoratedKey, "a".getBytes()));
+    }
+
+    @Test
+    public void testMergeAndGetPartitionMetaData() throws Exception
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+        RocksDBCF rocksDBCF = getCurrentRocksDBCF();
+        byte[] key = "test_key".getBytes();
+        byte[] value0 = PartitionMetaEncoder.encodePartitionLevelDeletion(DeletionTime.LIVE);
+        rocksDBCF.mergeMeta(dk, key, value0);
+        assertArrayEquals(value0, rocksDBCF.getMeta(dk, key));
+        byte[] value1 = PartitionMetaEncoder.encodePartitionLevelDeletion(new DeletionTime(1000, 1));
+        rocksDBCF.mergeMeta(dk, key, value1);
+        assertArrayEquals(value1, rocksDBCF.getMeta(dk, key));
+        byte[] value2 = PartitionMetaEncoder.encodePartitionLevelDeletion(new DeletionTime(999, 1));
+        rocksDBCF.mergeMeta(dk, key, value2);
+        assertArrayEquals(value1, rocksDBCF.getMeta(dk, key));
     }
 }
