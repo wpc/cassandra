@@ -29,6 +29,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -37,6 +42,9 @@ import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
+import org.apache.cassandra.concurrent.NamedThreadFactory;
+import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.dht.IPartitioner;
@@ -113,6 +121,12 @@ public class RocksDBCF implements RocksDBCFMBean
     private final CassandraPartitionMetaMergeOperator partitionMetaMergeOperator;
     private boolean closed = false; // indicate whether close() function is called or not.
     private final ReentrantReadWriteLock lockForClosedFlag = new ReentrantReadWriteLock(true); // protect 'closed' field
+    private static final ExecutorService DB_OPEN_EXECUTOR = new JMXEnabledThreadPoolExecutor(RocksDBConfigs.OPEN_CONCURRENCY,
+                                                                                             StageManager.KEEPALIVE,
+                                                                                             TimeUnit.SECONDS,
+                                                                                             new LinkedBlockingQueue<Runnable>(),
+                                                                                             new NamedThreadFactory("RocksDBOpen"),
+                                                                                             "internal");
 
     public RocksDBCF(ColumnFamilyStore cfs) throws RocksDBException
     {
@@ -153,12 +167,7 @@ public class RocksDBCF implements RocksDBCFMBean
         dataCfHandles = new ArrayList<>(NUM_SHARD);
         compactionFilters = new ArrayList<>(NUM_SHARD);
 
-        for (int i = 0; i < NUM_SHARD; i++)
-        {
-            String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
-                                Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
-            openRocksDB(shardedDir, tableOptions, metaTableOption);
-        }
+        openAllDBShards(rocksDBTableDir, tableOptions, metaTableOption);
 
         rocksMetrics = new RocksDBTableMetrics(cfs, stats);
 
@@ -182,7 +191,43 @@ public class RocksDBCF implements RocksDBCFMBean
         }
     }
 
-    private void openRocksDB(String rocksDBTableDir, BlockBasedTableConfig tableOptions, BlockBasedTableConfig metaTableOptions) throws RocksDBException
+    private void openAllDBShards(String rocksDBTableDir, BlockBasedTableConfig tableOptions, BlockBasedTableConfig metaTableOptions)
+    {
+        ArrayList<Future<RocksDBOpenRocksDBHandler>> tasks = new ArrayList<>(NUM_SHARD);
+
+        for (int i = 0; i < NUM_SHARD; i++)
+        {
+            String shardedDir = NUM_SHARD == 1 ? rocksDBTableDir :
+                                Paths.get(rocksDBTableDir, String.valueOf(i)).toString();
+            tasks.add(DB_OPEN_EXECUTOR.submit(() -> openRocksDB(shardedDir, tableOptions, metaTableOptions)));
+        }
+
+        for (int i = 0; i < NUM_SHARD; i++)
+        {
+            try
+            {
+                RocksDBOpenRocksDBHandler value = tasks.get(i).get();
+                rocksDBLists.add(value.getRocksDB());
+                metaCfHandles.add(value.getMetaCfHandle());
+                dataCfHandles.add(value.getDataCfHandle());
+                compactionFilters.add(value.getCompactionFilter()); // holding reference avoid compaction filter instance get gc
+            }
+            catch (ExecutionException e)
+            {
+                throw new RuntimeException(e.getMessage() + ", Failed opening shard with path " +
+                                           Paths.get(rocksDBTableDir, String.valueOf(i)).toString(),
+                                           e);
+            }
+            catch (InterruptedException e)
+            {
+                throw new RuntimeException(e.getMessage() + ", Failed opening shard with path " +
+                                           Paths.get(rocksDBTableDir, String.valueOf(i)).toString(),
+                                           e);
+            }
+        }
+    }
+
+    private RocksDBOpenRocksDBHandler openRocksDB(String rocksDBTableDir, BlockBasedTableConfig tableOptions, BlockBasedTableConfig metaTableOptions) throws RocksDBException
     {
         DBOptions dbOptions = new DBOptions();
         SstFileManager sstFileManager = new SstFileManager(Env.getDefault());
@@ -222,7 +267,6 @@ public class RocksDBCF implements RocksDBCFMBean
 
         List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>(2);
         CassandraCompactionFilter compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
-        compactionFilters.add(compactionFilter); // holding reference avoid compaction filter instance get gc
         ArrayList<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>(2);
         // config default column family for holding data
         ColumnFamilyOptions dataCfOptions = new ColumnFamilyOptions();
@@ -251,7 +295,6 @@ public class RocksDBCF implements RocksDBCFMBean
         RocksDB rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
 
         assert columnFamilyHandles.size() > 0;
-        dataCfHandles.add(columnFamilyHandles.get(0));
 
         if (metaCfExists)
         {
@@ -263,13 +306,14 @@ public class RocksDBCF implements RocksDBCFMBean
             assert columnFamilyHandles.size() == 1;
             metaCfHandle = rocksDB.createColumnFamily(metaCfDescriptor);
         }
+
         compactionFilter.setMetaCfHandle(rocksDB, metaCfHandle);
-        metaCfHandles.add(metaCfHandle);
-        rocksDBLists.add(rocksDB);
 
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
+
+        return new RocksDBOpenRocksDBHandler(rocksDB, metaCfHandle, columnFamilyHandles.get(0), compactionFilter);
     }
 
     private boolean rocksdbCfExists(DBOptions dbOptions, String rocksDBTableDir, byte[] columnFamilyName) throws RocksDBException

@@ -79,6 +79,9 @@ public class RocksDBConfigs
     // Number of cuncurrent flushing tasks when flush/drain is called.
     public static final int FLUSH_CONCURRENCY = Integer.getInteger("cassandra.rocksdb.flush_concurrency", 8);
 
+    // number of threads used to open sharded rocksdb instances
+    public static int OPEN_CONCURRENCY = Integer.getInteger("cassandra.rocksdb.open_concurrency", NUM_SHARD);
+
     /**
      * Streaming configs
      */
