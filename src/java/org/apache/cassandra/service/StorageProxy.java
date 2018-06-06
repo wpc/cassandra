@@ -245,32 +245,32 @@ public class StorageProxy implements StorageProxyMBean
                 ConsistencyLevel readConsistency = consistencyForPaxos == ConsistencyLevel.LOCAL_SERIAL ? ConsistencyLevel.LOCAL_QUORUM : ConsistencyLevel.QUORUM;
                 FilteredPartition current;
 
-                UUID ballot;
+
+                final BeginAndRepairPaxosResult result = beginAndRepairPaxos(start, key, metadata,
+                                                                             liveEndpoints, requiredParticipants,
+                                                                             consistencyForPaxos,
+                                                                             consistencyForCommit,
+                                                                             true,
+                                                                             state,
+                                                                             PaxosState.USE_FASTPAXOS,
+                                                                             readCommand);
+                UUID ballot = result.ballot;
+                contentions += result.contentions;
+                PartitionIterator iterator;
+
                 if (PaxosState.USE_FASTPAXOS)
                 {
-                    final BeginAndRepairPaxosResult result = beginAndRepairPaxosAndGet(keyspaceName, start, key, metadata, liveEndpoints,
-                                                                                                      requiredParticipants, consistencyForPaxos,
-                                                                                                      consistencyForCommit, true, state,
-                                                                                                      readCommand);
-                    ballot = result.ballot;
-                    contentions += result.contentions;
-                    PartitionIterator iterator = result.partitionIterator;
-
-                    try (RowIterator rowIter = PartitionIterators.getOnlyElement(iterator, readCommand))
-                    {
-                        current = FilteredPartition.create(rowIter);
-                    }
+                    // we already piggyback the read response in the result
+                    iterator = result.partitionIterator;
                 }
                 else
                 {
-                    final Pair<UUID, Integer> pair = beginAndRepairPaxos(start, key, metadata, liveEndpoints, requiredParticipants, consistencyForPaxos, consistencyForCommit, true, state);
-                    ballot = pair.left;
-                    contentions += pair.right;
+                    iterator = read(SinglePartitionReadCommand.Group.one(readCommand), readConsistency, state);
+                }
 
-                    try (RowIterator rowIter = readOne(readCommand, readConsistency))
-                    {
-                        current = FilteredPartition.create(rowIter);
-                    }
+                try (RowIterator rowIter = PartitionIterators.getOnlyElement(iterator, readCommand))
+                {
+                    current = FilteredPartition.create(rowIter);
                 }
 
                 if (!request.appliesTo(current))
@@ -387,7 +387,7 @@ public class StorageProxy implements StorageProxyMBean
      * @return the Paxos ballot promised by the replicas if no in-progress requests were seen and a quorum of
      * nodes have seen the mostRecentCommit.  Otherwise, return null.
      */
-    private static Pair<UUID, Integer> beginAndRepairPaxos(long start,
+    private static BeginAndRepairPaxosResult beginAndRepairPaxos(long start,
                                                            DecoratedKey key,
                                                            CFMetaData metadata,
                                                            List<InetAddress> liveEndpoints,
@@ -395,121 +395,9 @@ public class StorageProxy implements StorageProxyMBean
                                                            ConsistencyLevel consistencyForPaxos,
                                                            ConsistencyLevel consistencyForCommit,
                                                            final boolean isWrite,
-                                                           ClientState state)
-    throws WriteTimeoutException, WriteFailureException
-    {
-        long timeout = TimeUnit.MILLISECONDS.toNanos(DatabaseDescriptor.getCasContentionTimeout());
-
-        PrepareCallback summary = null;
-        int contentions = 0;
-        while (System.nanoTime() - start < timeout)
-        {
-            // We want a timestamp that is guaranteed to be unique for that node (so that the ballot is globally unique), but if we've got a prepare rejected
-            // already we also want to make sure we pick a timestamp that has a chance to be promised, i.e. one that is greater that the most recently known
-            // in progress (#5667). Lastly, we don't want to use a timestamp that is older than the last one assigned by ClientState or operations may appear
-            // out-of-order (#7801).
-            long minTimestampMicrosToUse = summary == null ? Long.MIN_VALUE : 1 + UUIDGen.microsTimestamp(summary.mostRecentInProgressCommit.ballot);
-            long ballotMicros = state.getTimestampForPaxos(minTimestampMicrosToUse);
-            // Note that ballotMicros is not guaranteed to be unique if two proposal are being handled concurrently by the same coordinator. But we still
-            // need ballots to be unique for each proposal so we have to use getRandomTimeUUIDFromMicros.
-            UUID ballot = UUIDGen.getRandomTimeUUIDFromMicros(ballotMicros);
-
-            // prepare
-            Tracing.trace("Preparing {}", ballot);
-            Commit toPrepare = Commit.newPrepare(key, metadata, ballot);
-            summary = preparePaxos(toPrepare, liveEndpoints, requiredParticipants, consistencyForPaxos);
-            if (!summary.promised)
-            {
-                Tracing.trace("Some replicas have already promised a higher ballot than ours; aborting");
-                contentions++;
-                // sleep a random amount to give the other proposer a chance to finish
-                Uninterruptibles.sleepUninterruptibly(ThreadLocalRandom.current().nextInt(100), TimeUnit.MILLISECONDS);
-                continue;
-            }
-
-            Commit inProgress = summary.mostRecentInProgressCommitWithUpdate;
-            Commit mostRecent = summary.mostRecentCommit;
-
-            // If we have an in-progress ballot greater than the MRC we know, then it's an in-progress round that
-            // needs to be completed, so do it.
-            if (!inProgress.update.isEmpty() && inProgress.isAfter(mostRecent))
-            {
-                Tracing.trace("Finishing incomplete paxos round {}", inProgress);
-                if(isWrite)
-                    casWriteMetrics.unfinishedCommit.inc();
-                else
-                    casReadMetrics.unfinishedCommit.inc();
-                Commit refreshedInProgress = Commit.newProposal(ballot, inProgress.update);
-                if (proposePaxos(refreshedInProgress, liveEndpoints, requiredParticipants, false, consistencyForPaxos))
-                {
-                    try
-                    {
-                        commitPaxos(refreshedInProgress, consistencyForCommit, false);
-                    }
-                    catch (WriteTimeoutException e)
-                    {
-                        // We're still doing preparation for the paxos rounds, so we want to use the CAS (see CASSANDRA-8672)
-                        throw new WriteTimeoutException(WriteType.CAS, e.consistency, e.received, e.blockFor);
-                    }
-                }
-                else
-                {
-                    Tracing.trace("Some replicas have already promised a higher ballot than ours; aborting");
-                    // sleep a random amount to give the other proposer a chance to finish
-                    contentions++;
-                    Uninterruptibles.sleepUninterruptibly(ThreadLocalRandom.current().nextInt(100), TimeUnit.MILLISECONDS);
-                }
-                continue;
-            }
-
-            // To be able to propose our value on a new round, we need a quorum of replica to have learn the previous one. Why is explained at:
-            // https://issues.apache.org/jira/browse/CASSANDRA-5062?focusedCommentId=13619810&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-13619810)
-            // Since we waited for quorum nodes, if some of them haven't seen the last commit (which may just be a timing issue, but may also
-            // mean we lost messages), we pro-actively "repair" those nodes, and retry.
-            int nowInSec = Ints.checkedCast(TimeUnit.MICROSECONDS.toSeconds(ballotMicros));
-            Iterable<InetAddress> missingMRC = summary.replicasMissingMostRecentCommit(metadata, nowInSec);
-            if (Iterables.size(missingMRC) > 0)
-            {
-                Tracing.trace("Repairing replicas that missed the most recent commit");
-                sendCommit(mostRecent, missingMRC);
-                // TODO: provided commits don't invalid the prepare we just did above (which they don't), we could just wait
-                // for all the missingMRC to acknowledge this commit and then move on with proposing our value. But that means
-                // adding the ability to have commitPaxos block, which is exactly CASSANDRA-5442 will do. So once we have that
-                // latter ticket, we can pass CL.ALL to the commit above and remove the 'continue'.
-                continue;
-            }
-
-            return Pair.create(ballot, contentions);
-        }
-
-        throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(metadata.ksName), ConsistencyLevel.Usage.WRITE));
-    }
-
-    private static class BeginAndRepairPaxosResult
-    {
-        public final UUID ballot;
-        public final int contentions;
-        public final PartitionIterator partitionIterator;
-
-        private BeginAndRepairPaxosResult(UUID ballot, int contentions, PartitionIterator partitionIterator)
-        {
-            this.ballot = ballot;
-            this.contentions = contentions;
-            this.partitionIterator = partitionIterator;
-        }
-    }
-
-    private static BeginAndRepairPaxosResult beginAndRepairPaxosAndGet(String keyspaceName,
-                                                                                      long start,
-                                                                                      DecoratedKey key,
-                                                                                      CFMetaData metadata,
-                                                                                      List<InetAddress> liveEndpoints,
-                                                                                      int requiredParticipants,
-                                                                                      ConsistencyLevel consistencyForPaxos,
-                                                                                      ConsistencyLevel consistencyForCommit,
-                                                                                      final boolean isWrite,
-                                                                                      ClientState state,
-                                                                                      SinglePartitionReadCommand readCommand)
+                                                           ClientState state,
+                                                           boolean piggybackReadResponse,
+                                                           SinglePartitionReadCommand readCommand)
     throws WriteTimeoutException, WriteFailureException
     {
         long timeout = TimeUnit.MILLISECONDS.toNanos(DatabaseDescriptor.getCasContentionTimeout());
@@ -533,11 +421,22 @@ public class StorageProxy implements StorageProxyMBean
             Tracing.trace("Preparing {}", ballot);
             Commit toPrepare = Commit.newPrepare(key, metadata, ballot);
 
-            PrepareAndReadCallback callback = preparePaxosAndRead(keyspaceName, toPrepare, liveEndpoints,
-                                                                  requiredParticipants, consistencyForPaxos, readCommand);
-            summary = callback.prepareCallback;
-            iterator = callback.iterator;
-
+            if(piggybackReadResponse)
+            {
+                PrepareAndReadCallback callback = preparePaxosAndRead(metadata.ksName,
+                                                                      toPrepare,
+                                                                      liveEndpoints,
+                                                                      requiredParticipants,
+                                                                      consistencyForPaxos,
+                                                                      readCommand);
+                summary = callback.prepareCallback;
+                iterator = callback.iterator;
+            }
+            else
+            {
+                summary = preparePaxos(toPrepare, liveEndpoints, requiredParticipants, consistencyForPaxos);
+            }
+            
             if (!summary.promised)
             {
                 Tracing.trace("Some replicas have already promised a higher ballot than ours; aborting");
@@ -603,6 +502,20 @@ public class StorageProxy implements StorageProxyMBean
         }
 
         throw new WriteTimeoutException(WriteType.CAS, consistencyForPaxos, 0, consistencyForPaxos.blockFor(Keyspace.open(metadata.ksName), ConsistencyLevel.Usage.WRITE));
+    }
+
+    private static class BeginAndRepairPaxosResult
+    {
+        public final UUID ballot;
+        public final int contentions;
+        public final PartitionIterator partitionIterator;
+
+        private BeginAndRepairPaxosResult(UUID ballot, int contentions, PartitionIterator partitionIterator)
+        {
+            this.ballot = ballot;
+            this.contentions = contentions;
+            this.partitionIterator = partitionIterator;
+        }
     }
 
     /**
@@ -1718,40 +1631,35 @@ public class StorageProxy implements StorageProxyMBean
             final ConsistencyLevel consistencyForCommitOrFetch = consistencyLevel == ConsistencyLevel.LOCAL_SERIAL
                                                                                    ? ConsistencyLevel.LOCAL_QUORUM
                                                                                    : ConsistencyLevel.QUORUM;
-            if (PaxosState.USE_FASTPAXOS)
+
+            try
             {
-                final BeginAndRepairPaxosResult paxosResult = beginAndRepairPaxosAndGet(metadata.ksName,
-                                                                                                  start,
-                                                                                                  key,
-                                                                                                  metadata,
-                                                                                                  liveEndpoints,
-                                                                                                  requiredParticipants,
-                                                                                                  consistencyLevel,
-                                                                                                  consistencyForCommitOrFetch,
-                                                                                                  true, state,
-                                                                                                  command);
-                partitionIterator = paxosResult.partitionIterator;
+                final BeginAndRepairPaxosResult paxosResult = beginAndRepairPaxos(start, key, metadata,
+                                                                                  liveEndpoints, requiredParticipants,
+                                                                                  consistencyLevel,
+                                                                                  consistencyForCommitOrFetch,
+                                                                                  true,
+                                                                                  state,
+                                                                                  PaxosState.USE_FASTPAXOS,
+                                                                                  command);
                 if (paxosResult.contentions > 0)
                     casReadMetrics.contention.update(paxosResult.contentions);
-            }
-            else
-            {
-                try
-                {
-                    final Pair<UUID, Integer> pair = beginAndRepairPaxos(start, key, metadata, liveEndpoints, requiredParticipants, consistencyLevel, consistencyForCommitOrFetch, false, state);
-                    if (pair.right > 0)
-                        casReadMetrics.contention.update(pair.right);
-                }
-                catch (WriteTimeoutException e)
-                {
-                    throw new ReadTimeoutException(consistencyLevel, 0, consistencyLevel.blockFor(Keyspace.open(metadata.ksName), ConsistencyLevel.Usage.WRITE), false);
-                }
-                catch (WriteFailureException e)
-                {
-                    throw new ReadFailureException(consistencyLevel, e.received, e.failures, e.blockFor, false);
-                }
 
-                partitionIterator = fetchRows(group.commands, consistencyForCommitOrFetch);
+                if (PaxosState.USE_FASTPAXOS)
+                    partitionIterator = paxosResult.partitionIterator;
+                else
+                    partitionIterator = fetchRows(group.commands, consistencyForCommitOrFetch);
+            }
+            catch (WriteTimeoutException e)
+            {
+                throw new ReadTimeoutException(consistencyLevel, 0,
+                                               consistencyLevel.blockFor(Keyspace.open(metadata.ksName),
+                                                                         ConsistencyLevel.Usage.WRITE),
+                                               false);
+            }
+            catch (WriteFailureException e)
+            {
+                throw new ReadFailureException(consistencyLevel, e.received, e.failures, e.blockFor, false);
             }
         }
         catch (UnavailableException e)
