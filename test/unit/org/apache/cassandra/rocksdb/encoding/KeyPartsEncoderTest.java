@@ -48,6 +48,7 @@ import org.apache.cassandra.db.marshal.TimeType;
 import org.apache.cassandra.db.marshal.TimeUUIDType;
 import org.apache.cassandra.db.marshal.TimestampType;
 import org.apache.cassandra.db.marshal.UTF8Type;
+import org.apache.cassandra.db.marshal.UUIDType;
 import org.apache.cassandra.rocksdb.encoding.orderly.Bytes;
 import org.apache.cassandra.serializers.SimpleDateSerializer;
 import org.apache.cassandra.utils.Hex;
@@ -55,11 +56,57 @@ import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.UUIDGen;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class KeyPartsEncoderTest
 {
     private static final long START_EPOCH = -12219292800000L;
+
+    @Test
+    public void shouldGetEncodedLengthForFixSizeType()
+    {
+        assertEncodedLengthIsCorrect(BooleanType.instance, Boolean.TRUE);
+        assertEncodedLengthIsCorrect(BooleanType.instance, Boolean.FALSE);
+        assertEncodedLengthIsCorrect(ByteType.instance, Byte.valueOf("0"));
+        assertEncodedLengthIsCorrect(ByteType.instance, Byte.MAX_VALUE);
+        assertEncodedLengthIsCorrect(ByteType.instance, Byte.MIN_VALUE);
+        assertEncodedLengthIsCorrect(Int32Type.instance, Integer.MIN_VALUE);
+        assertEncodedLengthIsCorrect(Int32Type.instance, 0);
+        assertEncodedLengthIsCorrect(Int32Type.instance, Integer.MAX_VALUE);
+        assertEncodedLengthIsCorrect(LongType.instance, Long.MIN_VALUE);
+        assertEncodedLengthIsCorrect(LongType.instance, 0L);
+        assertEncodedLengthIsCorrect(LongType.instance, Long.MAX_VALUE);
+        assertEncodedLengthIsCorrect(ShortType.instance, Short.MIN_VALUE);
+        assertEncodedLengthIsCorrect(SimpleDateType.instance, 0);
+        assertEncodedLengthIsCorrect(SimpleDateType.instance, Integer.MAX_VALUE);
+        assertEncodedLengthIsCorrect(TimeType.instance, 0L);
+        assertEncodedLengthIsCorrect(TimeType.instance, Long.MAX_VALUE);
+        assertEncodedLengthIsCorrect(TimestampType.instance, new Date(0L));
+        assertEncodedLengthIsCorrect(TimestampType.instance, new Date());
+        assertEncodedLengthIsCorrect(TimestampType.instance, new Date(Long.MAX_VALUE));
+        assertEncodedLengthIsCorrect(TimeUUIDType.instance, UUIDGen.getTimeUUID());
+        assertEncodedLengthIsCorrect(UUIDType.instance, UUIDGen.getTimeUUID());
+    }
+
+    @Test
+    public void encodeLengthForNoneFixLengthTypeAreNull()
+    {
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(AsciiType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(BytesType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(DecimalType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(DoubleType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(FloatType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(InetAddressType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(IntegerType.instance));
+        assertNull(KeyPartsEncoder.getEncodedLengthForType(UTF8Type.instance));
+    }
+
+
+    private void assertEncodedLengthIsCorrect(AbstractType type, Object object)
+    {
+        assertEquals(Integer.valueOf(encode(createKeyPart(object, type)).length), KeyPartsEncoder.getEncodedLengthForType(type));
+    }
 
     @Test
     public void encodeSingleByteType() throws Exception

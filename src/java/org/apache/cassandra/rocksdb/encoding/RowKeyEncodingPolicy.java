@@ -27,11 +27,19 @@ class RowKeyEncodingPolicy
 {
     public final RowKeyFactory rowKeyFactory;
     public final RowKeyInputAdapter inputAdapter;
+    private Integer encodedLength;
 
     public RowKeyEncodingPolicy(RowKeyFactory rowKeyFactory, RowKeyInputAdapter inputAdapter)
     {
+        this(rowKeyFactory, inputAdapter, null);
+    }
+
+
+    public RowKeyEncodingPolicy(RowKeyFactory rowKeyFactory, RowKeyInputAdapter inputAdapter, Integer encodedLength)
+    {
         this.rowKeyFactory = rowKeyFactory;
         this.inputAdapter = inputAdapter;
+        this.encodedLength = encodedLength;
     }
 
 
@@ -48,5 +56,10 @@ class RowKeyEncodingPolicy
     public Object compose(AbstractType<?> type, ByteBuffer value)
     {
         return inputAdapter.compose(type, value);
+    }
+
+    public Integer getEncodedLength()
+    {
+        return encodedLength;
     }
 }

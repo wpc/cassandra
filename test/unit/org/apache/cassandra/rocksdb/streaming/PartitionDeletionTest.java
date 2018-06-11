@@ -40,6 +40,20 @@ public class PartitionDeletionTest extends RocksDBTestBase
     }
 
     @Test
+    public void partitionDeleteWithoutClusteringKeyAndFixLengthPartitionKey() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p bigint, v text, PRIMARY KEY (p))");
+        execute("INSERT INTO %s(p, v) values (?, ?)", 1L, "v1");
+        execute("INSERT INTO %s(p, v) values (?, ?)", 2L, "v2");
+
+        execute("DELETE FROM %s WHERE p=?", 1L);
+        triggerCompaction();
+        assertRows(execute("SELECT p, v FROM %s WHERE p=?", 1L));
+        assertRows(execute("SELECT p, v FROM %s WHERE p=?", 2L),
+                   row(2L, "v2"));
+    }
+
+    @Test
     public void parititionDeleteWithClusteringKey() throws Throwable
     {
         createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
@@ -55,6 +69,24 @@ public class PartitionDeletionTest extends RocksDBTestBase
         execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", "p1", "k3", "v3");
         triggerCompaction();
         assertRows(execute("SELECT p, c, v FROM %s WHERE p=?", "p1"), row("p1", "k3", "v3"));
+    }
+
+    @Test
+    public void parititionDeleteWithClusteringKeyAndFixLengthPartitionKey() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p bigint, c text, v text, PRIMARY KEY (p, c))");
+
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", 1L, "k1", "v1");
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", 1L, "k2", "v2");
+        assertRows(execute("SELECT p, c, v FROM %s WHERE p=?", 1L),
+                   row(1L, "k1", "v1"), row(1L, "k2", "v2"));
+
+        execute("DELETE FROM %s WHERE p=?", 1L);
+        triggerCompaction();
+        assertRows(execute("SELECT p, c, v FROM %s WHERE p=?", 1L));
+        execute("INSERT INTO %s(p, c, v) values (?, ?, ?)", 1L, "k3", "v3");
+        triggerCompaction();
+        assertRows(execute("SELECT p, c, v FROM %s WHERE p=?", 1L), row(1L, "k3", "v3"));
     }
 
     @Test

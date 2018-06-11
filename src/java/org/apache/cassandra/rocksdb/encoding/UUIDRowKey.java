@@ -29,7 +29,7 @@ import org.apache.cassandra.rocksdb.encoding.orderly.RowKeyUtils;
 public class UUIDRowKey extends RowKey
 {
 
-    private static final int UUID_BYTE_SIZE = 16;
+    static final int UUID_BYTE_SIZE = 16;
 
     @Override
     public Class<?> getSerializedClass()
