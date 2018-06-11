@@ -38,6 +38,7 @@ import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNull;
 
 public class RowKeyEncoderTest
 {
@@ -86,5 +87,14 @@ public class RowKeyEncoderTest
         ByteBuffer decodedKey = RowKeyEncoder.decodeNonCompositePartitionKey(encodedKey, cfs.metadata);
 
         assertEquals(decodedKey, testKey);
+    }
+
+    @Test
+    public void testGetEncodedPartitionKeyLength()
+    {
+        ColumnFamilyStore cfs1 = Keyspace.open(KEYSPACE).getColumnFamilyStore(CF_STANDARD_1);
+        ColumnFamilyStore cfs2 = Keyspace.open(KEYSPACE).getColumnFamilyStore(CF_STANDARD_2);
+        assertEquals(Integer.valueOf(8 + 4), RowKeyEncoder.calculateEncodedPartitionKeyLength(cfs1.metadata));
+        assertNull(RowKeyEncoder.calculateEncodedPartitionKeyLength(cfs2.metadata));
     }
 }

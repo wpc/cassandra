@@ -124,7 +124,8 @@ public class RowKeyEncoder
     private static void appendPartitionKeyParts(List<Pair<AbstractType, ByteBuffer>> keyParts, List<ColumnDefinition> partitionKeyColumns, DecoratedKey partitionKey)
     {
         ByteBuffer partitionKeyBuffer = partitionKey.getKey().duplicate();
-        if (partitionKeyColumns.size() == 1) {
+        if (partitionKeyColumns.size() == 1)
+        {
             // optimize for none composite situation
             keyParts.add(Pair.create(partitionKeyColumns.get(0).type, partitionKeyBuffer));
             return;
@@ -151,7 +152,7 @@ public class RowKeyEncoder
     private static Pair<AbstractType, ByteBuffer> createTokenKeyPart(Token token)
     {
         AbstractType type = getTokenDataType(token.getPartitioner());
-        boolean useTokenValue = !(token.getPartitioner() instanceof  LocalPartitioner);
+        boolean useTokenValue = !(token.getPartitioner() instanceof LocalPartitioner);
         // Byte.MAX_BALUE is a arbitrary byte value for use in LocalPartitioner
         return Pair.create(type, type.decompose(useTokenValue ? token.getTokenValue() : Byte.MAX_VALUE));
     }
@@ -176,4 +177,25 @@ public class RowKeyEncoder
         throw new RuntimeException("Partitioner: " + partitioner.getClass().getName() + " is not supported yet");
     }
 
+    // caluated encoded partition key length base on token and partition keys types
+    // return a positive number if possible to caculate, otherwise null
+    public static Integer calculateEncodedPartitionKeyLength(CFMetaData metadata)
+    {
+        Integer length = KeyPartsEncoder.getEncodedLengthForType(getTokenDataType(metadata.partitioner));
+        if (length == null)
+        {
+            return null;
+        }
+        for (ColumnDefinition columnDefinition : metadata.partitionKeyColumns())
+        {
+            Integer pkLength = KeyPartsEncoder.getEncodedLengthForType(columnDefinition.type);
+            if (pkLength == null)
+            {
+                return null;
+            }
+            length = length + pkLength;
+        }
+
+        return length;
+    }
 }

@@ -240,6 +240,7 @@ public class RocksDBCF implements RocksDBCFMBean
 
         // db options
         dbOptions.setCreateIfMissing(true);
+        dbOptions.setCreateMissingColumnFamilies(true);
         dbOptions.setAllowConcurrentMemtableWrite(true);
         dbOptions.setEnableWriteThreadAdaptiveYield(true);
         dbOptions.setBytesPerSync(1024 * 1024);
@@ -263,10 +264,8 @@ public class RocksDBCF implements RocksDBCFMBean
         metaCfOptions.setTableFormatConfig(metaTableOptions);
         ColumnFamilyDescriptor metaCfDescriptor = new ColumnFamilyDescriptor("meta".getBytes(), metaCfOptions);
 
-        boolean metaCfExists = rocksdbCfExists(dbOptions, rocksDBTableDir, metaCfDescriptor.columnFamilyName());
-
         List<ColumnFamilyDescriptor> cfDescs = new ArrayList<>(2);
-        CassandraCompactionFilter compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
+        CassandraCompactionFilter compactionFilter = createCassandraCompactionFilter();
         ArrayList<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>(2);
         // config default column family for holding data
         ColumnFamilyOptions dataCfOptions = new ColumnFamilyOptions();
@@ -286,41 +285,39 @@ public class RocksDBCF implements RocksDBCFMBean
         dataCfOptions.setCompactionFilter(compactionFilter);
         dataCfOptions.setTableFormatConfig(tableOptions);
         cfDescs.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, dataCfOptions));
-        if (metaCfExists)
-        {
-            cfDescs.add(metaCfDescriptor);
-        }
+        cfDescs.add(metaCfDescriptor);
 
-        ColumnFamilyHandle metaCfHandle;
         RocksDB rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
 
-        assert columnFamilyHandles.size() > 0;
-
-        if (metaCfExists)
-        {
-            assert columnFamilyHandles.size() == 2;
-            metaCfHandle = columnFamilyHandles.get(1);
-        }
-        else
-        {
-            assert columnFamilyHandles.size() == 1;
-            metaCfHandle = rocksDB.createColumnFamily(metaCfDescriptor);
-        }
-
+        assert columnFamilyHandles.size() == 2;
+        ColumnFamilyHandle dataCfHandle = columnFamilyHandles.get(0);
+        ColumnFamilyHandle metaCfHandle = columnFamilyHandles.get(1);
         compactionFilter.setMetaCfHandle(rocksDB, metaCfHandle);
 
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
 
-        return new RocksDBOpenRocksDBHandler(rocksDB, metaCfHandle, columnFamilyHandles.get(0), compactionFilter);
+        return new RocksDBOpenRocksDBHandler(rocksDB, metaCfHandle, dataCfHandle, compactionFilter);
     }
 
-    private boolean rocksdbCfExists(DBOptions dbOptions, String rocksDBTableDir, byte[] columnFamilyName) throws RocksDBException
+    private CassandraCompactionFilter createCassandraCompactionFilter()
     {
-        List<byte[]> columnFamilies = RocksDB.listColumnFamilies(new Options(dbOptions, new ColumnFamilyOptions()), rocksDBTableDir);
-        return columnFamilies.stream().anyMatch(bytes -> Arrays.equals(columnFamilyName, bytes));
+        Integer partitionKeyLength = RowKeyEncoder.calculateEncodedPartitionKeyLength(this.cfs.metadata);
+
+        if (partitionKeyLength == null)
+        {
+            // partition key length is not fixed, compaction filter falls back to range scan for find partition meta data.
+            return new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
+        }
+        else
+        {
+            // partition key has fix length, compaction filter will use point lookup with partition key for loading
+            // parition meta data to save cpu
+            return new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds, partitionKeyLength);
+        }
     }
+
 
     private RocksDB getRocksDBFromKey(DecoratedKey key)
     {
