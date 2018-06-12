@@ -264,19 +264,9 @@ public class RocksandraIndexTest extends RocksDBTestBase
         createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
                                   RocksandraClusteringColumnIndex.class.getName()));
 
-        while (true)
-        {
-            try
-            {
-                assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
-                           row("p1", "k2", "v1", "j2"),
-                           row("p1", "k3", "v1", "j3"));
-            }
-            catch (IndexNotAvailableException e) {
-                Thread.sleep(100);
-                continue;
-            }
-            break;
-        }
+        assertTrue(waitForIndex(KEYSPACE, currentTable(), "test_index"));
+        assertRows(execute("SELECT * FROM %s WHERE p=? AND v=?", "p1", "v1"),
+                   row("p1", "k2", "v1", "j2"),
+                   row("p1", "k3", "v1", "j3"));
     }
 }
