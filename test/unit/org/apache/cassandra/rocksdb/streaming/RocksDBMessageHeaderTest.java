@@ -40,4 +40,12 @@ public class RocksDBMessageHeaderTest
         RocksDBMessageHeader deserialized = RocksDBMessageHeader.SERIALIZER.deserialize(in);
         assertEquals(header, deserialized);
     }
+
+    @Test(expected = RocksDBStreamingScheamVersionMismatchException.class)
+    public void testShouldDetectFormatVersionMismatch() throws Exception{
+        DataOutputBuffer out = new DataOutputBuffer(1024);
+        out.writeInt(RocksDBMessageHeader.RocksDBMessageHeaderSerializer.CURRENT_STREAMING_SCHEMA_VERSION + 1);
+        DataInputBuffer in = new DataInputBuffer(out.buffer(), false);
+        RocksDBMessageHeader deserialized = RocksDBMessageHeader.SERIALIZER.deserialize(in);
+    }
 }

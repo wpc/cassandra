@@ -27,10 +27,11 @@ import java.util.Collection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.config.DatabaseDescriptor;
+import io.netty.buffer.ByteBuf;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBIteratorAdapter;
@@ -55,6 +56,7 @@ public class RocksDBStreamWriter
     private StreamSession session = null;
     private long streamedPairs = 0;
     private long outgoingBytes;
+    private long outgoingBytesDelta;
 
     public RocksDBStreamWriter(RocksDBCF rocksDBCF, Collection<Range<Token>> ranges, StreamManager.StreamRateLimiter limiter, long estimatedTotalKeys)
     {
@@ -87,68 +89,36 @@ public class RocksDBStreamWriter
     /**
      * Write key value pairs from RocksDB to  stream according to the stream ranges. As the underline RocksDBCF
      * might be sharded, it streams shards one by one:
-     *  [shard_number], [flag more], [key-value pairs], [flag more], [key, value pairs] .... [flag eof],
-     *  [shard_number, [flag more], [key-value pairs] ...
-     * @param out output stream.
+     * [shard_number], [flag more], [key-value pairs], [flag more], [key, value pairs] .... [flag eof],
+     * [shard_number, [flag more], [key-value pairs] ...
+     *
+     * @param out   output stream.
      * @param limit limit the number of key value pairs to be streamed. If 0 then no limit.
      * @throws IOException
      */
     public void write(OutputStream out, int limit) throws IOException
     {
-        int streamedPairs = 0;
-        long outgoingBytesDelta = 0;
+        outgoingBytesDelta = 0;
+        streamedPairs = 0;
 
         // Iterate through all shards.
         for (int shardId = 0; shardId < RocksDBConfigs.NUM_SHARD; shardId++)
         {
             // Send shard number first.
             out.write(ByteBufferUtil.bytes(shardId).array());
-            // Iterate through all possible key-value pairs and send to stream.
-            rangeLoop:
-            for (Range<Token> range : ranges)
+            for (RocksCFName rocksCFName : RocksCFName.NEED_STREAM)
             {
-                RocksDBIteratorAdapter iterator = rocksDBCF.newShardIterator(shardId,
-                                                                             new ReadOptions().setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE));
-                try
+                out.write(ByteBufferUtil.bytes(rocksCFName.getId()).array());
+                // Iterate through all possible key-value pairs and send to stream.
+                ReadOptions readOption = new ReadOptions()
+                                      .setReadaheadSize(RocksDBConfigs.STREAMING_READ_AHEAD_BUFFER_SIZE);
+                try (RocksDBIteratorAdapter iterator = rocksDBCF.newShardIterator(shardId, readOption, rocksCFName))
                 {
-                    iterator.seekToFirst();
-                    iterator.seek(RowKeyEncoder.encodeToken(range.left));
-                    byte[] stop = RowKeyEncoder.encodeToken(range.right);
-                    while (iterator.isValid())
-                    {
-                        if (limit > 0 && streamedPairs >= limit)
-                            break rangeLoop;
-                        byte[] key = iterator.key();
-                        byte[] value = iterator.value();
-                        if (FBUtilities.compareUnsigned(key, stop) >= 0)
-                            break;
-                        limiter.acquire(RocksDBStreamUtils.MORE.length + Integer.BYTES * 2 + key.length + value.length);
-                        out.write(RocksDBStreamUtils.MORE);
-                        out.write(ByteBufferUtil.bytes(key.length).array());
-                        out.write(key);
-                        out.write(ByteBufferUtil.bytes(value.length).array());
-                        out.write(value);
-                        digest.update(key);
-                        digest.update(value);
-                        outgoingBytes += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
-                        outgoingBytesDelta += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
-                        if (outgoingBytesDelta > OUTGOING_BYTES_DELTA_UPDATE_THRESHOLD)
-                        {
-                            StreamingMetrics.totalOutgoingBytes.inc(outgoingBytesDelta);
-                            outgoingBytesDelta = 0;
-                            updateProgress(false);
-                        }
-                        streamedPairs++;
-                        iterator.next();
-                    }
+                    writeShard(out, iterator, limit);
                 }
-                finally
-                {
-                    iterator.close();
-                }
+                LOGGER.info("Finished streaming shard " + shardId + " cf: " + rocksCFName.name());
+                out.write(RocksDBStreamUtils.EOF);
             }
-            LOGGER.info("Finished streaming shard " + shardId);
-            out.write(RocksDBStreamUtils.EOF);
         }
         LOGGER.info("Ranges streamed: " + ranges);
         LOGGER.info("Number of rocksdb entries written: " + streamedPairs);
@@ -157,6 +127,51 @@ public class RocksDBStreamWriter
         out.write(md5Digest);
         LOGGER.info("Stream digest: " + Hex.bytesToHex(md5Digest));
         updateProgress(true);
+    }
+
+    private void writeShard(OutputStream out, RocksDBIteratorAdapter iterator, int limit) throws IOException
+    {
+        for (Range<Token> range : ranges)
+        {
+            writeForRange(out, iterator, range, limit);
+        }
+    }
+
+    private void writeForRange(OutputStream out, RocksDBIteratorAdapter iterator, Range<Token> range, int limit) throws IOException
+    {
+        iterator.seekToFirst();
+        iterator.seek(RowKeyEncoder.encodeToken(range.left));
+        byte[] stop = RowKeyEncoder.encodeToken(range.right);
+        while (iterator.isValid())
+        {
+            if (limit > 0 && streamedPairs >= limit)
+            {
+                return;
+            }
+
+            byte[] key = iterator.key();
+            byte[] value = iterator.value();
+            if (FBUtilities.compareUnsigned(key, stop) >= 0)
+                break;
+            limiter.acquire(RocksDBStreamUtils.MORE.length + Integer.BYTES * 2 + key.length + value.length);
+            out.write(RocksDBStreamUtils.MORE);
+            out.write(ByteBufferUtil.bytes(key.length).array());
+            out.write(key);
+            out.write(ByteBufferUtil.bytes(value.length).array());
+            out.write(value);
+            digest.update(key);
+            digest.update(value);
+            outgoingBytes += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
+            outgoingBytesDelta += RocksDBStreamUtils.MORE.length + Integer.BYTES + key.length + Integer.BYTES + value.length;
+            if (outgoingBytesDelta > OUTGOING_BYTES_DELTA_UPDATE_THRESHOLD)
+            {
+                StreamingMetrics.totalOutgoingBytes.inc(outgoingBytesDelta);
+                outgoingBytesDelta = 0;
+                updateProgress(false);
+            }
+            streamedPairs++;
+            iterator.next();
+        }
     }
 
     public long getOutgoingBytes()

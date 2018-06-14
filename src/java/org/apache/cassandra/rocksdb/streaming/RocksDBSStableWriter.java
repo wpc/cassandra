@@ -20,23 +20,26 @@ package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.rocksdb.CompressionType;
+import org.apache.cassandra.utils.ByteBufferUtil;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileWriter;
 
-public class RocksDBSStableWriter
+public class RocksDBSStableWriter implements AutoCloseable
 {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBSStableWriter.class);
     private final UUID cfId;
+    private RocksCFName rocksCFName;
     private final int shardId;
     private final EnvOptions envOptions;
     private final Options options;
@@ -46,14 +49,10 @@ public class RocksDBSStableWriter
     private volatile long incomingBytes;
     private volatile int sstableIngested;
 
-    public RocksDBSStableWriter(UUID cfId) throws IOException, RocksDBException
-    {
-        this(cfId, 0);
-    }
-
-    public RocksDBSStableWriter(UUID cfId, int shardId)
+    public RocksDBSStableWriter(UUID cfId, int shardId, RocksCFName rocksCFName)
     {
         this.cfId = cfId;
+        this.rocksCFName = rocksCFName;
         this.currentSstableSize = 0;
         this.incomingBytes = 0;
         this.sstableIngested = 0;
@@ -85,7 +84,7 @@ public class RocksDBSStableWriter
             if (sstable != null && sstable.exists())
             {
                 sstableIngested += 1;
-                RocksDBStreamUtils.ingestRocksSstable(cfId, shardId, sstable.getAbsolutePath());
+                RocksDBStreamUtils.ingestRocksSstable(cfId, shardId, sstable.getAbsolutePath(), rocksCFName);
             }
         } finally
         {
@@ -105,7 +104,6 @@ public class RocksDBSStableWriter
     {
         if (sstableWriter == null)
             createSstable();
-
         sstableWriter.merge(key, value);
 
         currentSstableSize += key.length + value.length;

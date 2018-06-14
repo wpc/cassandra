@@ -78,8 +78,10 @@ public class RocksDBMessageHeader
 
     static class RocksDBMessageHeaderSerializer
     {
+        public static final int CURRENT_STREAMING_SCHEMA_VERSION = 0;
         public void seriliaze(RocksDBMessageHeader header, DataOutputPlus out) throws IOException
         {
+            out.writeInt(CURRENT_STREAMING_SCHEMA_VERSION);
             org.apache.cassandra.utils.UUIDSerializer.serializer.serialize(header.cfId, out, MessagingService.current_version);
             out.writeInt(header.sequenceNumber);
             out.writeLong(header.estimatedBytes);
@@ -89,6 +91,10 @@ public class RocksDBMessageHeader
 
         public RocksDBMessageHeader deserialize(DataInputPlus in) throws IOException
         {
+            int streamingSchemaVersion = in.readInt();
+            if(streamingSchemaVersion != CURRENT_STREAMING_SCHEMA_VERSION) {
+                throw new RocksDBStreamingScheamVersionMismatchException(streamingSchemaVersion, CURRENT_STREAMING_SCHEMA_VERSION);
+            }
             UUID cfId = org.apache.cassandra.utils.UUIDSerializer.serializer.deserialize(in, MessagingService.current_version);
             int sequenceNumber = in.readInt();
             long estimatedBytes = in.readLong();
