@@ -31,13 +31,14 @@ import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.metrics.StreamingMetrics;
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.service.DigestMismatchException;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Hex;
 import org.apache.cassandra.utils.Pair;
+import org.rocksdb.RocksDBException;
 
 public class RocksDBStreamReader
 {
@@ -50,6 +51,8 @@ public class RocksDBStreamReader
     private final long estimatedIncomingKeys;
     private long totalIncomingBytes;
     private long totalIncomingKeys;
+    private long incomingBytesDelta;
+    private int sstableIngested;
 
     public RocksDBStreamReader(RocksDBMessageHeader header, StreamSession session)
     {
@@ -76,67 +79,83 @@ public class RocksDBStreamReader
 
         LOGGER.debug("[Stream #{}] Start receiving rocskdb file #{} from {}, ks = '{}', table = '{}'.",
                      session.planId(), header.sequenceNumber, session.peer, cfs.keyspace.getName(),
-                     cfs.getColumnFamilyName());
-        RocksDBSStableWriter writer = null;
-        int sstableIngested = 0;
-        try
+                     cfs.getTableName());
+        sstableIngested = 0;
+        incomingBytesDelta = 0;
+        for (int expectedShardId = 0; expectedShardId < RocksDBConfigs.NUM_SHARD; expectedShardId++)
         {
-            long incomingBytesDelta = 0;
-            for (int expectedShardId = 0; expectedShardId < RocksDBConfigs.NUM_SHARD; expectedShardId ++)
-            {
-                int shardId = input.readInt();
-                LOGGER.info("Receiving shard: " + shardId);
-                if (shardId != expectedShardId)
-                    throw new StreamingShardMismatchException(header, shardId, expectedShardId);
-                writer = new RocksDBSStableWriter(header.cfId, shardId);
-                while (input.readByte() != RocksDBStreamUtils.EOF[0])
-                {
-                    int keyLength = input.readInt();
-                    byte[] key = new byte[keyLength];
-                    input.readFully(key);
-                    int valueLength = input.readInt();
-                    byte[] value = new byte[valueLength];
-                    input.readFully(value);
-                    digest.update(key);
-                    digest.update(value);
-                    writer.write(key, value);
-                    incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
-                    totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
-                    totalIncomingKeys++;
-                    if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
-                    {
-                        StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
-                        incomingBytesDelta = 0;
-                        RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, false);
-                    }
-                }
-                writer.close();
-                sstableIngested += writer.getSstableIngested();
-            }
-            byte[] actualDigest = digest.digest();
-            int expectedDigestLength = input.readInt();
-            byte[] expectedDigest = new byte[expectedDigestLength];
-            input.readFully(expectedDigest);
 
-            LOGGER.info("Received stream, expected digest: " + Hex.bytesToHex(expectedDigest) + ", actual digest: " + Hex.bytesToHex(actualDigest));
-            if (!Arrays.equals(expectedDigest, actualDigest))
+            int shardId = input.readInt();
+            LOGGER.info("Receiving shard: " + shardId);
+            if (shardId != expectedShardId)
+                throw new StreamingShardMismatchException(header, shardId, expectedShardId);
+
+            for (RocksCFName expectedRocksCFName : RocksCFName.NEED_STREAM)
             {
-                throw new StreamingDigestMismatchException(header, expectedDigest, actualDigest);
+                RocksCFName rocksCFName = RocksCFName.valueFromId(input.readShort());
+                if (rocksCFName != expectedRocksCFName)
+                    throw new StreamingRocksCFNameMismatchException(header, shardId, rocksCFName, expectedRocksCFName);
+
+                writeForShard(input, shardId, rocksCFName);
+                LOGGER.info("Finished receiving shard " + shardId + " cf: " + rocksCFName.name());
             }
-            RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, true);
         }
-        catch (Throwable e)
+        byte[] actualDigest = digest.digest();
+        int expectedDigestLength = input.readInt();
+        byte[] expectedDigest = new byte[expectedDigestLength];
+        input.readFully(expectedDigest);
+
+        LOGGER.info("Received stream, expected digest: " + Hex.bytesToHex(expectedDigest) + ", actual digest: " + Hex.bytesToHex(actualDigest));
+        if (!Arrays.equals(expectedDigest, actualDigest))
         {
-            if (writer != null)
-            {
-                writer.abort(e);
-            }
-            throw Throwables.propagate(e);
+            throw new StreamingDigestMismatchException(header, expectedDigest, actualDigest);
         }
+        RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, true);
 
         LOGGER.info("[Stream #{}] received {} rocskdb sstables from #{} from {}, ks = '{}', table = '{}'.",
                     session.planId(), sstableIngested, header.sequenceNumber, session.peer, cfs.keyspace.getName(),
-                    cfs.getColumnFamilyName());
+                    cfs.getTableName());
+    }
+
+    private void writeForShard(DataInputPlus input, int shardId, RocksCFName rocksCFName)
+    {
+        RocksDBSStableWriter writer = new RocksDBSStableWriter(header.cfId, shardId, rocksCFName);
+        try
+        {
+            writeWithWriter(input, writer);
+            writer.close();
+        }
+        catch (Throwable e)
+        {
+            writer.abort(e);
+            throw Throwables.propagate(e);
+        }
+        sstableIngested += writer.getSstableIngested();
+    }
+
+    private void writeWithWriter(DataInputPlus input, RocksDBSStableWriter writer) throws IOException, RocksDBException
+    {
+        while (input.readByte() != RocksDBStreamUtils.EOF[0])
+        {
+            int keyLength = input.readInt();
+            byte[] key = new byte[keyLength];
+            input.readFully(key);
+            int valueLength = input.readInt();
+            byte[] value = new byte[valueLength];
+            input.readFully(value);
+            digest.update(key);
+            digest.update(value);
+            writer.write(key, value);
+            incomingBytesDelta += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+            totalIncomingBytes += RocksDBStreamUtils.EOF.length + Integer.BYTES * 2 + keyLength + valueLength;
+            totalIncomingKeys++;
+            if (incomingBytesDelta > INCOMING_BYTES_DELTA_UPDATE_THRESHOLD)
+            {
+                StreamingMetrics.totalIncomingBytes.inc(incomingBytesDelta);
+                incomingBytesDelta = 0;
+                RocksDBStreamUtils.rocksDBProgress(session, header.cfId.toString(), ProgressInfo.Direction.IN, totalIncomingBytes, totalIncomingKeys, estimatedIncomingKeys, false);
+            }
+        }
     }
 
     public long getTotalIncomingBytes()

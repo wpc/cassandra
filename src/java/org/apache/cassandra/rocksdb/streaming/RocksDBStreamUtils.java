@@ -41,6 +41,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
@@ -48,6 +49,7 @@ import org.apache.cassandra.rocksdb.RocksDBProperty;
 import org.apache.cassandra.streaming.ProgressInfo;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.utils.Pair;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -76,12 +78,7 @@ public class RocksDBStreamUtils
         return cfs;
     }
 
-    public static void ingestRocksSstable(UUID cfId, String sstFile) throws RocksDBException
-    {
-        ingestRocksSstable(cfId, 0, sstFile);
-    }
-
-    public static void ingestRocksSstable(UUID cfId, int shardId, String sstFile) throws RocksDBException
+    public static void ingestRocksSstable(UUID cfId, int shardId, String sstFile, RocksCFName rocksCFName) throws RocksDBException
     {
         ColumnFamilyStore cfs = getColumnFamilyStore(cfId);
         RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfId);
@@ -89,6 +86,7 @@ public class RocksDBStreamUtils
             return;
 
         RocksDB db = rocksDBCF.getRocksDB(shardId);
+        ColumnFamilyHandle cfhandle = rocksDBCF.getCfHandleByShard(shardId, rocksCFName);
 
         // There might be multiple streaming sessions (threads) for the same sstable/db at the same time.
         // Adding lock to the db to prevent multiple sstables are ingested at same time and trigger
@@ -118,7 +116,7 @@ public class RocksDBStreamUtils
 
             long ingestStartTime = System.currentTimeMillis();
             try(final IngestExternalFileOptions ingestExternalFileOptions = new IngestExternalFileOptions()) {
-                db.ingestExternalFile(Arrays.asList(sstFile), ingestExternalFileOptions);
+                db.ingestExternalFile(cfhandle, Arrays.asList(sstFile), ingestExternalFileOptions);
             }
 
             LOGGER.info("Time spend on ingestion:" + (System.currentTimeMillis() - ingestStartTime));

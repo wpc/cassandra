@@ -399,9 +399,28 @@ public class RocksDBCF implements RocksDBCFMBean
 
     public RocksDBIteratorAdapter newShardIterator(int shardId, ReadOptions options)
     {
+        RocksCFName rocksCFName = RocksCFName.DEFAULT;
+        return newShardIterator(shardId, options, rocksCFName);
+    }
+
+    public RocksDBIteratorAdapter newShardIterator(int shardId, ReadOptions options, RocksCFName rocksCFName)
+    {
         rocksMetrics.rocksDBIterNew.inc();
         RocksDB rocksDB = getRocksDB(shardId);
-        return new RocksDBIteratorAdapter(rocksDB.newIterator(options), rocksMetrics);
+        return new RocksDBIteratorAdapter(rocksDB.newIterator(getCfHandleByShard(shardId, rocksCFName), options), rocksMetrics);
+    }
+
+    public ColumnFamilyHandle getCfHandleByShard(int shardId, RocksCFName rocksCFName)
+    {
+        if(rocksCFName == RocksCFName.DEFAULT) {
+            return dataCfHandles.get(shardId);
+        }
+
+        if (rocksCFName == RocksCFName.META) {
+            return metaCfHandles.get(shardId);
+        }
+
+        throw new AssertionError("should not reach here");
     }
 
     public void merge(DecoratedKey partitionKey, byte[] key, byte[] value) throws RocksDBException
@@ -639,3 +658,4 @@ public class RocksDBCF implements RocksDBCFMBean
         return StreamingConsistencyCheckUtils.checkAndGenerateReport(cfs, expectedNumKeys);
     }
 }
+

@@ -19,6 +19,7 @@
 package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ import org.apache.cassandra.streaming.StreamState;
 import org.apache.cassandra.streaming.messages.StreamMessage;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
 public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
@@ -114,20 +116,7 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
             assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i));
         }
 
-        // Use customized outgoing message serializer so that table one is streamed to table two.
-        StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
-        try
-        {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
-            List<Range<Token>> ranges = new ArrayList<>();
-            ranges.add(
-                      new Range<Token>(RocksDBUtils.getMinToken(inCfs.getPartitioner()),
-                                       RocksDBUtils.getMaxToken(inCfs.getPartitioner())));
-            transferRanges(inCfs, ranges);
-        } finally
-        {
-            RocksDBOutgoingMessage.SERIALIZER = replaced;
-        }
+        streamRanges(outCfs, inCfs, fullRange(outCfs));
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)
@@ -167,15 +156,7 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
         ranges.add(new Range<Token>(minToken, midToken));
 
         // Use customized outgoing message serializer so that table one is streamed to table two.
-        StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
-        try
-        {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
-            transferRanges(inCfs, ranges);
-        } finally
-        {
-            RocksDBOutgoingMessage.SERIALIZER = replaced;
-        }
+        streamRanges(outCfs, inCfs, ranges);
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)
@@ -216,28 +197,79 @@ public class RocksDBStreamTransferTest extends RocksDBStreamTestBase
         {
             assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i));
         }
+        List<Range<Token>> ranges = new ArrayList<>();
 
-        // Use customized outgoing message serializer so that table one is streamed to table two.
-        StreamMessage.Serializer<RocksDBOutgoingMessage> replaced = RocksDBOutgoingMessage.SERIALIZER;
-        try
-        {
-            RocksDBOutgoingMessage.SERIALIZER = new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId));
-            List<Range<Token>> ranges = new ArrayList<>();
+        IPartitioner partitioner = inCfs.getPartitioner();
+        Token rangeEnd = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner));
+        Token rangeStart = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner)).increaseSlightly();
+        ranges.add(new Range<Token>(rangeStart, rangeEnd));
 
-            IPartitioner partitioner = inCfs.getPartitioner();
-            Token rangeEnd = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner));
-            Token rangeStart = partitioner.midpoint(RocksDBUtils.getMinToken(partitioner), RocksDBUtils.getMaxToken(partitioner)).increaseSlightly();
-            ranges.add(new Range<Token>(rangeStart, rangeEnd));
-            transferRanges(inCfs, ranges);
-        } finally
-        {
-            RocksDBOutgoingMessage.SERIALIZER = replaced;
-        }
+        streamRanges(outCfs, inCfs, ranges);
 
         // Verifies all data are streamed.
         for (int i = 0; i < numberOfKeys; i ++)
         {
             assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i), row("v" + i));
+        }
+    }
+
+    @Test
+    public void testTransferPartitionMetaData() throws Throwable
+    {
+        int numberOfKeys = 2;
+
+        // Create table one and insert some data for streaming.
+        createTable("CREATE TABLE %s (p TEXT, v TEXT, PRIMARY KEY (p))");
+        ColumnFamilyStore outCfs = getCurrentColumnFamilyStore();
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            execute("DELETE FROM %s WHERE p=?", "p" + i);
+        }
+
+        // Create table two and for receiving streamed data.
+        createTable("CREATE TABLE %s (p TEXT, v TEXT, PRIMARY KEY (p))");
+        ColumnFamilyStore inCfs = getCurrentColumnFamilyStore();
+
+        // insert some "old" data
+        long hourAgoInMicroSeconds = (System.currentTimeMillis() - 3600 * 1000) * 1000;
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            execute("INSERT INTO %s(p, v) values (?, ?) USING TIMESTAMP ?", "p" + i, "v" + i, hourAgoInMicroSeconds);
+        }
+        streamRanges(outCfs, inCfs, fullRange(inCfs));
+
+        // force flush to make partition deletion happens
+        triggerCompaction();
+        // Verifies partition deletions are streamed.
+        for (int i = 0; i < numberOfKeys; i ++)
+        {
+            assertRows(execute("SELECT v FROM %s WHERE p=?", "p" + i));
+        }
+    }
+
+    private List<Range<Token>> fullRange(ColumnFamilyStore cfs)
+    {
+        List<Range<Token>> ranges = new ArrayList<>();
+        ranges.add(new Range<Token>(RocksDBUtils.getMinToken(cfs.getPartitioner()),
+                                    RocksDBUtils.getMaxToken(cfs.getPartitioner())));
+        return ranges;
+    }
+
+    private void streamRanges(ColumnFamilyStore outCfs, ColumnFamilyStore inCfs, List<Range<Token>> ranges) throws Exception
+    {
+        // Use customized outgoing message serializer so that table one is streamed to table two.
+        StreamMessage.Serializer<StreamMessage> replaced = StreamMessage.Type.ROCKSFILE.outSerializer;
+        Field field = StreamMessage.Type.ROCKSFILE.getClass().getDeclaredField("outSerializer");
+        try
+        {
+
+            field.setAccessible(true);
+            field.set(StreamMessage.Type.ROCKSFILE, new CustomRocksDBOutgoingMessageSerializer(RocksDBEngine.getRocksDBCF(outCfs.metadata.cfId)));
+            transferRanges(inCfs, ranges);
+        } finally
+        {
+            field.set(StreamMessage.Type.ROCKSFILE, replaced);
+            field.setAccessible(false);
         }
     }
 
