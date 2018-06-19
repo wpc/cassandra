@@ -21,7 +21,8 @@ package org.apache.cassandra.rocksdb;
 public enum RocksCFName
 {
     DEFAULT((short) 0),
-    META((short) 1);
+    META((short) 1),
+    INDEX((short) 2);
 
     public static final RocksCFName[] NEED_STREAM = new RocksCFName[]{META, DEFAULT};
     private final short id;

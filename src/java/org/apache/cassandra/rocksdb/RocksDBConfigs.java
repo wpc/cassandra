@@ -54,6 +54,9 @@ public class RocksDBConfigs
     // memtable size for meta cf, default 16M. Need make it small enough for flushing frequently to avoid holding off too much WAL files deletion
     public static final int META_WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.meta_write_buffer_size_mbytes", 16);
 
+    // memtable size for index cd, default 64M.
+    public static final int INDEX_WRITE_BUFFER_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.index_write_buffer_size_mbytes", 64);
+
     // MAX_TOTAL_WAL_SIZE_MBYTES once reached, rocksdb will flush cfs that hold off WAL deletion. Without this one stale cf make us spend
     // a lot disk space on commit logs. By default we make it 1.5 times of data cf memtable likely we will at most keep 2~3 log file.
     public static final int MAX_TOTAL_WAL_SIZE_MBYTES = Integer.getInteger("cassandra.rocksdb.max_total_wal_size_mbytes", WRITE_BUFFER_SIZE_MBYTES + WRITE_BUFFER_SIZE_MBYTES / 2);
