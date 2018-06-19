@@ -164,7 +164,7 @@ public class RocksDBEngine implements StorageEngine
 
         try
         {
-            rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)).mergeMeta(partitionKey, rocksDBKey, rocksDBValue);
+            rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)).merge(RocksCFName.META, partitionKey, rocksDBKey, rocksDBValue);
         }
         catch (RocksDBException e)
         {
@@ -399,7 +399,7 @@ public class RocksDBEngine implements StorageEngine
         DecoratedKey decoratedKey = parseStringPartitionKey(cfs, partitionKey);
         byte[] rocksKey = RowKeyEncoder.encode(decoratedKey, cfs.metadata);
         RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
-        byte[] meta = rocksDBCF.getMeta(decoratedKey, rocksKey);
+        byte[] meta = rocksDBCF.get(RocksCFName.META, decoratedKey, rocksKey);
         if (meta == null) {
             return "";
         }

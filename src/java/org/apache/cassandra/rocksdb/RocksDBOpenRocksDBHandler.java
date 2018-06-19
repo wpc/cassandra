@@ -30,16 +30,19 @@ public class RocksDBOpenRocksDBHandler
     private final RocksDB rocksDB;
     private final ColumnFamilyHandle metaCfHandle;
     private final ColumnFamilyHandle dataCfHandle;
+    private final ColumnFamilyHandle indexCfHandle;
     private final CassandraCompactionFilter compactionFilter;
 
     public RocksDBOpenRocksDBHandler(RocksDB rocksDB,
                                      ColumnFamilyHandle metaCfHandle,
                                      ColumnFamilyHandle dataCfHandle,
+                                     ColumnFamilyHandle indexCfHandle,
                                      CassandraCompactionFilter compactionFilter)
     {
         this.rocksDB = rocksDB;
         this.metaCfHandle = metaCfHandle;
         this.dataCfHandle = dataCfHandle;
+        this.indexCfHandle = indexCfHandle;
         this.compactionFilter = compactionFilter;
     }
 
@@ -57,6 +60,8 @@ public class RocksDBOpenRocksDBHandler
     {
         return dataCfHandle;
     }
+
+    public ColumnFamilyHandle getIndexCfHandle() { return indexCfHandle; }
 
     public CassandraCompactionFilter getCompactionFilter()
     {

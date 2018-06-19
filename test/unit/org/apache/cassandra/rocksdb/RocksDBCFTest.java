@@ -215,13 +215,27 @@ public class RocksDBCFTest extends RocksDBTestBase
         RocksDBCF rocksDBCF = getCurrentRocksDBCF();
         byte[] key = "test_key".getBytes();
         byte[] value0 = PartitionMetaEncoder.encodePartitionLevelDeletion(DeletionTime.LIVE);
-        rocksDBCF.mergeMeta(dk, key, value0);
-        assertArrayEquals(value0, rocksDBCF.getMeta(dk, key));
+        rocksDBCF.merge(RocksCFName.META, dk, key, value0);
+        assertArrayEquals(value0, rocksDBCF.get(RocksCFName.META, dk, key));
         byte[] value1 = PartitionMetaEncoder.encodePartitionLevelDeletion(new DeletionTime(1000, 1));
-        rocksDBCF.mergeMeta(dk, key, value1);
-        assertArrayEquals(value1, rocksDBCF.getMeta(dk, key));
+        rocksDBCF.merge(RocksCFName.META, dk, key, value1);
+        assertArrayEquals(value1, rocksDBCF.get(RocksCFName.META, dk, key));
         byte[] value2 = PartitionMetaEncoder.encodePartitionLevelDeletion(new DeletionTime(999, 1));
-        rocksDBCF.mergeMeta(dk, key, value2);
-        assertArrayEquals(value1, rocksDBCF.getMeta(dk, key));
+        rocksDBCF.merge(RocksCFName.META, dk, key, value2);
+        assertArrayEquals(value1, rocksDBCF.get(RocksCFName.META, dk, key));
+    }
+
+    @Test
+    public void testIndexReadWrite() throws Throwable
+    {
+        createTable("CREATE TABLE %s (p text, c text, v text, PRIMARY KEY (p, c))");
+
+        ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
+
+        RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs.metadata.cfId);
+        byte[] key = "test_key".getBytes();
+        byte[] value = encodeValue(cfs, "test_value");
+        rocksDBCF.merge(RocksCFName.INDEX, dk, key, value);
+        assertArrayEquals(value, rocksDBCF.get(RocksCFName.INDEX, dk, key));
     }
 }
