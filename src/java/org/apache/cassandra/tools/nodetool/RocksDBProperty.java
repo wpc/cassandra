@@ -11,6 +11,7 @@ import io.airlift.command.Command;
 
 import io.airlift.command.Option;
 import org.apache.cassandra.db.ColumnFamilyStoreMBean;
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.tools.NodeProbe;
 import org.apache.cassandra.tools.NodeTool.NodeToolCmd;
 
@@ -92,8 +93,9 @@ public class RocksDBProperty extends NodeToolCmd
     @Option(title = "list", name = {"-l", "--list"}, description = "List all avaliable properties")
     private boolean listProperites = false;
 
-    @Option(title = "meta", name = {"-m", "--meta"}, description = "Show partition meta data properties")
-    private boolean meta = false;
+    @Option(title = "cf", name = {"--cf"}, description = "Show partition data properties for specified rocksdb cf, valid options are: default, index, meta")
+    private String cf = "default";
+
 
 
     @Override
@@ -112,7 +114,7 @@ public class RocksDBProperty extends NodeToolCmd
 
         if (args.size() == 3)
         {
-            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property, meta);
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspace, args.get(2), PROPERTY_PREFIX + property, RocksCFName.valueOf(cf.toUpperCase()));
             printRocksDBProperties(rocksDBProperties);
             return;
         }
@@ -130,7 +132,7 @@ public class RocksDBProperty extends NodeToolCmd
             if (keyspace != null && !keyspaceName.equals(keyspace))
                 continue;
             System.out.println("Table: " + keyspaceName + "." + tableName);
-            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property, meta);
+            List<String> rocksDBProperties = probe.getRocksDBProperty(keyspaceName, tableName, PROPERTY_PREFIX + property, RocksCFName.valueOf(cf.toUpperCase()));
             printRocksDBProperties(rocksDBProperties);
         }
     }

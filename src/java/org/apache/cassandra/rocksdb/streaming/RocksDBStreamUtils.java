@@ -85,43 +85,7 @@ public class RocksDBStreamUtils
         if (cfs == null || rocksDBCF == null)
             return;
 
-        RocksDB db = rocksDBCF.getRocksDB(shardId);
-        ColumnFamilyHandle cfhandle = rocksDBCF.getCfHandleByShard(shardId, rocksCFName);
-
-        // There might be multiple streaming sessions (threads) for the same sstable/db at the same time.
-        // Adding lock to the db to prevent multiple sstables are ingested at same time and trigger
-        // write stalls.
-        synchronized (db)
-        {
-            long startTime = System.currentTimeMillis();
-            // Wait until compaction catch up by examing the number of l0 sstables.
-            while (true)
-            {
-                int numOfLevel0Sstables = RocksDBProperty.getNumberOfSstablesByLevel(rocksDBCF, 0);
-                if (numOfLevel0Sstables <= RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER)
-                    break;
-                try
-                {
-                    LOGGER.debug("Number of level0 sstables " + numOfLevel0Sstables + " exceeds the threshold " + RocksDBConfigs.LEVEL0_STOP_WRITES_TRIGGER
-                                + ", sleep for " + INGESTION_WAIT_MS + "ms.");
-                    Thread.sleep(INGESTION_WAIT_MS);
-                }
-                catch (InterruptedException e)
-                {
-                    LOGGER.warn("Ingestion wait interrupted, procceding.");
-                }
-            }
-            rocksDBCF.getRocksMetrics().rocksDBIngestWaitTimeHistogram.update(System.currentTimeMillis() - startTime);
-            LOGGER.info("Time spend waiting for compaction:" + (System.currentTimeMillis() - startTime));
-
-            long ingestStartTime = System.currentTimeMillis();
-            try(final IngestExternalFileOptions ingestExternalFileOptions = new IngestExternalFileOptions()) {
-                db.ingestExternalFile(cfhandle, Arrays.asList(sstFile), ingestExternalFileOptions);
-            }
-
-            LOGGER.info("Time spend on ingestion:" + (System.currentTimeMillis() - ingestStartTime));
-            rocksDBCF.getRocksMetrics().rocksDBIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
-        }
+        rocksDBCF.ingestRocksSstable(shardId, sstFile, INGESTION_WAIT_MS, rocksCFName);
     }
 
     /**

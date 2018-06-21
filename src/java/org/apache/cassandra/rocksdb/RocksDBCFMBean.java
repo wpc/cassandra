@@ -32,7 +32,7 @@ public interface RocksDBCFMBean
 
     public String ingestRocksDBStream(String inputFile) throws IOException, RocksDBException;
 
-    public List<String> getRocksDBProperty(String property, boolean meta);
+    public List<String> getRocksDBProperty(String property, RocksCFName cf);
 
     String dumpPartition(String partitionKey, int limit);
     String dumpPartitionMetaData(String partitionKey);
