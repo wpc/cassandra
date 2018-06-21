@@ -75,6 +75,7 @@ import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.metrics.ThreadPoolMetrics;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.MessagingServiceMBean;
+import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBCF;
 import org.apache.cassandra.rocksdb.RocksDBCFMBean;
 import org.apache.cassandra.service.CacheService;
@@ -1480,9 +1481,9 @@ public class NodeProbe implements AutoCloseable
         return getRocksDBCFProxy(keyspace, cf).ingestRocksDBStream(input);
     }
 
-    public List<String> getRocksDBProperty(String keyspace, String table, String property, boolean meta)
+    public List<String> getRocksDBProperty(String keyspace, String table, String property, RocksCFName cf)
     {
-        return getRocksDBCFProxy(keyspace, table).getRocksDBProperty(property, meta);
+        return getRocksDBCFProxy(keyspace, table).getRocksDBProperty(property, cf);
     }
 
     public boolean isRocksDBBacked(String keyspace, String table)
