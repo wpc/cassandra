@@ -122,7 +122,7 @@ public class RocksDBEngineTest extends RocksDBTestBase
         createIndex(String.format("CREATE CUSTOM INDEX test_index ON %%s(v) USING '%s'",
                                   RocksandraClusteringColumnIndex.class.getName()));
 
-        assertEquals(originalNumRocksDBFamilySize + 1, ((RocksDBEngine)cfs.engine).rocksDBFamily.size());
+        assertEquals(originalNumRocksDBFamilySize, ((RocksDBEngine)cfs.engine).rocksDBFamily.size());
     }
 
     @Test
