@@ -272,22 +272,38 @@ public class RocksDBEngine implements StorageEngine
         byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, clustering, cfs.metadata);
         byte[] rocksDBValue = RowValueEncoder.encode(cfs.metadata, row);
 
+        Transaction transaction = null;
+        Boolean safeToCommit = true;
         try
         {
             indexer.start();
-            RocksCFName rocksCFName = cfs.isIndex() ? RocksCFName.INDEX : RocksCFName.DEFAULT;
-            getRocksDBCFOfParent(cfs).merge(rocksCFName, partitionKey, rocksDBKey, rocksDBValue);
+
+            if (cfs.isIndex())
+            {
+                secondaryIndexMetrics.rsiTotalInsertions.inc();
+                transaction = ((RocksandraClusteringColumnIndex.IndexUpdateTransaction)indexer).getTransaction();
+                if (transaction != null)
+                {
+                    getRocksDBCFOfParent(cfs).merge(RocksCFName.INDEX, partitionKey, rocksDBKey, rocksDBValue, transaction);
+                }
+                else
+                {
+                    getRocksDBCFOfParent(cfs).merge(RocksCFName.INDEX, partitionKey, rocksDBKey, rocksDBValue);
+                }
+            }
+            else
+            {
+                getRocksDBCF(cfs).merge(partitionKey, rocksDBKey, rocksDBValue);
+            }
 
             if (indexer != UpdateTransaction.NO_OP)
             {
                 try
                 {
-                    secondaryIndexMetrics.rsiTotalInsertions.inc();
                     indexer.onInserted(row);
                 }
                 catch (RuntimeException e)
                 {
-                    secondaryIndexMetrics.rsiInsertionFailures.inc();
                     logger.error(e.toString(), e);
                     throw new StorageEngineException("Index update failed", e);
                 }
@@ -296,11 +312,30 @@ public class RocksDBEngine implements StorageEngine
         catch (RocksDBException e)
         {
             logger.error(e.toString(), e);
+            if (cfs.isIndex())
+            {
+                secondaryIndexMetrics.rsiInsertionFailures.inc();
+                if (transaction != null)
+                {
+                    try
+                    {
+                        transaction.rollback();
+                    }
+                    catch (RocksDBException error)
+                    {
+                        safeToCommit = false;
+                        logger.error(error.toString(), error);
+                    }
+                }
+            }
             throw new StorageEngineException("Row merge failed", e);
         }
         finally
         {
-            indexer.commit();
+            if (safeToCommit)
+            {
+                indexer.commit();
+            }
         }
     }
 
