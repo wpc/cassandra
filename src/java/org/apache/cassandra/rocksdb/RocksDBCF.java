@@ -72,6 +72,7 @@ import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.Transaction;
 import org.rocksdb.WriteOptions;
 
 import static org.apache.cassandra.rocksdb.RocksDBConfigs.NUM_SHARD;
@@ -270,6 +271,12 @@ public class RocksDBCF implements RocksDBCFMBean
     {
         RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
         dbhandle.merge(rocksCFName, writeOptions, key, value);
+    }
+
+    public void merge(RocksCFName rocksCFName, DecoratedKey partitionKey, byte[] key, byte[] value, Transaction transaction) throws RocksDBException
+    {
+        RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
+        dbhandle.merge(rocksCFName, key, value, transaction);
     }
 
     private int getShardIdForKey(DecoratedKey partitionKey)
@@ -521,6 +528,12 @@ public class RocksDBCF implements RocksDBCFMBean
             rocksMetrics.rocksDBIngestTimeHistogram.update(System.currentTimeMillis() - ingestStartTime);
         }
 
+    }
+
+    public Transaction beginTransaction(DecoratedKey partitionKey)
+    {
+        RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
+        return dbhandle.beginTransaction(writeOptions);
     }
 }
 

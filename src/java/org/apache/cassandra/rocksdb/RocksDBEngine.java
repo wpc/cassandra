@@ -64,6 +64,7 @@ import org.apache.cassandra.metrics.SecondaryIndexMetrics;
 import org.apache.cassandra.rocksdb.encoding.PartitionMetaEncoder;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
+import org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamReceiveTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamTransferTask;
 import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
@@ -77,6 +78,7 @@ import org.rocksdb.LRUCache;
 import org.rocksdb.RateLimiter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.Transaction;
 
 public class RocksDBEngine implements StorageEngine
 {

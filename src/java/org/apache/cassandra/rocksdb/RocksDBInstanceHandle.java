@@ -40,11 +40,13 @@ import org.rocksdb.DBOptions;
 import org.rocksdb.Env;
 import org.rocksdb.FlushOptions;
 import org.rocksdb.IngestExternalFileOptions;
+import org.rocksdb.OptimisticTransactionDB;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileManager;
 import org.rocksdb.Statistics;
+import org.rocksdb.Transaction;
 import org.rocksdb.WriteOptions;
 
 import static org.apache.cassandra.rocksdb.RocksDBConfigs.MERGE_OPERANDS_LIMIT;
@@ -56,6 +58,7 @@ public class RocksDBInstanceHandle
 {
     private static final Logger logger = LoggerFactory.getLogger(RocksDBInstanceHandle.class);
 
+    private final OptimisticTransactionDB optimisticTransactionDB;
     private final RocksDB rocksDB;
     private final ColumnFamilyHandle metaCfHandle;
     private final ColumnFamilyHandle dataCfHandle;
@@ -162,7 +165,16 @@ public class RocksDBInstanceHandle
         cfDescs.add(metaCfDescriptor);
         cfDescs.add(indexCfDescriptor);
 
-        this.rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
+        if (!RocksDBConfigs.DISABLE_INDEX_TRANSACTIONS)
+        {
+            optimisticTransactionDB = OptimisticTransactionDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
+            rocksDB = optimisticTransactionDB.getBaseDB();
+        }
+        else
+        {
+            optimisticTransactionDB = null;
+            rocksDB = RocksDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
+        }
 
         assert columnFamilyHandles.size() == 3;
         this.dataCfHandle = columnFamilyHandles.get(0);
@@ -217,6 +229,11 @@ public class RocksDBInstanceHandle
         rocksDB.merge(cfHandle, writeOptions, key, value);
     }
 
+    public void merge(RocksCFName rocksCFName, byte[] key, byte[] value, Transaction transaction) throws RocksDBException
+    {
+        ColumnFamilyHandle cfHandle = getCfHandle(rocksCFName);
+        transaction.merge(cfHandle, key, value);
+    }
 
     public byte[] get(RocksCFName rocksCFName, ReadOptions readOptions, byte[] key) throws RocksDBException
     {
@@ -290,5 +307,10 @@ public class RocksDBInstanceHandle
         try(final IngestExternalFileOptions ingestExternalFileOptions = new IngestExternalFileOptions()) {
             rocksDB.ingestExternalFile(cfhandle, Arrays.asList(sstFile), ingestExternalFileOptions);
         }
+    }
+
+    public Transaction beginTransaction(WriteOptions writeOptions)
+    {
+        return optimisticTransactionDB != null ? optimisticTransactionDB.beginTransaction(writeOptions) : null;
     }
 }

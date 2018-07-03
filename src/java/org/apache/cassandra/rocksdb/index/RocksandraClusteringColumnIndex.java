@@ -61,10 +61,16 @@ import org.apache.cassandra.index.IndexRegistry;
 import org.apache.cassandra.index.internal.IndexEntry;
 import org.apache.cassandra.index.transactions.IndexTransaction;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
+import org.apache.cassandra.rocksdb.RocksDBCF;
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.concurrent.OpOrder;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.Transaction;
 
 import static org.apache.cassandra.cql3.statements.RequestValidations.checkFalse;
 
@@ -418,7 +424,7 @@ public class RocksandraClusteringColumnIndex implements Index
         Row row = BTreeRow.noCellLiveRow(buildIndexClustering(rowKey, clustering, cell), info);
         PartitionUpdate upd = partitionUpdate(valueKey, row);
         assert baseCfs.keyspace.engine != null;
-        indexCfs.keyspace.engineApply(indexCfs, upd, UpdateTransaction.NO_OP, opGroup, null, false);
+        indexCfs.keyspace.engineApply(indexCfs, upd, new IndexUpdateTransaction(valueKey, baseCfs), opGroup, null, false);
         logger.trace("Inserted entry into index for value {}", valueKey);
     }
 
@@ -446,7 +452,7 @@ public class RocksandraClusteringColumnIndex implements Index
     {
         Row row = BTreeRow.emptyDeletedRow(indexClustering, Row.Deletion.regular(deletion));
         PartitionUpdate upd = partitionUpdate(indexKey, row);
-        indexCfs.keyspace.engineApply(indexCfs, upd, UpdateTransaction.NO_OP, opGroup, null, false);
+        indexCfs.keyspace.engineApply(indexCfs, upd, new IndexUpdateTransaction(indexKey, baseCfs), opGroup, null, false);
         logger.trace("Removed index entry for value {}", indexKey);
     }
 
@@ -604,5 +610,62 @@ public class RocksandraClusteringColumnIndex implements Index
             builder.addClusteringColumn(def.name, def.type);
         }
         return builder;
+    }
+
+    public static class IndexUpdateTransaction implements UpdateTransaction
+    {
+
+        private DecoratedKey partitionKey;
+        private ColumnFamilyStore cfs;
+        private Transaction transaction;
+
+        public IndexUpdateTransaction(DecoratedKey partitionKey, ColumnFamilyStore cfs)
+        {
+            this.partitionKey = partitionKey;
+            this.cfs = cfs;
+        }
+
+        public void start()
+        {
+            RocksDBCF rocksDBCF = RocksDBEngine.getRocksDBCF(cfs);
+            transaction = rocksDBCF.beginTransaction(partitionKey);
+        }
+
+        public void onPartitionDeletion(DeletionTime deletionTime)
+        {
+        }
+
+        public void onRangeTombstone(RangeTombstone tombstone)
+        {
+        }
+
+        public void onInserted(Row row)
+        {
+        }
+
+        public void onUpdated(Row existing, Row updated)
+        {
+        }
+
+        public void commit()
+        {
+            if (transaction != null)
+            {
+                try
+                {
+                    transaction.commit();
+                }
+                catch (RocksDBException e)
+                {
+                    RocksDBEngine.secondaryIndexMetrics.rsiInsertionFailures.inc();
+                    logger.error(e.toString(), e);
+                }
+            }
+        }
+
+        public Transaction getTransaction()
+        {
+            return transaction;
+        }
     }
 }

@@ -85,6 +85,9 @@ public class RocksDBConfigs
     // number of threads used to open sharded rocksdb instances
     public static int OPEN_CONCURRENCY = Integer.getInteger("cassandra.rocksdb.open_concurrency", NUM_SHARD);
 
+    // disable index transactions, default is false
+    public static boolean DISABLE_INDEX_TRANSACTIONS = Boolean.getBoolean("cassandra.rocksdb.disable_index_transactions");
+
     /**
      * Streaming configs
      */
