@@ -21,6 +21,7 @@ package org.apache.cassandra.metrics;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import org.apache.cassandra.rocksdb.RocksDBConfigs;
 import org.apache.cassandra.rocksdb.RocksDBEngine;
 import org.apache.cassandra.rocksdb.RocksDBTestBase;
 import org.jboss.byteman.contrib.bmunit.BMRule;
@@ -83,6 +84,7 @@ public class SecondaryIndexMetricsTest extends RocksDBTestBase
     action = "throw new RocksDBException(\"test exception\");")
     public void testIndexTransactionRollbackSuccess() throws Throwable
     {
+        RocksDBConfigs.ENABLE_INDEX_TRANSACTIONS = true;
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
         createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
 
@@ -117,6 +119,7 @@ public class SecondaryIndexMetricsTest extends RocksDBTestBase
     })
     public void testIndexTransactionRollbackFailure() throws Throwable
     {
+        RocksDBConfigs.ENABLE_INDEX_TRANSACTIONS = true;
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
         createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
 
@@ -144,6 +147,7 @@ public class SecondaryIndexMetricsTest extends RocksDBTestBase
     action = "throw new RocksDBException(\"test exception\");")
     public void testIndexTransactionCommitFailure() throws Throwable
     {
+        RocksDBConfigs.ENABLE_INDEX_TRANSACTIONS = true;
         createTable("CREATE TABLE %s (p text, c text, v text, j text, PRIMARY KEY (p, c, v))");
         createIndex("CREATE CUSTOM INDEX test_index ON %s(v) USING 'org.apache.cassandra.rocksdb.index.RocksandraClusteringColumnIndex'");
 

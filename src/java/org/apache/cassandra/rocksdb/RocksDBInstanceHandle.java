@@ -165,7 +165,7 @@ public class RocksDBInstanceHandle
         cfDescs.add(metaCfDescriptor);
         cfDescs.add(indexCfDescriptor);
 
-        if (!RocksDBConfigs.DISABLE_INDEX_TRANSACTIONS)
+        if (RocksDBConfigs.ENABLE_INDEX_TRANSACTIONS)
         {
             optimisticTransactionDB = OptimisticTransactionDB.open(dbOptions, rocksDBTableDir, cfDescs, columnFamilyHandles);
             rocksDB = optimisticTransactionDB.getBaseDB();
