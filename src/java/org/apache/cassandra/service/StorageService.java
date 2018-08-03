@@ -762,9 +762,6 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             if (!MessagingService.instance().isListening())
                 MessagingService.instance().listen();
             LoadBroadcaster.instance.startBroadcasting();
-
-            HintsService.instance.startDispatch();
-            BatchlogManager.instance.start();
         }
     }
 
