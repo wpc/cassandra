@@ -38,6 +38,7 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.gms.FailureDetector;
+import org.apache.cassandra.metrics.TokenMetaDataMetrics;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.BiMultiValMap;
 import org.apache.cassandra.utils.Pair;
@@ -647,9 +648,10 @@ public class TokenMetadata
         {
             if ((tm = cachedTokenMap.get()) != null)
                 return tm;
-
+            long start = System.nanoTime();
             tm = cloneOnlyTokenMap();
             cachedTokenMap.set(tm);
+            TokenMetaDataMetrics.tokenMapCachePopulation.addNano(System.nanoTime() - start);
             return tm;
         }
     }
