@@ -27,6 +27,10 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataInputPlus.DataInputStreamPlus;
 
 import org.apache.cassandra.io.util.DataOutputStreamPlus;
+import org.apache.cassandra.rocksdb.streaming.RocksDBCassandraStreamReader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBIncomingMessage;
+import org.apache.cassandra.rocksdb.streaming.RocksDBMessageHeader;
+import org.apache.cassandra.rocksdb.streaming.RocksDBStreamUtils;
 import org.apache.cassandra.streaming.StreamReader;
 import org.apache.cassandra.streaming.StreamSession;
 import org.apache.cassandra.streaming.compress.CompressedStreamReader;
@@ -39,13 +43,19 @@ import static org.apache.cassandra.utils.Throwables.extractIOExceptionCause;
  */
 public class IncomingFileMessage extends StreamMessage
 {
-    public static Serializer<IncomingFileMessage> serializer = new Serializer<IncomingFileMessage>()
+    public static Serializer<StreamMessage> serializer = new Serializer<StreamMessage>()
     {
         @SuppressWarnings("resource")
-        public IncomingFileMessage deserialize(ReadableByteChannel in, int version, StreamSession session) throws IOException
+        public StreamMessage deserialize(ReadableByteChannel in, int version, StreamSession session) throws IOException
         {
             DataInputPlus input = new DataInputStreamPlus(Channels.newInputStream(in));
             FileMessageHeader header = FileMessageHeader.serializer.deserialize(input, version);
+
+            if (RocksDBStreamUtils.isRocksDBBacked(header.cfId))
+            {
+                return deserializeForRocksandra(in, session, header);
+            }
+
             StreamReader reader = !header.isCompressed() ? new StreamReader(header, session)
                     : new CompressedStreamReader(header, session);
 
@@ -60,7 +70,25 @@ public class IncomingFileMessage extends StreamMessage
             }
         }
 
-        public void serialize(IncomingFileMessage message, DataOutputStreamPlus out, int version, StreamSession session) throws IOException
+        private StreamMessage deserializeForRocksandra(ReadableByteChannel in, StreamSession session, FileMessageHeader header) throws IOException
+        {
+            if (!header.isCompressed()) {
+                throw new UnsupportedOperationException("Only support compressed streaming for Rocksandra");
+            }
+            try
+            {
+                RocksDBCassandraStreamReader reader = new RocksDBCassandraStreamReader(header, session);
+                reader.read(in);
+                return new RocksDBIncomingMessage(new RocksDBMessageHeader(header), reader.totalSize());
+            }
+            catch (Throwable t)
+            {
+                JVMStabilityInspector.inspectThrowable(t);
+                throw t;
+            }
+        }
+
+        public void serialize(StreamMessage message, DataOutputStreamPlus out, int version, StreamSession session) throws IOException
         {
             throw new UnsupportedOperationException("Not allowed to call serialize on an incoming file");
         }

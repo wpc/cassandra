@@ -25,6 +25,7 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
+import org.apache.cassandra.streaming.messages.FileMessageHeader;
 
 public class RocksDBMessageHeader
 {
@@ -35,16 +36,23 @@ public class RocksDBMessageHeader
     public final long estimatedKeys;
     public final int numShard;
 
-    public RocksDBMessageHeader(UUID cfId, int sequenceNumber) {
+    public RocksDBMessageHeader(UUID cfId, int sequenceNumber)
+    {
         this(cfId, sequenceNumber, 0, 0);
     }
 
-    public RocksDBMessageHeader(UUID cfId, int sequenceNumber, long estimatedBytes, long estimatedKeys) {
+    public RocksDBMessageHeader(UUID cfId, int sequenceNumber, long estimatedBytes, long estimatedKeys)
+    {
         this.cfId = cfId;
         this.sequenceNumber = sequenceNumber;
         this.estimatedBytes = estimatedBytes;
         this.estimatedKeys = estimatedKeys;
         this.numShard = RocksDBConfigs.NUM_SHARD;
+    }
+
+    public RocksDBMessageHeader(FileMessageHeader header)
+    {
+        this(header.cfId, header.sequenceNumber, 0, header.estimatedKeys);
     }
 
     @Override
@@ -79,6 +87,7 @@ public class RocksDBMessageHeader
     static class RocksDBMessageHeaderSerializer
     {
         public static final int CURRENT_STREAMING_SCHEMA_VERSION = 0;
+
         public void seriliaze(RocksDBMessageHeader header, DataOutputPlus out) throws IOException
         {
             out.writeInt(CURRENT_STREAMING_SCHEMA_VERSION);
@@ -92,7 +101,8 @@ public class RocksDBMessageHeader
         public RocksDBMessageHeader deserialize(DataInputPlus in) throws IOException
         {
             int streamingSchemaVersion = in.readInt();
-            if(streamingSchemaVersion != CURRENT_STREAMING_SCHEMA_VERSION) {
+            if (streamingSchemaVersion != CURRENT_STREAMING_SCHEMA_VERSION)
+            {
                 throw new RocksDBStreamingScheamVersionMismatchException(streamingSchemaVersion, CURRENT_STREAMING_SCHEMA_VERSION);
             }
             UUID cfId = org.apache.cassandra.utils.UUIDSerializer.serializer.deserialize(in, MessagingService.current_version);
@@ -105,7 +115,5 @@ public class RocksDBMessageHeader
                 throw new StreamingShardMismatchException(header, numShard, RocksDBConfigs.NUM_SHARD);
             return header;
         }
-
     }
-
 }

@@ -20,15 +20,24 @@ package org.apache.cassandra.rocksdb.streaming;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.DeletionTime;
+import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.Unfiltered;
+import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.rocksdb.RocksCFName;
 import org.apache.cassandra.rocksdb.RocksDBConfigs;
-import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.rocksdb.RocksDBEngine;
+import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
+import org.apache.cassandra.rocksdb.encoding.value.RowValueEncoder;
+import org.apache.cassandra.utils.FBUtilities;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
@@ -48,6 +57,7 @@ public class RocksDBSStableWriter implements AutoCloseable
     private long currentSstableSize;
     private volatile long incomingBytes;
     private volatile int sstableIngested;
+    private byte[] lastWrittenKeyAfterIngestion = null;
 
     public RocksDBSStableWriter(UUID cfId, int shardId, RocksCFName rocksCFName)
     {
@@ -66,7 +76,7 @@ public class RocksDBSStableWriter implements AutoCloseable
 
     private synchronized void createSstable() throws IOException, RocksDBException
     {
-        sstable = File.createTempFile(cfId.toString(), ".sst", RocksDBConfigs.STREAMING_TMPFILE_PATH);
+        sstable = File.createTempFile(cfId.toString() + "_" + shardId + "_", ".sst", RocksDBConfigs.STREAMING_TMPFILE_PATH);
         sstable.deleteOnExit();
         sstableWriter = new SstFileWriter(envOptions, options);
         sstableWriter.open(sstable.getAbsolutePath());
@@ -85,8 +95,10 @@ public class RocksDBSStableWriter implements AutoCloseable
             {
                 sstableIngested += 1;
                 RocksDBStreamUtils.ingestRocksSstable(cfId, shardId, sstable.getAbsolutePath(), rocksCFName);
+                lastWrittenKeyAfterIngestion = null;
             }
-        } finally
+        }
+        finally
         {
             if (sstableWriter != null)
                 sstableWriter.close();
@@ -102,14 +114,52 @@ public class RocksDBSStableWriter implements AutoCloseable
 
     public synchronized void write(byte[] key, byte[] value) throws IOException, RocksDBException
     {
+        // While streaming from Cassandra storage engine, the data might be out of order
+        // whereas Rocksdb sstable writer can only support ordered pairs in one sstable.
+        if (lastWrittenKeyAfterIngestion != null && FBUtilities.compareUnsigned(lastWrittenKeyAfterIngestion, key) >= 0)
+            IngestSstable();
+
+        if (currentSstableSize >= RocksDBConfigs.SSTABLE_INGEST_THRESHOLD)
+            IngestSstable();
+
         if (sstableWriter == null)
             createSstable();
         sstableWriter.merge(key, value);
 
+        lastWrittenKeyAfterIngestion = key;
         currentSstableSize += key.length + value.length;
         incomingBytes += key.length + value.length + RocksDBStreamUtils.MORE.length + Integer.BYTES * 2;
-        if (currentSstableSize >= RocksDBConfigs.SSTABLE_INGEST_THRESHOLD)
-            IngestSstable();
+    }
+
+    public synchronized void writePartition(UnfilteredRowIterator iterator) throws IOException, RocksDBException
+    {
+        DecoratedKey key = iterator.partitionKey();
+
+        if (key.getKey().remaining() > FBUtilities.MAX_UNSIGNED_SHORT)
+        {
+            LOGGER.error("Key size {} exceeds maximum of {}, skipping row", key.getKey().remaining(), FBUtilities.MAX_UNSIGNED_SHORT);
+            return;
+        }
+
+        if (iterator.isEmpty())
+            return;
+
+        DecoratedKey partitionKey = iterator.partitionKey();
+        CFMetaData metaData = iterator.metadata();
+        if(!iterator.partitionLevelDeletion().isLive())
+        {
+            throw new UnsupportedOperationException("Partition delete import from sstableloader is not supported yet");
+        }
+        while (iterator.hasNext())
+        {
+            Unfiltered unfiltered = iterator.next();
+            if (unfiltered.kind() == Unfiltered.Kind.RANGE_TOMBSTONE_MARKER)
+            {
+                throw new UnsupportedOperationException("Range Tombstone is not supported during streaming, halt the streaming.");
+            }
+            Row row = (Row) unfiltered;
+            write(RowKeyEncoder.encode(partitionKey, row.clustering(), metaData), RowValueEncoder.encode(metaData, row));
+        }
     }
 
     public synchronized void close() throws IOException
@@ -135,7 +185,9 @@ public class RocksDBSStableWriter implements AutoCloseable
         {
             close();
         }
-        catch (IOException re) {}
+        catch (IOException re)
+        {
+        }
         return e;
     }
 
@@ -148,5 +200,4 @@ public class RocksDBSStableWriter implements AutoCloseable
     {
         return sstableIngested;
     }
-
 }
