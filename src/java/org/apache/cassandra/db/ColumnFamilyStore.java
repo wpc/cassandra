@@ -432,10 +432,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             this.compactionStrategyManager.disable();
         }
 
-        // create the private ColumnFamilyStores for the secondary column indexes
-        for (IndexMetadata info : metadata.getIndexes())
-            indexManager.addIndex(info);
-
         if (registerBookkeeping)
         {
             // register the mbean
@@ -491,6 +487,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         {
             engine.openColumnFamilyStore(this);
         }
+
+        for (IndexMetadata info : metadata.getIndexes())
+            indexManager.addIndex(info);
     }
 
     public Directories getDirectories()
