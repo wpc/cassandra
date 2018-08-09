@@ -279,7 +279,7 @@ public class RocksDBCF implements RocksDBCFMBean
         dbhandle.merge(rocksCFName, key, value, transaction);
     }
 
-    private int getShardIdForKey(DecoratedKey partitionKey)
+    public int getShardIdForKey(DecoratedKey partitionKey)
     {
         return shardIDForToken(partitionKey.getToken());
     }

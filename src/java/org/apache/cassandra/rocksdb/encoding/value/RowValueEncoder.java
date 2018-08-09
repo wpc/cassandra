@@ -108,10 +108,6 @@ public class RowValueEncoder
 
     private static void encodeColumn(byte index, Cell cell, ByteBuffer dest)
     {
-        if (LOGGER.isDebugEnabled())
-        {
-            LOGGER.debug("Writing cell: " + RocksDBStreamUtils.toString(cell));
-        }
         if (cell.isTombstone())
         {
             TombstoneEncoder.encode(index, cell, dest);

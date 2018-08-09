@@ -222,4 +222,9 @@ public class RocksDBStreamUtils
         RocksDBProgressInfo progress = new RocksDBProgressInfo(session.peer, session.getSessionInfo().sessionIndex, fileName, direction, bytes, keys, estimatedTotalKeys, completed);
         session.progress(progress);
     }
+
+    public static boolean isRocksDBBacked(UUID cfId)
+    {
+        return getColumnFamilyStore(cfId).isRocksDBBacked();
+    }
 }

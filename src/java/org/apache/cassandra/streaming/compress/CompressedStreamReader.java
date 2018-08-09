@@ -81,7 +81,7 @@ public class CompressedStreamReader extends StreamReader
                      session.planId(), fileSeqNum, session.peer, repairedAt, totalSize, cfs.keyspace.getName(),
                      cfs.getColumnFamilyName());
 
-        CompressedInputStream cis = new CompressedInputStream(Channels.newInputStream(channel), compressionInfo,
+         CompressedInputStream cis = new CompressedInputStream(Channels.newInputStream(channel), compressionInfo,
                                                               inputVersion.compressedChecksumType(), cfs::getCrcCheckChance);
         TrackedInputStream in = new TrackedInputStream(cis);
 

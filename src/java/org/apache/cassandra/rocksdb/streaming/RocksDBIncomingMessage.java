@@ -64,7 +64,7 @@ public class RocksDBIncomingMessage extends StreamMessage
 
     public final RocksDBMessageHeader header;
     public final long totalIncomingBytes;
-    protected RocksDBIncomingMessage(RocksDBMessageHeader header, long totalIncomingBytes)
+    public RocksDBIncomingMessage(RocksDBMessageHeader header, long totalIncomingBytes)
     {
         super(Type.ROCKSFILE);
         this.header = header;
