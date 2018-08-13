@@ -145,7 +145,7 @@ public class RowIteratorSanityCheck
             if (!cassandraRows.containsKey(c))
             {
                 Row rocksdbRow = rocksdbRows.get(c);
-                if (rocksdbRow.hasLiveData(nowInSecond))
+                if (rocksdbRow.hasLiveData(nowInSecond, metaData.enforceStrictLiveness()))
                 {
                     cassandraMissingRows++;
                     match = false;
@@ -160,7 +160,7 @@ public class RowIteratorSanityCheck
             else if (!rocksdbRows.containsKey(c))
             {
                 Row cassandraRow = cassandraRows.get(c);
-                if (cassandraRow.hasLiveData(nowInSecond))
+                if (cassandraRow.hasLiveData(nowInSecond, metaData.enforceStrictLiveness()))
                 {
                     rocksDBMissingRows++;
                     match = false;
