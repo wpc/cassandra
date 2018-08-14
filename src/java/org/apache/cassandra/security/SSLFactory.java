@@ -61,7 +61,6 @@ public final class SSLFactory
 
     public static SSLServerSocket getServerSocket(EncryptionOptions options, InetAddress address, int port) throws IOException
     {
-        Security.addProvider(new OpenSSLProvider());
         SSLContext ctx = createSSLContext(options, true);
         SSLServerSocket serverSocket = (SSLServerSocket) ctx.getServerSocketFactory().createServerSocket();
         try
@@ -141,6 +140,7 @@ public final class SSLFactory
     @SuppressWarnings("resource")
     public static SSLContext createSSLContext(EncryptionOptions options, boolean buildTruststore) throws IOException
     {
+        Security.addProvider(new OpenSSLProvider());
         FileInputStream tsf = null;
         FileInputStream ksf = null;
         SSLContext ctx;
