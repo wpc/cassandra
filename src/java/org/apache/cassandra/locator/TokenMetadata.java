@@ -53,7 +53,7 @@ public class TokenMetadata
      * Each Token is associated with exactly one Address, but each Address may have
      * multiple tokens.  Hence, the BiMultiValMap collection.
      */
-    private final BiMultiValMap<Token, InetAddress> tokenToEndpointMap;
+    private final SortedBiMultiValMap<Token, InetAddress> tokenToEndpointMap;
 
     /** Maintains endpoint to host ID map of every node in the cluster */
     private final BiMap<InetAddress, UUID> endpointToHostIdMap;
@@ -120,7 +120,7 @@ public class TokenMetadata
              DatabaseDescriptor.getPartitioner());
     }
 
-    private TokenMetadata(BiMultiValMap<Token, InetAddress> tokenToEndpointMap, BiMap<InetAddress, UUID> endpointsMap, Topology topology, IPartitioner partitioner)
+    private TokenMetadata(SortedBiMultiValMap<Token, InetAddress> tokenToEndpointMap, BiMap<InetAddress, UUID> endpointsMap, Topology topology, IPartitioner partitioner)
     {
         this.tokenToEndpointMap = tokenToEndpointMap;
         this.topology = topology;
@@ -361,7 +361,7 @@ public class TokenMetadata
         lock.writeLock().lock();
         try
         {
-            Collection<Token> oldNodeTokens = tokenToEndpointMap.inverse().get(oldNode);
+            Collection<Token> oldNodeTokens = tokenToEndpointMap.inverseGet(oldNode);
             if (!replacingTokens.containsAll(oldNodeTokens) || !oldNodeTokens.containsAll(replacingTokens))
             {
                 throw new RuntimeException(String.format("Node %s is trying to replace node %s with tokens %s with a " +
@@ -542,7 +542,7 @@ public class TokenMetadata
         lock.readLock().lock();
         try
         {
-            return new ArrayList<>(tokenToEndpointMap.inverse().get(endpoint));
+            return new ArrayList<>(tokenToEndpointMap.inverseGet(endpoint));
         }
         finally
         {
@@ -563,7 +563,7 @@ public class TokenMetadata
         lock.readLock().lock();
         try
         {
-            return tokenToEndpointMap.inverse().containsKey(endpoint);
+            return tokenToEndpointMap.containsValue(endpoint);
         }
         finally
         {
@@ -619,7 +619,7 @@ public class TokenMetadata
         lock.readLock().lock();
         try
         {
-            return new TokenMetadata(SortedBiMultiValMap.create(tokenToEndpointMap, null, inetaddressCmp),
+            return new TokenMetadata(SortedBiMultiValMap.create(tokenToEndpointMap),
                                      HashBiMap.create(endpointToHostIdMap),
                                      new Topology(topology),
                                      partitioner);
@@ -894,10 +894,9 @@ public class TokenMetadata
 
         // For each of the bootstrapping nodes, simply add and remove them one by one to
         // allLeftMetadata and check in between what their ranges would be.
-        Multimap<InetAddress, Token> bootstrapAddresses = bootstrapTokens.inverse();
-        for (InetAddress endpoint : bootstrapAddresses.keySet())
+        for (InetAddress endpoint : bootstrapTokens.valueSet())
         {
-            Collection<Token> tokens = bootstrapAddresses.get(endpoint);
+            Collection<Token> tokens = bootstrapTokens.inverseGet(endpoint);
 
             allLeftMetadata.updateNormalTokens(tokens, endpoint);
             for (Range<Token> range : strategy.getAddressRanges(allLeftMetadata).get(endpoint))
@@ -1120,7 +1119,7 @@ public class TokenMetadata
         lock.readLock().lock();
         try
         {
-            Set<InetAddress> eps = tokenToEndpointMap.inverse().keySet();
+            Set<InetAddress> eps = tokenToEndpointMap.valueSet();
 
             if (!eps.isEmpty())
             {
@@ -1130,7 +1129,7 @@ public class TokenMetadata
                 {
                     sb.append(ep);
                     sb.append(':');
-                    sb.append(tokenToEndpointMap.inverse().get(ep));
+                    sb.append(tokenToEndpointMap.inverseGet(ep));
                     sb.append(System.getProperty("line.separator"));
                 }
             }
@@ -1329,7 +1328,7 @@ public class TokenMetadata
             dcEndpoints.put(dc, ep);
 
             if (!dcRacks.containsKey(dc))
-                dcRacks.put(dc, HashMultimap.<String, InetAddress>create());
+                dcRacks.put(dc, HashMultimap.create());
             dcRacks.get(dc).put(rack, ep);
 
             currentLocations.put(ep, Pair.create(dc, rack));

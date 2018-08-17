@@ -18,58 +18,43 @@
 package org.apache.cassandra.utils;
 
 import java.util.Comparator;
+import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
-import com.google.common.collect.SortedSetMultimap;
-import com.google.common.collect.TreeMultimap;
+import java.util.TreeSet;
 
 public class SortedBiMultiValMap<K, V> extends BiMultiValMap<K, V>
 {
-    protected SortedBiMultiValMap(SortedMap<K, V> forwardMap, SortedSetMultimap<V, K> reverseMap)
-    {
-        super(forwardMap, reverseMap);
-    }
+    private static final Comparator defaultComparator = (o1, o2) -> ((Comparable) o1).compareTo(o2);
 
-    public static <K extends Comparable<K>, V extends Comparable<V>> SortedBiMultiValMap<K, V> create()
-    {
-        return new SortedBiMultiValMap<K, V>(new TreeMap<K,V>(), TreeMultimap.<V, K>create());
-    }
-
-    public static <K, V> SortedBiMultiValMap<K, V> create(Comparator<K> keyComparator, Comparator<V> valueComparator)
+    public static <K, V> SortedBiMultiValMap<K, V> create(Comparator<? super K> keyComparator, Comparator<? super V> valueComparator)
     {
         if (keyComparator == null)
-            keyComparator = defaultComparator();
+            keyComparator = defaultComparator;
         if (valueComparator == null)
-            valueComparator = defaultComparator();
-        return new SortedBiMultiValMap<K, V>(new TreeMap<K,V>(keyComparator), TreeMultimap.<V, K>create(valueComparator, keyComparator));
+            valueComparator = defaultComparator;
+        return new SortedBiMultiValMap<>(new TreeMap<>(keyComparator), new TreeMap<>(valueComparator));
     }
 
-    public static <K extends Comparable<K>, V extends Comparable<V>> SortedBiMultiValMap<K, V> create(BiMultiValMap<K, V> map)
+    public static <K, V> SortedBiMultiValMap<K, V> create(SortedBiMultiValMap<K, V> map)
     {
-        SortedBiMultiValMap<K, V> newMap = SortedBiMultiValMap.<K,V>create();
-        newMap.forwardMap.putAll(map);
-        newMap.reverseMap.putAll(map.inverse());
-        return newMap;
-    }
-
-    public static <K, V> SortedBiMultiValMap<K, V> create(BiMultiValMap<K, V> map, Comparator<K> keyComparator, Comparator<V> valueComparator)
-    {
-        SortedBiMultiValMap<K, V> newMap = create(keyComparator, valueComparator);
-        newMap.forwardMap.putAll(map);
-        newMap.reverseMap.putAll(map.inverse());
-        return newMap;
-    }
-
-    private static <T> Comparator<T> defaultComparator()
-    {
-        return new Comparator<T>()
+        Comparator<? super K> keyComparator = ((SortedMap<K, V>) (map.forwardMap)).comparator();
+        Comparator<? super V> valueComparator = ((SortedMap<V, K>) (map.reverseMap)).comparator();
+        SortedBiMultiValMap<K, V> instance = SortedBiMultiValMap.create(keyComparator, valueComparator);
+        instance.forwardMap.putAll(map.forwardMap);
+        for (Entry<V, Set<K>> entry : map.reverseMap.entrySet())
         {
-            @SuppressWarnings("unchecked")
-            public int compare(T o1, T o2)
-            {
-                return ((Comparable<T>) o1).compareTo(o2);
-            }
-        };
+            TreeSet<K> ks = new TreeSet<>(keyComparator);
+            ks.addAll(entry.getValue());
+            instance.reverseMap.put(entry.getKey(), ks);
+        }
+
+        return instance;
+    }
+
+    private SortedBiMultiValMap(Map<K, V> forwardMap, Map<V, Set<K>> reverseMap)
+    {
+        super(forwardMap, reverseMap);
     }
 }
