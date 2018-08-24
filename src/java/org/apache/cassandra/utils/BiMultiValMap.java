@@ -18,16 +18,16 @@
 package org.apache.cassandra.utils;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.SortedSet;
-import java.util.TreeSet;
+
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 
 /**
+ *
  * A variant of BiMap which does not enforce uniqueness of values. This means the inverse
  * is a Multimap.  (But the "forward" view is not a multimap; keys may only each have one value.)
  *
@@ -36,18 +36,16 @@ import java.util.TreeSet;
  */
 public class BiMultiValMap<K, V> implements Map<K, V>
 {
-    private static final int DEFAULT_VALUES_PER_KEY = 2;
-
     protected final Map<K, V> forwardMap;
-    protected final Map<V, Set<K>> reverseMap;
+    protected final Multimap<V, K> reverseMap;
 
     public BiMultiValMap()
     {
-        this.forwardMap = new HashMap<>();
-        this.reverseMap = new HashMap<>();
+        this.forwardMap = new HashMap<K, V>();
+        this.reverseMap = HashMultimap.<V, K>create();
     }
 
-    protected BiMultiValMap(Map<K, V> forwardMap, Map<V, Set<K>> reverseMap)
+    protected BiMultiValMap(Map<K, V> forwardMap, Multimap<V, K> reverseMap)
     {
         this.forwardMap = forwardMap;
         this.reverseMap = reverseMap;
@@ -56,32 +54,13 @@ public class BiMultiValMap<K, V> implements Map<K, V>
     public BiMultiValMap(BiMultiValMap<K, V> map)
     {
         this();
-        forwardMap.putAll(map.forwardMap);
-        // make sure Set in the reverse map is recreated
-        for (Entry<V, Set<K>> entry : map.reverseMap.entrySet())
-        {
-            reverseMap.put(entry.getKey(), createSet(entry.getValue()));
-        }
+        forwardMap.putAll(map);
+        reverseMap.putAll(map.inverse());
     }
 
-    private Set<K> createSet(Set<K> source)
+    public Multimap<V, K> inverse()
     {
-        if (forwardMap instanceof SortedMap)
-        {
-            TreeSet<K> set = new TreeSet<>(((SortedMap<K, V>) forwardMap).comparator());
-            set.addAll(source);
-            return set;
-        }
-
-        return new HashSet<>(source);
-    }
-
-    private Set<K> createSet()
-    {
-        if (forwardMap instanceof SortedMap)
-            return new TreeSet<>(((SortedMap<K, V>) forwardMap).comparator());
-
-        return new HashSet<>(DEFAULT_VALUES_PER_KEY);
+        return Multimaps.unmodifiableMultimap(reverseMap);
     }
 
     public void clear()
@@ -117,27 +96,15 @@ public class BiMultiValMap<K, V> implements Map<K, V>
 
     public Set<K> keySet()
     {
-        return Collections.unmodifiableSet(forwardMap.keySet());
+        return forwardMap.keySet();
     }
 
     public V put(K key, V value)
     {
         V oldVal = forwardMap.put(key, value);
         if (oldVal != null)
-        {
-            Set<K> keys = reverseMap.get(oldVal);
-            if (keys != null)
-            {
-                keys.remove(key);
-            }
-        }
-        Set<K> keys = reverseMap.get(value);
-        if (keys == null)
-        {
-            keys = createSet();
-            reverseMap.put(value, keys);
-        }
-        keys.add(key);
+            reverseMap.remove(oldVal, key);
+        reverseMap.put(value, key);
         return oldVal;
     }
 
@@ -150,22 +117,16 @@ public class BiMultiValMap<K, V> implements Map<K, V>
     public V remove(Object key)
     {
         V oldVal = forwardMap.remove(key);
-        Set<K> keys = reverseMap.get(oldVal);
-        if (keys != null)
-            keys.remove(key);
+        reverseMap.remove(oldVal, key);
         return oldVal;
     }
 
     public Collection<K> removeValue(V value)
     {
-        Set<K> keys = reverseMap.remove(value);
-        if (keys == null)
-        {
-            return Collections.emptySet();
-        }
+        Collection<K> keys = reverseMap.removeAll(value);
         for (K key : keys)
             forwardMap.remove(key);
-        return Collections.unmodifiableSet(keys);
+        return keys;
     }
 
     public int size()
@@ -175,21 +136,11 @@ public class BiMultiValMap<K, V> implements Map<K, V>
 
     public Collection<V> values()
     {
-        return forwardMap.values();
+        return reverseMap.keys();
     }
 
-    public Set<V> valueSet()
+    public Collection<V> valueSet()
     {
-        return Collections.unmodifiableSet(reverseMap.keySet());
-    }
-
-    public Collection<K> inverseGet(V value)
-    {
-        Set<K> keys = reverseMap.get(value);
-        if (keys == null)
-        {
-            return Collections.emptySet();
-        }
-        return Collections.unmodifiableSet(keys);
+        return reverseMap.keySet();
     }
 }
