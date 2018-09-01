@@ -156,7 +156,7 @@ public class RocksDBPartition implements Partition
     {
         byte[] partitionKeyBytes = RowKeyEncoder.encode(partitionKey, metadata);
 
-        RocksDBIteratorAdapter rocksIterator = db.newIterator(partitionKey);
+        RocksDBIteratorAdapter rocksIterator = metadata.isIndex() ? db.newIterator(RocksCFName.INDEX, partitionKey) : db.newIterator(partitionKey);
 
         iterOrder.seekToStart(rocksIterator, partitionKey, partitionKeyBytes, slice, metadata);
 

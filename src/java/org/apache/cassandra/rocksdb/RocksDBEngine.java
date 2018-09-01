@@ -58,6 +58,7 @@ import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.exceptions.StorageEngineException;
+import org.apache.cassandra.index.SecondaryIndexManager;
 import org.apache.cassandra.index.transactions.UpdateTransaction;
 import org.apache.cassandra.metrics.SecondaryIndexMetrics;
 import org.apache.cassandra.rocksdb.encoding.PartitionMetaEncoder;
@@ -121,7 +122,7 @@ public class RocksDBEngine implements StorageEngine
     public void openColumnFamilyStore(ColumnFamilyStore cfs)
     {
         Pair<UUID, String> key = new Pair<>(cfs.metadata.cfId, cfs.name);
-        if(rocksDBFamily.containsKey(key)) {
+        if(rocksDBFamily.containsKey(key) || cfs.isIndex()) {
             return;
         }
         try
@@ -164,7 +165,7 @@ public class RocksDBEngine implements StorageEngine
 
         try
         {
-            rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)).merge(RocksCFName.META, partitionKey, rocksDBKey, rocksDBValue);
+            getRocksDBCFOfParent(cfs).merge(RocksCFName.META, partitionKey, rocksDBKey, rocksDBValue);
         }
         catch (RocksDBException e)
         {
@@ -175,7 +176,7 @@ public class RocksDBEngine implements StorageEngine
 
     public UnfilteredRowIterator queryStorage(ColumnFamilyStore cfs, SinglePartitionReadCommand readCommand)
     {
-        Partition partition = new RocksDBPartition(rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)),
+        Partition partition = new RocksDBPartition(getRocksDBCFOfParent(cfs),
                                                    readCommand.partitionKey(),
                                                    readCommand.metadata());
         return readCommand.clusteringIndexFilter().getUnfilteredRowIterator(readCommand.columnFilter(), partition);
@@ -271,20 +272,38 @@ public class RocksDBEngine implements StorageEngine
         byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, clustering, cfs.metadata);
         byte[] rocksDBValue = RowValueEncoder.encode(cfs.metadata, row);
 
+        Transaction transaction = null;
+        Boolean safeToCommit = true;
         try
         {
             indexer.start();
-            rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name)).merge(partitionKey, rocksDBKey, rocksDBValue);
+
+            if (cfs.isIndex())
+            {
+                secondaryIndexMetrics.rsiTotalInsertions.inc();
+                transaction = ((RocksandraClusteringColumnIndex.IndexUpdateTransaction)indexer).getTransaction();
+                if (transaction != null)
+                {
+                    getRocksDBCFOfParent(cfs).merge(RocksCFName.INDEX, partitionKey, rocksDBKey, rocksDBValue, transaction);
+                }
+                else
+                {
+                    getRocksDBCFOfParent(cfs).merge(RocksCFName.INDEX, partitionKey, rocksDBKey, rocksDBValue);
+                }
+            }
+            else
+            {
+                getRocksDBCF(cfs).merge(partitionKey, rocksDBKey, rocksDBValue);
+            }
+
             if (indexer != UpdateTransaction.NO_OP)
             {
                 try
                 {
-                    secondaryIndexMetrics.rsiTotalInsertions.inc();
                     indexer.onInserted(row);
                 }
                 catch (RuntimeException e)
                 {
-                    secondaryIndexMetrics.rsiInsertionFailures.inc();
                     logger.error(e.toString(), e);
                     throw new StorageEngineException("Index update failed", e);
                 }
@@ -293,12 +312,39 @@ public class RocksDBEngine implements StorageEngine
         catch (RocksDBException e)
         {
             logger.error(e.toString(), e);
+            if (cfs.isIndex())
+            {
+                secondaryIndexMetrics.rsiInsertionFailures.inc();
+                if (transaction != null)
+                {
+                    try
+                    {
+                        transaction.rollback();
+                    }
+                    catch (RocksDBException error)
+                    {
+                        safeToCommit = false;
+                        logger.error(error.toString(), error);
+                    }
+                }
+            }
             throw new StorageEngineException("Row merge failed", e);
         }
         finally
         {
-            indexer.commit();
+            if (safeToCommit)
+            {
+                indexer.commit();
+            }
         }
+    }
+
+    private RocksDBCF getRocksDBCFOfParent(ColumnFamilyStore cfs)
+    {
+        if (cfs.isIndex()) {
+            cfs = SecondaryIndexManager.getParentCfs(cfs);
+        }
+        return getRocksDBCF(cfs);
     }
 
     public static RocksDBCF getRocksDBCF(UUID cfId)
@@ -327,7 +373,7 @@ public class RocksDBEngine implements StorageEngine
         }
         final Collection<Range<Token>> ranges = StorageService.instance.getLocalRanges(keyspace.getName());
         final Collection<Range<Token>> completeRanges = RocksDBStreamUtils.calcluateComplementRanges(cfs.getPartitioner(), ranges);
-        RocksDBCF db = rocksDBFamily.get(new Pair<>(cfs.metadata.cfId, cfs.name));
+        RocksDBCF db = getRocksDBCFOfParent(cfs);
         for (Range range : completeRanges)
         {
             try

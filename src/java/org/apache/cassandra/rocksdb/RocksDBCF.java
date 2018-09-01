@@ -239,6 +239,11 @@ public class RocksDBCF implements RocksDBCFMBean
         return newIterator(RocksCFName.DEFAULT, partitionKey, readOptions);
     }
 
+    public RocksDBIteratorAdapter newIterator(RocksCFName rocksCFName, DecoratedKey partitionKey)
+    {
+        return newIterator(rocksCFName, partitionKey, readOptions);
+    }
+
     public RocksDBIteratorAdapter newIterator(RocksCFName rocksCFName, DecoratedKey partitionKey, ReadOptions options)
     {
         RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);

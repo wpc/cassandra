@@ -18,8 +18,6 @@
 package org.apache.cassandra.rocksdb.index;
 
 import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -48,7 +46,6 @@ import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.PartitionColumns;
 import org.apache.cassandra.db.RangeTombstone;
 import org.apache.cassandra.db.ReadCommand;
-import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.partitions.PartitionIterator;
@@ -420,6 +417,7 @@ public class RocksandraClusteringColumnIndex implements Index
                                                                cell));
         Row row = BTreeRow.noCellLiveRow(buildIndexClustering(rowKey, clustering, cell), info);
         PartitionUpdate upd = partitionUpdate(valueKey, row);
+        assert baseCfs.keyspace.engine != null;
         indexCfs.keyspace.engineApply(indexCfs, upd, UpdateTransaction.NO_OP, opGroup, null, false);
         logger.trace("Inserted entry into index for value {}", valueKey);
     }
