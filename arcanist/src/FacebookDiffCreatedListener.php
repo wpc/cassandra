@@ -58,16 +58,19 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
 
     $job = array(
       'command' => 'SandcastleUniversalCommand',
-      'command-args' => $cmd_args,
-      'vcs' => 'ig-cassandra-git',
+      'args' => $cmd_args,
+      'capabilities' => array(
+        'vcs' => 'ig-cassandra-git',
+        'type' => 'lego',
+      ),
       'diff' => $diffID,
-      'type' => 'lego',
-      'alias' => 'ig-cassandra-build',
-      );
+      'alias' => 'ig-cassandra-test',
+      'source' => 'arc',
+    );
 
     $sandcastle = new ArcanistSandcastleClient($event->getValue('workflow'));
     $sandcastle->createBundle();
-    $sandcastle->enqueue($job);
+    $sandcastle->send($job);
   }
 
 }
