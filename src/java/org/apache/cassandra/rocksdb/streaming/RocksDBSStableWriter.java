@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
-import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
@@ -148,7 +147,7 @@ public class RocksDBSStableWriter implements AutoCloseable
         CFMetaData metaData = iterator.metadata();
         if(!iterator.partitionLevelDeletion().isLive())
         {
-            throw new UnsupportedOperationException("Partition delete import from sstableloader is not supported yet");
+            applyPartitionDeleteDirectly(iterator);
         }
         while (iterator.hasNext())
         {
@@ -160,6 +159,13 @@ public class RocksDBSStableWriter implements AutoCloseable
             Row row = (Row) unfiltered;
             write(RowKeyEncoder.encode(partitionKey, row.clustering(), metaData), RowValueEncoder.encode(metaData, row));
         }
+    }
+
+    private void applyPartitionDeleteDirectly(UnfilteredRowIterator iterator)
+    {
+        ColumnFamilyStore cfs = RocksDBStreamUtils.getColumnFamilyStore(cfId);
+        RocksDBEngine engine = (RocksDBEngine) cfs.engine;
+        engine.applyPartitionLevelDeletionToRocksdb(cfs, iterator.partitionKey(), iterator.partitionLevelDeletion());
     }
 
     public synchronized void close() throws IOException

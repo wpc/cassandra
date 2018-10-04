@@ -160,7 +160,7 @@ public class RocksDBEngine implements StorageEngine
         }
     }
 
-    private void applyPartitionLevelDeletionToRocksdb(ColumnFamilyStore cfs, DecoratedKey partitionKey, DeletionTime partitionLevelDeletion)
+    public void applyPartitionLevelDeletionToRocksdb(ColumnFamilyStore cfs, DecoratedKey partitionKey, DeletionTime partitionLevelDeletion)
     {
         byte[] rocksDBKey = RowKeyEncoder.encode(partitionKey, cfs.metadata);
         byte[] rocksDBValue = PartitionMetaEncoder.encodePartitionLevelDeletion(partitionLevelDeletion);
