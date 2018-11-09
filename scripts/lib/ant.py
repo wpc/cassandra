@@ -21,7 +21,9 @@ def run_ant_target(target_name, options=[]):
     env = os.environ.copy()
     if USE_PROXY:
         env['ANT_OPTS'] = ('-Dhttp.proxyHost=fwdproxy -Dhttp.proxyPort=8080 -Djava.net.preferIPv6Addresses=true ' +
-                           '-Dhttps.proxyHost=fwdproxy -Dhttps.proxyPort=8080')
+                           '-Dhttps.proxyHost=fwdproxy -Dhttps.proxyPort=8080 ' +
+                           '-Dhttp.nonProxyHosts=*.facebook.com\|*.tfbnw.net\|*.fb.com\|*.thefacebook.com ' +
+                           '-Dhttps.nonProxyHosts=*.facebook.com\|*.tfbnw.net\|*.fb.com\|*.thefacebook.com')
     # Redirect subprocess's stdout to stderr, so that we could write formatted result to stdout.
     subprocess.check_call(['ant', '-f', BUILD_FILE, target_name] + options,
                             cwd=PROJECT_ROOT, env=env, stdout=sys.stderr)
