@@ -30,6 +30,7 @@ import org.apache.cassandra.metrics.RocksDBTableMetrics;
 import org.apache.cassandra.rocksdb.encoding.RowKeyEncoder;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.CassandraCompactionFilter;
+import org.rocksdb.CassandraPartitionMetaData;
 import org.rocksdb.CassandraPartitionMetaMergeOperator;
 import org.rocksdb.CassandraValueMergeOperator;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -64,6 +65,7 @@ public class RocksDBInstanceHandle
     private final ColumnFamilyHandle dataCfHandle;
     private final ColumnFamilyHandle indexCfHandle;
     private final CassandraCompactionFilter compactionFilter;
+    private final CassandraPartitionMetaData partitionMetaData;
 
     private FlushOptions flushOptions = new FlushOptions().setWaitForFlush(true);
 
@@ -82,7 +84,7 @@ public class RocksDBInstanceHandle
         partitionMetaMergeOperator = new CassandraPartitionMetaMergeOperator();
 
         // holding reference avoid compaction filter instance get gc
-        this.compactionFilter = createCassandraCompactionFilter(cfs, purgeTtlOnExpiration, gcGraceSeconds);
+        this.compactionFilter = new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
 
         DBOptions dbOptions = new DBOptions();
         SstFileManager sstFileManager = new SstFileManager(Env.getDefault());
@@ -180,29 +182,22 @@ public class RocksDBInstanceHandle
         this.dataCfHandle = columnFamilyHandles.get(0);
         this.metaCfHandle = columnFamilyHandles.get(1);
         this.indexCfHandle = columnFamilyHandles.get(2);
-
-        this.compactionFilter.setMetaCfHandle(rocksDB, metaCfHandle);
+        this.partitionMetaData = new CassandraPartitionMetaData(rocksDB, metaCfHandle, getTokenLength(cfs));
+        this.compactionFilter.setPartitionMetaData(partitionMetaData);
 
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
     }
 
-    private CassandraCompactionFilter createCassandraCompactionFilter(ColumnFamilyStore cfs, boolean purgeTtlOnExpiration, int gcGraceSeconds)
+    private Integer getTokenLength(ColumnFamilyStore cfs)
     {
-        Integer partitionKeyLength = RowKeyEncoder.calculateEncodedPartitionKeyLength(cfs.metadata);
-
-        if (partitionKeyLength == null)
+        Integer tokenLength = RowKeyEncoder.getEncodedTokenLength(cfs.metadata);
+        if (tokenLength == null)
         {
-            // partition key length is not fixed, compaction filter falls back to range scan for find partition meta data.
-            return new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds);
+            throw new UnsupportedOperationException("Only fix token length partitioner is supported by Rocksandra");
         }
-        else
-        {
-            // partition key has fix length, compaction filter will use point lookup with partition key for loading
-            // parition meta data to save cpu
-            return new CassandraCompactionFilter(purgeTtlOnExpiration, true, gcGraceSeconds, partitionKeyLength);
-        }
+        return tokenLength;
     }
 
     private ColumnFamilyHandle getCfHandle(RocksCFName rocksCFName)
@@ -312,5 +307,10 @@ public class RocksDBInstanceHandle
     public Transaction beginTransaction(WriteOptions writeOptions)
     {
         return optimisticTransactionDB != null ? optimisticTransactionDB.beginTransaction(writeOptions) : null;
+    }
+
+    public void deleteParition(byte[] partitionKeyWithToken, int localDeletionTime, long markedForDeleteAt) throws RocksDBException
+    {
+        this.partitionMetaData.deletePartition(partitionKeyWithToken, localDeletionTime, markedForDeleteAt);
     }
 }

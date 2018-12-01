@@ -47,6 +47,7 @@ import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
@@ -534,6 +535,13 @@ public class RocksDBCF implements RocksDBCFMBean
     {
         RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
         return dbhandle.beginTransaction(writeOptions);
+    }
+
+    public void deletePartition(DecoratedKey partitionKey, DeletionTime partitionLevelDeletion) throws RocksDBException
+    {
+        RocksDBInstanceHandle dbhandle = getDBHandleForPartitionKey(partitionKey);
+        byte[] partitionKeyWithToken = RowKeyEncoder.encode(partitionKey, cfs.metadata);
+        dbhandle.deleteParition(partitionKeyWithToken, partitionLevelDeletion.localDeletionTime(), partitionLevelDeletion.markedForDeleteAt());
     }
 }
 
