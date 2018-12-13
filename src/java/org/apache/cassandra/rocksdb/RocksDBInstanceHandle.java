@@ -183,11 +183,39 @@ public class RocksDBInstanceHandle
         this.metaCfHandle = columnFamilyHandles.get(1);
         this.indexCfHandle = columnFamilyHandles.get(2);
         this.partitionMetaData = new CassandraPartitionMetaData(rocksDB, metaCfHandle, getTokenLength(cfs));
+        setupMetaBloomFilter(rocksDBTableDir);
         this.compactionFilter.setPartitionMetaData(partitionMetaData);
 
         logger.info("Open rocksdb instance for cf {}.{} with path:{}, gcGraceSeconds:{}, purgeTTL:{}",
                     cfs.keyspace.getName(), cfs.name, rocksDBTableDir,
                     gcGraceSeconds, purgeTtlOnExpiration);
+    }
+
+    // Setup bloom filter in PartitionMetaData to filter out none exists key effectively
+    // This generally make sense when majority of the partition key is not deleted
+    private void setupMetaBloomFilter(String rocksDBTableDir) throws RocksDBException
+    {
+        long dataNumOfKeys = Long.valueOf(rocksDB.getProperty(dataCfHandle, "rocksdb.estimate-num-keys"));
+        long metaNumOfKeys = Long.valueOf(rocksDB.getProperty(metaCfHandle, "rocksdb.estimate-num-keys"));
+        int bloomTotalBits = RocksDBConfigs.PARTITION_META_KEY_BLOOM_TOTAL_BITS;
+
+        if (dataNumOfKeys == 0)
+        {
+            logger.info("Skip partition meta bloom filter setup for {} since there is no data in data cf", rocksDBTableDir);
+            return;
+        }
+        if (metaNumOfKeys > bloomTotalBits / 10)
+        {
+            logger.info("Skip partition meta bloom filter setup for {} since there are too many partition keys with" +
+                        " meta data and bloom will not perform well. " +
+                        "Estimate number of meta keys: {}, threshold: {}",
+                        rocksDBTableDir, metaNumOfKeys, bloomTotalBits / 10);
+            return;
+        }
+        long startTime = System.currentTimeMillis();
+        partitionMetaData.enableBloomFilter(bloomTotalBits);
+        logger.info("Enabled partition meta key bloom filter for {} using {}ms, bloom_total_bits:{}",
+                    rocksDBTableDir, System.currentTimeMillis() - startTime, bloomTotalBits);
     }
 
     private Integer getTokenLength(ColumnFamilyStore cfs)
