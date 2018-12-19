@@ -452,15 +452,6 @@ public class RocksDBEngine implements StorageEngine
 
     public void forceMajorCompaction(ColumnFamilyStore cfs)
     {
-        RocksDBCF rocksDBCF = getRocksDBCF(cfs.metadata.cfId);
-        try
-        {
-            rocksDBCF.compactRange();
-        }
-        catch (RocksDBException e)
-        {
-            logger.error(e.toString(), e);
-            throw new RuntimeException(e);
-        }
+        getRocksDBCF(cfs.metadata.cfId).compactRange();
     }
 }
