@@ -20,6 +20,7 @@ public class RocksDBConfigs
 
     // Stopping writes when pending compaction reach limit, default to disabled
     public static final long HARD_PENDING_COMPACTION_BYTES_LIMIT = Long.getLong("cassandra.rocksdb.hard_pending_compaction_bytes_limit", 0);
+    public static final boolean ALLOW_INGEST_BEHINDE = Boolean.getBoolean("cassandra.rocksdb.allow_ingest_behind");
 
     // Paths for storing RocksDB files.
     public static String ROCKSDB_DIR = System.getProperty("cassandra.rocksdb.dir", "/data/rocksdb");
