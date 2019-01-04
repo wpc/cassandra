@@ -201,15 +201,9 @@ public class RocksDBInstanceHandle
     // This generally make sense when majority of the partition key is not deleted
     private void setupMetaBloomFilter(String rocksDBTableDir) throws RocksDBException
     {
-        long dataNumOfKeys = Long.valueOf(rocksDB.getProperty(dataCfHandle, "rocksdb.estimate-num-keys"));
         long metaNumOfKeys = Long.valueOf(rocksDB.getProperty(metaCfHandle, "rocksdb.estimate-num-keys"));
         int bloomTotalBits = RocksDBConfigs.PARTITION_META_KEY_BLOOM_TOTAL_BITS;
 
-        if (dataNumOfKeys == 0)
-        {
-            logger.info("Skip partition meta bloom filter setup for {} since there is no data in data cf", rocksDBTableDir);
-            return;
-        }
         if (metaNumOfKeys > bloomTotalBits / 10)
         {
             logger.info("Skip partition meta bloom filter setup for {} since there are too many partition keys with" +
@@ -220,8 +214,8 @@ public class RocksDBInstanceHandle
         }
         long startTime = System.currentTimeMillis();
         partitionMetaData.enableBloomFilter(bloomTotalBits);
-        logger.info("Enabled partition meta key bloom filter for {} using {}ms, bloom_total_bits:{}",
-                    rocksDBTableDir, System.currentTimeMillis() - startTime, bloomTotalBits);
+        logger.info("Enabled partition meta key bloom filter for {}, loading {} keys using {}ms, bloom_total_bits:{}",
+                    rocksDBTableDir, metaNumOfKeys, System.currentTimeMillis() - startTime, bloomTotalBits);
     }
 
     private Integer getTokenLength(ColumnFamilyStore cfs)
@@ -253,7 +247,6 @@ public class RocksDBInstanceHandle
 
     public void merge(RocksCFName rocksCFName, WriteOptions writeOptions, byte[] key, byte[] value) throws RocksDBException
     {
-
         ColumnFamilyHandle cfHandle = getCfHandle(rocksCFName);
         rocksDB.merge(cfHandle, writeOptions, key, value);
     }
@@ -364,5 +357,10 @@ public class RocksDBInstanceHandle
     public void deleteParition(byte[] partitionKeyWithToken, int localDeletionTime, long markedForDeleteAt) throws RocksDBException
     {
         this.partitionMetaData.deletePartition(partitionKeyWithToken, localDeletionTime, markedForDeleteAt);
+    }
+
+    public void applyRawPartitionMetaData(byte[] key, byte[] value) throws RocksDBException
+    {
+        this.partitionMetaData.applyRaw(key, value);
     }
 }
