@@ -332,14 +332,18 @@ public class RocksDBInstanceHandle
     }
 
     public void clearSnapshot(String tag) {
-        String snapshotDir = getSnapshotPath();
+        String snapshotPath = getSnapshotPath();
         if (tag == null || tag.equals("")) {
             logger.info("Clearing all checkpoints for " + cfs.keyspace.getName());
-            FileUtils.deleteRecursive(new File(snapshotDir));
+
+            File snapshotDir = new File(snapshotPath);
+            if (snapshotDir.isDirectory()) {
+                FileUtils.deleteRecursive(snapshotDir);
+            }
         } else {
-            String checkpointPath = Paths.get(snapshotDir, tag).toString();
+            String checkpointPath = Paths.get(snapshotPath, tag).toString();
             File checkpoint = new File(checkpointPath);
-            if(FileUtils.isContained(new File(snapshotDir), checkpoint) && checkpoint.isDirectory())
+            if(FileUtils.isContained(new File(snapshotPath), checkpoint) && checkpoint.isDirectory())
             {
                 FileUtils.deleteRecursive(checkpoint);
                 logger.info("Clearing checkpoint [" + tag + "] for " + cfs.keyspace.getName() + " in " + checkpointPath);

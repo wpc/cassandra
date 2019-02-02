@@ -2927,15 +2927,12 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             tag = "";
 
         Set<String> keyspaces = new HashSet<>();
-        for (String dataDir : DatabaseDescriptor.getAllDataFileLocations())
+        for(String keyspace : Schema.instance.getKeyspaces())
         {
-            for(String keyspaceDir : new File(dataDir).list())
-            {
-                // Only add a ks if it has been specified as a param, assuming params were actually provided.
-                if (keyspaceNames.length > 0 && !Arrays.asList(keyspaceNames).contains(keyspaceDir))
-                    continue;
-                keyspaces.add(keyspaceDir);
-            }
+            // Only add a ks if it has been specified as a param, assuming params were actually provided.
+            if (keyspaceNames.length > 0 && !Arrays.asList(keyspaceNames).contains(keyspace))
+                continue;
+            keyspaces.add(keyspace);
         }
 
         for (String keyspace : keyspaces)
